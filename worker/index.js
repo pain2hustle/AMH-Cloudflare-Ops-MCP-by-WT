@@ -684,6 +684,24 @@ const SECURITY_HEADERS = {
   "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=()",
 };
 
+// The supplied WT landing is a self-contained bundle. It uses inline bootstrap
+// scripts and blob URLs to unpack its embedded fonts and images. Only the
+// landing asset receives this CSP; API and OAuth responses keep the stricter
+// default policy above.
+const WT_LANDING_CSP = [
+  "default-src 'self' blob: data:",
+  "script-src 'self' 'unsafe-inline' blob:",
+  "style-src 'self' 'unsafe-inline' blob:",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data: blob:",
+  "connect-src 'self'",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join("; ");
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
@@ -731,7 +749,7 @@ function renderLlmsText(origin) {
     "MCP endpoint: " + origin + "/mcp",
     "Connect Cloudflare: " + origin + "/oauth/cloudflare/start",
     "Agent Console: https://console.artificialmindhive.com/console",
-    "Project and examples: https://github.com/pain2hustle/cloudflare-ops-mcp",
+    "Project and examples: https://github.com/pain2hustle/AMH-Cloudflare-Ops-MCP-by-WT",
     "Walrus Tusk landing (legacy route name): https://artificialmindhive.com/WalrusTooth",
     "",
     "Capabilities: DNS inspection and guarded changes; SPF, DKIM, DMARC, BIMI; Email Routing; Pages cutovers; cache purge; Turnstile; scoped tokens; account diagnostics; MCP federation; SafeTry agent harness.",
@@ -748,7 +766,7 @@ function renderWalrusTuskMarkdown(origin) {
     "- Hosted MCP: " + origin + "/mcp",
     "- Connect with Cloudflare OAuth: " + origin + "/oauth/cloudflare/start",
     "- Live Agent Console: https://console.artificialmindhive.com/console",
-    "- Source, setup, examples, privacy, terms, and security: https://github.com/pain2hustle/cloudflare-ops-mcp",
+    "- Source, setup, examples, privacy, terms, and security: https://github.com/pain2hustle/AMH-Cloudflare-Ops-MCP-by-WT",
     "- Public brand landing (legacy route name): https://artificialmindhive.com/WalrusTooth",
     "",
     "Users authorize their own Cloudflare account. Walrus Tusk does not give users the owner's Cloudflare API token.",
@@ -793,7 +811,7 @@ function renderStatusHtml(info) {
       <p>DNS, Email Routing, DMARC, BIMI, Pages cutovers, cache purge, and Turnstile tools stay approval-gated. Every user connects through Cloudflare OAuth and receives a separate MCP connector key—never the owner's API token.</p>
       <div class="actions">
         <a class="btn primary" href="${start}">Connect Cloudflare</a>
-        <a class="btn" href="https://github.com/pain2hustle/cloudflare-ops-mcp">Setup &amp; examples</a>
+        <a class="btn" href="https://github.com/pain2hustle/AMH-Cloudflare-Ops-MCP-by-WT">Setup &amp; examples</a>
         <a class="btn" href="?format=json">View JSON</a>
       </div>
     </div>
@@ -812,6 +830,25 @@ function renderStatusHtml(info) {
 </body>
 </html>`;
 }
+
+async function renderWtLanding(request, env) {
+  if (!env.ASSETS || typeof env.ASSETS.fetch !== "function") return null;
+  const assetUrl = new URL("/WT-MCP-Root.html", request.url);
+  const assetRequest = new Request(assetUrl.toString(), { method: "GET", headers: request.headers });
+  const assetResponse = await env.ASSETS.fetch(assetRequest);
+  if (!assetResponse.ok || !assetResponse.body) return null;
+
+  const headers = new Headers(assetResponse.headers);
+  headers.set("content-type", "text/html; charset=utf-8");
+  headers.set("cache-control", "public, max-age=300");
+  headers.set("content-security-policy", WT_LANDING_CSP);
+  return new Response(assetResponse.body, {
+    status: assetResponse.status,
+    statusText: assetResponse.statusText,
+    headers,
+  });
+}
+
 async function fetchInner(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
 
@@ -841,6 +878,10 @@ async function fetchInner(request, env) {
         note: "Connect at /oauth/cloudflare/start, then POST MCP JSON-RPC to /mcp with your one-user connector key. Cloudflare tokens remain server-side.",
       };
       const wantsJson = url.searchParams.get("format") === "json" || /application\/json/i.test(request.headers.get("accept") || "");
+      if (url.pathname === "/" && !wantsJson && /text\/html/i.test(request.headers.get("accept") || "")) {
+        const landing = await renderWtLanding(request, env);
+        if (landing) return landing;
+      }
       if (!wantsJson && /text\/html/i.test(request.headers.get("accept") || "")) {
         return new Response(renderStatusHtml(info), { status: 200, headers: { "content-type": "text/html; charset=utf-8", ...CORS } });
       }

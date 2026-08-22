@@ -38,6 +38,27 @@ test("worker browser status page uses green OAuth connect UI", async () => {
   assert.match(html, /Per-user keys/i);
 });
 
+test("worker serves the AMH-only WT bundle at the browser root", async () => {
+  const expected = "<!doctype html><title>AMH Cloudflare Ops MCP by WT</title><a href='/oauth/cloudflare/start'>Connect Cloudflare</a>";
+  const requested = [];
+  const res = await worker.fetch(new Request("https://mcp.artificialmindhive.com/", {
+    headers: { accept: "text/html" },
+  }), {
+    ASSETS: {
+      fetch: async (request) => {
+        requested.push(new URL(request.url).pathname);
+        return new Response(expected, { headers: { "content-type": "text/html" } });
+      },
+    },
+  });
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(requested, ["/WT-MCP-Root.html"]);
+  assert.equal(await res.text(), expected);
+  assert.match(res.headers.get("content-security-policy"), /script-src[^;]*'unsafe-inline'[^;]*blob:/);
+  assert.doesNotMatch(expected, /nothingunseen/i);
+});
+
 test("worker publishes Walrus Tusk search and AI discovery resources", async () => {
   const origin = "https://mcp.artificialmindhive.com";
   const cases = [
