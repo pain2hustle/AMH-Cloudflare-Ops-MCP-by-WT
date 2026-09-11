@@ -32,7 +32,21 @@ if (!OP.url || !OP.key) {
   process.exit(1);
 }
 
+const CACHE_MS = Number(process.env.DASH_CACHE_MS || 20000);
+const cache = new Map(); // apiPath -> { at, out }
 async function proxy(apiPath, method = "GET", body) {
+  if (method === "GET" && !body) {
+    const hit = cache.get(apiPath);
+    if (hit && Date.now() - hit.at < CACHE_MS) return hit.out;
+    if (hit && hit.pending) return hit.pending;
+    const pending = proxyUncached(apiPath, method, body).then((out) => { cache.set(apiPath, { at: Date.now(), out }); return out; })
+      .catch((e) => { cache.delete(apiPath); throw e; });
+    cache.set(apiPath, { at: 0, out: hit ? hit.out : null, pending });
+    return pending;
+  }
+  return proxyUncached(apiPath, method, body);
+}
+async function proxyUncached(apiPath, method = "GET", body) {
   const res = await fetch(new URL(apiPath, OP.url), {
     method,
     headers: { "content-type": "application/json", "x-amh-internal-key": OP.key, "x-amh-actor": OP.actor },
@@ -125,7 +139,7 @@ function aiCalls(j,events){return (events||[]).filter(e=>e.job_id===j.id&&e.kind
 async function load(){
   let d;try{const r=await fetch('/d/dashboard');d=await r.json()}catch(e){$('sub').textContent='cannot reach harness: '+e.message;return}
   const u=d.usage||{};const used=u.daily_calls??u.calls??((u.primary_calls||0)+(u.verifier_calls||0));const lim=u.daily_limit??u.limit??8;
-  $('sub').textContent='live · auto-refresh 3s · local, no login · model lane: '+(u.profile||'free');
+  $('sub').textContent='live · auto-refresh 30s · local, no login · model lane: '+(u.profile||'free');
   const jobs=(d.jobs||[]).slice();
   // today stats
   $('today').innerHTML=[['n:'+used+' / '+lim,'AI calls today'],['n:'+(u.zero_ai_jobs??0),'zero-AI jobs'],['n:'+jobs.length,'jobs total'],['n:'+((d.agent_profiles||[]).length),'agents'],['n:'+((d.schedules||[]).length),'schedules']].map(s=>'<div class="stat"><div class="n">'+esc(s[0].slice(2))+'</div><div class="l">'+s[1]+'</div></div>').join('');
@@ -147,7 +161,7 @@ async function load(){
   fill('capCan',ct.can);fill('capNo',ct.cannot);fill('capEsc',ct.escalates_when);
   const lb=$('learned');lb.innerHTML='';(cat.learning_log||[]).forEach(l=>lb.insertAdjacentHTML('beforeend','<div class="agent"><div class="jobname">'+esc(l.added)+' <span class="pill">v'+esc(l.version||'')+'</span></div><div class="role">'+esc(l.meaning)+'</div></div>'));if(!(cat.learning_log||[]).length)lb.innerHTML='<span class="empty">No lessons yet.</span>';
 }
-load();setInterval(load,3000);
+load();setInterval(function(){if(!document.hidden)load()},30000);document.addEventListener('visibilitychange',function(){if(!document.hidden)load()});
 </script></body></html>`;
 
 const server = http.createServer(async (req, res) => {
