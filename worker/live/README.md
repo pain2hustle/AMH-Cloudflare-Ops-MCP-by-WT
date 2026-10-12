@@ -31,3 +31,9 @@ someone deployed since.
   - The last report is in KV `audit:last` and is shown by list_tokens.
   - mint_scoped_token policy was already allow (no policies set).
   - list_tokens/mint return 9109 until the hub token gets User → API Tokens → Edit.
+- 0.6.3 (2026-10-12): Cloudflare's official MCP is federated, and the token auditor is adjustable.
+  - **Federation:** mcp.cloudflare.com/mcp as `cf` (amh, token cfat_PZ99…) and `cfdoors` (austinsdoors1, cfut_oKK…). It covers the full CF API through docs/search/execute/whoami.
+  - **Ordering:** tools/list puts `cf__*`/`cfdoors__*` right after the native tools, because Grok keeps only about 45 tools.
+  - **`token_audit_settings {unused_days}`:** the auditor's default unused limit, stored in KV `cfg:unused_days` (default 7). Only admin keys can change it.
+  - **`mint_scoped_token` `keep_days`:** a per-token override, stored in the mint log.
+  - **Note:** `cf__execute` is the raw API, so the hub's artificialmindhive deploy guard does not apply to it. The landing guard and rollback are the safety net there.

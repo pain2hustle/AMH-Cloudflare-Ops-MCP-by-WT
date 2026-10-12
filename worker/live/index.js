@@ -2306,7 +2306,7 @@ async function runPagesDeployTool(name, args, client, altClient) {
 var SERVER = {
   name: "cloudflare-ops-mcp",
   title: "AMH Walrus Tusk Cloudflare Ops MCP \u2014 SafeTry Agent Harness",
-  version: "0.6.2"
+  version: "0.6.3"
 };
 var INDEXNOW_KEY = "d4f02a51e05cfee056bc027685262a64";
 var MGMT_TOOL_DEFS = [
@@ -2522,6 +2522,7 @@ var TOOLS = [
         ttl_seconds: { type: "number", description: "Lifetime in seconds. Default 3600; capped at 86400 unless confirm_long=true." },
         confirm_long: { type: "boolean", description: "Required to exceed the 24h TTL cap." },
         name: { type: "string", description: "Optional token label for the CF dashboard." },
+        keep_days: { type: "number", description: "How many days this token may sit unused before the auditor revokes it (1-365). Default = token_audit_settings unused_days." },
         apply: { type: "boolean", description: "Default false = dry-run." }
       },
       required: ["domain"]
@@ -2577,6 +2578,11 @@ var TOOLS = [
     }
   },
   ...PAGES_DEPLOY_TOOL_DEFS,
+  {
+    name: "token_audit_settings",
+    description: "Read or change the token auditor: unused_days = how long a hub-minted (cfops) token may sit unused before it is revoked (default 7). Admin keys can change it.",
+    inputSchema: { type: "object", properties: { unused_days: { type: "number", description: "1-365; omit to just read" } } }
+  },
   {
     name: "agent_research_start",
     description: "Delegate a bounded research, verification, zero-AI site-health, UI, Cloudflare diagnosis, inventory, data review, missed-items, or revision-proposal job to the private AMH WT coordinator. Returns immediately with job and memory hashes; the configured free lane or explicitly enabled paid K2 lane runs durably in the background.",
@@ -2651,6 +2657,17 @@ async function runHarnessTool(name, args, env, authContext) {
 __name(runHarnessTool, "runHarnessTool");
 async function runTool(name, args, env, authContext) {
   if (HARNESS_TOOLS.has(name)) return runHarnessTool(name, args, env, authContext);
+  if (name === "token_audit_settings") {
+    const kv = env.CLOUDFLARE_OPS_OAUTH;
+    if (!kv) return { error: "no KV" };
+    if (args.unused_days !== void 0) {
+      if (authContext?.mode !== "admin") return { error: "only an admin key can change this" };
+      const d = Math.floor(Number(args.unused_days));
+      if (!(d >= 1 && d <= 365)) return { error: "unused_days must be 1-365" };
+      await kv.put("cfg:unused_days", String(d));
+    }
+    return { unused_days: Number(await kv.get("cfg:unused_days")) || 7, last_audit: await kv.get("audit:last", "json") };
+  }
   const legacyTenant = authContext?.mode === "admin" ? String(args.tenant || "default").trim() || "default" : "default";
   const token = await getOAuthAccessToken(env, authContext, legacyTenant);
   if (!token) {
@@ -2676,7 +2693,7 @@ async function runTool(name, args, env, authContext) {
       });
       if (minted && minted.apply === true && minted.id && env.CLOUDFLARE_OPS_OAUTH) {
         const zoneId = await resolveZone2(client, domain).then((z) => z && z.id).catch(() => null);
-        await env.CLOUDFLARE_OPS_OAUTH.put(`mintlog:${minted.id}`, JSON.stringify({ id: minted.id, domain: minted.domain, zone_id: zoneId, preset: minted.preset, expires_on: minted.expires_on, at: new Date().toISOString(), actor: authContext?.connectionId || authContext?.mode || "unknown" }), { expirationTtl: 60 * 60 * 24 * 30 });
+        await env.CLOUDFLARE_OPS_OAUTH.put(`mintlog:${minted.id}`, JSON.stringify({ id: minted.id, domain: minted.domain, zone_id: zoneId, preset: minted.preset, expires_on: minted.expires_on, keep_days: Number(args.keep_days) >= 1 ? Math.min(365, Math.floor(Number(args.keep_days))) : null, at: new Date().toISOString(), actor: authContext?.connectionId || authContext?.mode || "unknown" }), { expirationTtl: 60 * 60 * 24 * 30 });
       }
       return minted;
     }
@@ -2823,7 +2840,9 @@ async function handleRpc(msg, env, authContext) {
       fed = [];
     }
     const isAdmin = authContext && authContext.mode === "admin";
-    return rpcResult(id, { tools: [...TOOLS, ...isAdmin ? MGMT_TOOL_DEFS : [], ...fed] });
+    // Connector apps (Grok) keep only the first ~45 tools, so the small, high-value upstreams go first.
+    const FIRST = /^(cf|cfdoors)__/;
+    return rpcResult(id, { tools: [...TOOLS, ...fed.filter((t) => FIRST.test(t.name)), ...isAdmin ? MGMT_TOOL_DEFS : [], ...fed.filter((t) => !FIRST.test(t.name))] });
   }
   if (method === "tools/call") {
     const toolName = params && params.name;
@@ -3183,6 +3202,8 @@ async function auditMintedTokens(env) {
   const token = env.CLOUDFLARE_API_TOKEN;
   if (!token) { report.errors.push("no CLOUDFLARE_API_TOKEN"); return report; }
   const client = new CloudflareClient({ token });
+  const unusedDays = Number(env.CLOUDFLARE_OPS_OAUTH && await env.CLOUDFLARE_OPS_OAUTH.get("cfg:unused_days")) || 7;
+  report.unused_days = unusedDays;
   let list = [];
   try {
     for (let page = 1; page <= 10; page++) {
@@ -3196,9 +3217,10 @@ async function auditMintedTokens(env) {
     report.checked++;
     let why = null;
     const log = env.CLOUDFLARE_OPS_OAUTH ? await env.CLOUDFLARE_OPS_OAUTH.get(`mintlog:${t.id}`, "json") : null;
+    const keep = (log && log.keep_days) || unusedDays;
     if (t.status === "expired" || (t.expires_on && Date.parse(t.expires_on) < Date.now())) why = "expired";
     else if (!t.expires_on) why = "no expiry";
-    else if (Date.now() - Date.parse(t.last_used_on || t.issued_on || 0) > 7 * 864e5) why = "unused 7 days";
+    else if (Date.now() - Date.parse(t.last_used_on || t.issued_on || 0) > keep * 864e5) why = `unused ${keep} days`;
     else if (!log) why = "no mint log entry";
     else {
       const res = (t.policies || []).flatMap((p) => Object.keys(p.resources || {}));
