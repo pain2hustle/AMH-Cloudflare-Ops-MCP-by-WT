@@ -2306,7 +2306,7 @@ async function runPagesDeployTool(name, args, client, altClient) {
 var SERVER = {
   name: "cloudflare-ops-mcp",
   title: "AMH Walrus Tusk Cloudflare Ops MCP \u2014 SafeTry Agent Harness",
-  version: "0.6.1"
+  version: "0.6.2"
 };
 var INDEXNOW_KEY = "d4f02a51e05cfee056bc027685262a64";
 var MGMT_TOOL_DEFS = [
@@ -2681,7 +2681,7 @@ async function runTool(name, args, env, authContext) {
       return minted;
     }
     case "list_tokens":
-      return { tokens: await listTokens(client), presets: Object.keys(TOKEN_PRESETS), last_audit: env.CLOUDFLARE_OPS_OAUTH ? await env.CLOUDFLARE_OPS_OAUTH.get("audit:last", "json") : null };
+      return { tokens: await listTokens(client), presets: Object.keys(TOKEN_PRESETS), last_audit: env.CLOUDFLARE_OPS_OAUTH ? await env.CLOUDFLARE_OPS_OAUTH.get("audit:last", "json") : null, this_week: env.CLOUDFLARE_OPS_OAUTH ? await env.CLOUDFLARE_OPS_OAUTH.get(`digest:${new Date(Date.now() - ((new Date().getUTCDay() + 6) % 7) * 864e5).toISOString().slice(0, 10)}`, "json") : null };
     case "revoke_token":
       return await revokeToken(client, String(args.token_id || "").trim(), { apply: args.apply === true });
     case "who_serves_domain":
@@ -3198,6 +3198,7 @@ async function auditMintedTokens(env) {
     const log = env.CLOUDFLARE_OPS_OAUTH ? await env.CLOUDFLARE_OPS_OAUTH.get(`mintlog:${t.id}`, "json") : null;
     if (t.status === "expired" || (t.expires_on && Date.parse(t.expires_on) < Date.now())) why = "expired";
     else if (!t.expires_on) why = "no expiry";
+    else if (Date.now() - Date.parse(t.last_used_on || t.issued_on || 0) > 7 * 864e5) why = "unused 7 days";
     else if (!log) why = "no mint log entry";
     else {
       const res = (t.policies || []).flatMap((p) => Object.keys(p.resources || {}));
@@ -3207,7 +3208,17 @@ async function auditMintedTokens(env) {
     try { await client.request("DELETE", `/user/tokens/${encodeURIComponent(t.id)}`); report.revoked.push({ id: t.id, name: t.name, why }); }
     catch (e) { report.errors.push(`revoke ${t.id}: ${String(e.message || e).slice(0, 120)}`); }
   }
-  if (env.CLOUDFLARE_OPS_OAUTH) await env.CLOUDFLARE_OPS_OAUTH.put("audit:last", JSON.stringify(report), { expirationTtl: 60 * 60 * 24 * 30 });
+  if (env.CLOUDFLARE_OPS_OAUTH) {
+    await env.CLOUDFLARE_OPS_OAUTH.put("audit:last", JSON.stringify(report), { expirationTtl: 60 * 60 * 24 * 30 });
+    const d = new Date(), monday = new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 864e5).toISOString().slice(0, 10);
+    const key = `digest:${monday}`;
+    const dg = (await env.CLOUDFLARE_OPS_OAUTH.get(key, "json")) || { week_of: monday, audits: 0, revoked: [], tokens: {} };
+    dg.audits++;
+    dg.revoked.push(...report.revoked.map((r) => ({ ...r, at: report.at })));
+    for (const t of list) if (/^cfops /.test(String(t.name || ""))) dg.tokens[t.id] = { name: t.name, issued_on: t.issued_on, last_used_on: t.last_used_on || null, expires_on: t.expires_on || null };
+    dg.revoked = dg.revoked.slice(-200);
+    await env.CLOUDFLARE_OPS_OAUTH.put(key, JSON.stringify(dg), { expirationTtl: 60 * 60 * 24 * 60 });
+  }
   console.log(JSON.stringify({ event: "token_audit", ...report }));
   return report;
 }
