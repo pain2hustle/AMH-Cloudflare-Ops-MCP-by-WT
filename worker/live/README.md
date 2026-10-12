@@ -24,3 +24,10 @@ someone deployed since.
   - Second account: secret `CLOUDFLARE_API_TOKEN_DOORS` (austinsdoors1), used for admin keys only.
   - artificialmindhive production is refused.
   - Tested end to end on a throwaway project (deploy, image, _redirects, list); the project was deleted after.
+- 0.6.1 (2026-10-12): token vending, via `inject-token-audit.cjs`.
+  - Every minted token is named `cfops …`, and each mint writes KV `mintlog:<id>`.
+  - `auditMintedTokens` revokes `cfops …` tokens that are expired, have no expiry, have no mint log, or reach beyond their zone. Austin's own tokens are never touched.
+  - It runs at most hourly, piggybacked on real traffic: the free plan's 5 cron slots on pain2hustle1 are all used.
+  - The last report is in KV `audit:last` and is shown by list_tokens.
+  - mint_scoped_token policy was already allow (no policies set).
+  - list_tokens/mint return 9109 until the hub token gets User → API Tokens → Edit.

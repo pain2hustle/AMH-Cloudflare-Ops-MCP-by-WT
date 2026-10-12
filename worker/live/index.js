@@ -1341,7 +1341,7 @@ async function mintScopedToken(client, opts = {}) {
   }
   const expiresOn = new Date(Date.now() + ttl * 1e3).toISOString().replace(/\.\d{3}Z$/, "Z");
   const body = {
-    name: name || `cfops ${preset} ${zone.name} (auto-expires)`,
+    name: "cfops " + (name ? String(name).replace(/^cfops\s*/i, "").slice(0, 80) : `${preset} ${zone.name} (auto-expires)`),
     policies: [
       {
         effect: "allow",
@@ -2306,7 +2306,7 @@ async function runPagesDeployTool(name, args, client, altClient) {
 var SERVER = {
   name: "cloudflare-ops-mcp",
   title: "AMH Walrus Tusk Cloudflare Ops MCP \u2014 SafeTry Agent Harness",
-  version: "0.6.0"
+  version: "0.6.1"
 };
 var INDEXNOW_KEY = "d4f02a51e05cfee056bc027685262a64";
 var MGMT_TOOL_DEFS = [
@@ -2664,8 +2664,8 @@ async function runTool(name, args, env, authContext) {
   const DOMAINLESS = /* @__PURE__ */ new Set(["list_tokens", "revoke_token", "account_doctor", "pages_branch_check"]);
   if (!domain && !DOMAINLESS.has(name)) return { error: "domain is required" };
   switch (name) {
-    case "mint_scoped_token":
-      return await mintScopedToken(client, {
+    case "mint_scoped_token": {
+      const minted = await mintScopedToken(client, {
         domain,
         preset: args.preset || "dns-zone",
         extra_groups: Array.isArray(args.extra_groups) ? args.extra_groups : [],
@@ -2674,8 +2674,14 @@ async function runTool(name, args, env, authContext) {
         name: args.name,
         apply: args.apply === true
       });
+      if (minted && minted.apply === true && minted.id && env.CLOUDFLARE_OPS_OAUTH) {
+        const zoneId = await resolveZone2(client, domain).then((z) => z && z.id).catch(() => null);
+        await env.CLOUDFLARE_OPS_OAUTH.put(`mintlog:${minted.id}`, JSON.stringify({ id: minted.id, domain: minted.domain, zone_id: zoneId, preset: minted.preset, expires_on: minted.expires_on, at: new Date().toISOString(), actor: authContext?.connectionId || authContext?.mode || "unknown" }), { expirationTtl: 60 * 60 * 24 * 30 });
+      }
+      return minted;
+    }
     case "list_tokens":
-      return { tokens: await listTokens(client), presets: Object.keys(TOKEN_PRESETS) };
+      return { tokens: await listTokens(client), presets: Object.keys(TOKEN_PRESETS), last_audit: env.CLOUDFLARE_OPS_OAUTH ? await env.CLOUDFLARE_OPS_OAUTH.get("audit:last", "json") : null };
     case "revoke_token":
       return await revokeToken(client, String(args.token_id || "").trim(), { apply: args.apply === true });
     case "who_serves_domain":
@@ -3169,8 +3175,50 @@ var RateLimiterDO = class {
     this.hits = null;
   }
 };
+// Token-vending auditor (hourly cron). Revokes hub-minted ("cfops …") tokens that have no mint log,
+// reach beyond the one zone they were minted for, have no expiry, or are already expired.
+// Tokens not named "cfops …" (Austin's own) are never read past the name and never touched.
+async function auditMintedTokens(env) {
+  const report = { at: new Date().toISOString(), checked: 0, revoked: [], kept: 0, errors: [] };
+  const token = env.CLOUDFLARE_API_TOKEN;
+  if (!token) { report.errors.push("no CLOUDFLARE_API_TOKEN"); return report; }
+  const client = new CloudflareClient({ token });
+  let list = [];
+  try {
+    for (let page = 1; page <= 10; page++) {
+      const { result } = await client.request("GET", `/user/tokens?per_page=50&page=${page}`);
+      list.push(...(result || []));
+      if (!result || result.length < 50) break;
+    }
+  } catch (e) { report.errors.push("list: " + String(e.message || e).slice(0, 160)); }
+  for (const t of list) {
+    if (!/^cfops /.test(String(t.name || ""))) continue;
+    report.checked++;
+    let why = null;
+    const log = env.CLOUDFLARE_OPS_OAUTH ? await env.CLOUDFLARE_OPS_OAUTH.get(`mintlog:${t.id}`, "json") : null;
+    if (t.status === "expired" || (t.expires_on && Date.parse(t.expires_on) < Date.now())) why = "expired";
+    else if (!t.expires_on) why = "no expiry";
+    else if (!log) why = "no mint log entry";
+    else {
+      const res = (t.policies || []).flatMap((p) => Object.keys(p.resources || {}));
+      if (!log.zone_id || res.some((r) => r !== `com.cloudflare.api.account.zone.${log.zone_id}`)) why = "scope beyond its zone";
+    }
+    if (!why) { report.kept++; continue; }
+    try { await client.request("DELETE", `/user/tokens/${encodeURIComponent(t.id)}`); report.revoked.push({ id: t.id, name: t.name, why }); }
+    catch (e) { report.errors.push(`revoke ${t.id}: ${String(e.message || e).slice(0, 120)}`); }
+  }
+  if (env.CLOUDFLARE_OPS_OAUTH) await env.CLOUDFLARE_OPS_OAUTH.put("audit:last", JSON.stringify(report), { expirationTtl: 60 * 60 * 24 * 30 });
+  console.log(JSON.stringify({ event: "token_audit", ...report }));
+  return report;
+}
+__name(auditMintedTokens, "auditMintedTokens");
 var index_default = {
-  async fetch(request, env) {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(auditMintedTokens(env).catch((e) => console.log(JSON.stringify({ event: "token_audit_failed", error: String(e && e.message || e).slice(0, 200) }))));
+  },
+  async fetch(request, env, ctx) {
+    // No cron slot left on the free plan: audit at most hourly, piggybacked on real traffic.
+    if (ctx && env.CLOUDFLARE_OPS_OAUTH) ctx.waitUntil(env.CLOUDFLARE_OPS_OAUTH.get("audit:last", "json").then((r) => (!r || Date.now() - Date.parse(r.at) > 36e5) ? auditMintedTokens(env) : null).catch(() => {}));
     try {
       return harden(await fetchInner(request, env));
     } catch (e) {
