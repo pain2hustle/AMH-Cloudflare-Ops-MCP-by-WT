@@ -1,4 +1,4 @@
-// github-tools.js — Austin's GitHub (pain2hustle/*) from the hub, no PC. Same tool names/shapes as
+// github-tools.js — Austin's GitHub (pain2hustle/* and pain2hustle1/*) from the hub, no PC. Same tool names/shapes as
 // the PC ops server (repo_list / repo_read / repo_commit_push / repo_open_pr) plus repo_search.
 // Writes are fenced in code, because the token itself is broad:
 //   - only branches grok/<name> or agent/<name>; never the default branch, never force, never delete a branch
@@ -6,6 +6,7 @@
 // Uses the git data API, so one call = one commit, however many files.
 
 var GH_OWNER = "pain2hustle";
+var GH_OWNERS = ["pain2hustle", "pain2hustle1"]; // Austin's two GitHub accounts (the token is a collaborator on pain2hustle1 repos)
 var GH_BRANCH_RE = /^(grok|agent)\/[A-Za-z0-9._-]{1,60}$/;
 var GH_MAX_FILES = 100, GH_MAX_BYTES = 20 * 1024 * 1024;
 
@@ -24,8 +25,9 @@ async function gh(env, method, path, body, accept) {
 function ghRepo(repo) {
   const s = String(repo || "").trim().replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, "");
   const name = s.includes("/") ? s.split("/") : [GH_OWNER, s];
-  if (name[0].toLowerCase() !== GH_OWNER || !/^[A-Za-z0-9._-]{1,100}$/.test(name[1])) throw new Error(`repo must be ${GH_OWNER}/<name>`);
-  return `${GH_OWNER}/${name[1]}`;
+  const owner = GH_OWNERS.find((o) => o === name[0].toLowerCase());
+  if (!owner || !/^[A-Za-z0-9._-]{1,100}$/.test(name[1])) throw new Error(`repo must be ${GH_OWNERS.join(" or ")}/<name>`);
+  return `${owner}/${name[1]}`;
 }
 function ghPath(p) {
   const s = String(p || "").replace(/\\/g, "/").replace(/^\/+/, "");
@@ -41,12 +43,12 @@ var ghEnc = (s) => s.split("/").map(encodeURIComponent).join("/");
 async function ghRepoList(env, args) {
   const out = [];
   for (let page = 1; page <= 5; page++) {
-    const r = await gh(env, "GET", `/user/repos?per_page=100&page=${page}&affiliation=owner&sort=pushed`);
+    const r = await gh(env, "GET", `/user/repos?per_page=100&page=${page}&affiliation=owner,collaborator&sort=pushed`);
     out.push(...r);
     if (r.length < 100) break;
   }
   const q = String(args.q || "").toLowerCase();
-  return { owner: GH_OWNER, repos: out.filter((r) => r.owner.login.toLowerCase() === GH_OWNER && (!q || (r.name + " " + (r.description || "")).toLowerCase().includes(q)))
+  return { owners: GH_OWNERS, repos: out.filter((r) => GH_OWNERS.includes(r.owner.login.toLowerCase()) && (!q || (r.name + " " + (r.description || "")).toLowerCase().includes(q)))
     .map((r) => ({ repo: r.full_name, private: r.private, default_branch: r.default_branch, pushed_at: r.pushed_at, description: r.description, url: r.html_url })) };
 }
 
@@ -138,7 +140,7 @@ async function ghOpenPr(env, args) {
   const repo = ghRepo(args.repo), branch = String(args.branch || "").trim();
   if (!GH_BRANCH_RE.test(branch)) throw new Error("branch must be grok/<name> or agent/<name>");
   const info = await gh(env, "GET", `/repos/${repo}`);
-  const open = await gh(env, "GET", `/repos/${repo}/pulls?state=open&head=${GH_OWNER}:${encodeURIComponent(branch)}`);
+  const open = await gh(env, "GET", `/repos/${repo}/pulls?state=open&head=${repo.split("/")[0]}:${encodeURIComponent(branch)}`);
   if (open.length) return { ok: true, existing: true, number: open[0].number, url: open[0].html_url };
   const pr = await gh(env, "POST", `/repos/${repo}/pulls`, { title: String(args.title || branch).slice(0, 200), head: branch, base: info.default_branch, body: String(args.body || "Opened by an agent through the cfops hub. Austin reviews and merges.").slice(0, 20000) });
   return { ok: true, number: pr.number, url: pr.html_url };
@@ -148,7 +150,7 @@ async function ghMergePr(env, args) {
   const repo = ghRepo(args.repo);
   let num = Number(args.number) || 0;
   if (!num && args.branch) {
-    const open = await gh(env, "GET", `/repos/${repo}/pulls?state=open&head=${GH_OWNER}:${encodeURIComponent(String(args.branch))}`);
+    const open = await gh(env, "GET", `/repos/${repo}/pulls?state=open&head=${repo.split("/")[0]}:${encodeURIComponent(String(args.branch))}`);
     if (!open.length) throw new Error("no open PR for that branch; repo_open_pr first");
     num = open[0].number;
   }
@@ -163,10 +165,10 @@ async function ghMergePr(env, args) {
 }
 
 var GITHUB_TOOL_DEFS = [
-  { name: "repo_list", description: "List Austin's GitHub repos (pain2hustle/*): default branch, last push, private flag. Optional q filters by name/description. No PC needed.",
+  { name: "repo_list", description: "List Austin's GitHub repos (pain2hustle/* and pain2hustle1/*): default branch, last push, private flag. Optional q filters by name/description. No PC needed.",
     inputSchema: { type: "object", properties: { q: { type: "string" } } } },
   { name: "repo_read", description: "Read a file (raw text) or list a folder from a pain2hustle repo at a branch/ref. Use find (+around) to get exact snippets, or offset/length for big files. No PC needed.",
-    inputSchema: { type: "object", properties: { repo: { type: "string", description: "pain2hustle/<name> or <name>" }, path: { type: "string" }, ref: { type: "string" }, find: { type: "string" }, around: { type: "number" }, offset: { type: "number" }, length: { type: "number" } }, required: ["repo"] } },
+    inputSchema: { type: "object", properties: { repo: { type: "string", description: "pain2hustle/<name>, pain2hustle1/<name>, or <name> (= pain2hustle)" }, path: { type: "string" }, ref: { type: "string" }, find: { type: "string" }, around: { type: "number" }, offset: { type: "number" }, length: { type: "number" } }, required: ["repo"] } },
   { name: "repo_search", description: "Search code inside one pain2hustle repo (GitHub code search). Returns matching file paths.",
     inputSchema: { type: "object", properties: { repo: { type: "string" }, query: { type: "string" } }, required: ["repo", "query"] } },
   { name: "repo_commit_push", description: "Commit to a grok/<name> (or agent/<name>) branch on GitHub in ONE commit, no PC. Branch is created from the default branch if new. files [{path, content, encoding?:'base64', delete?:true}] and/or edits [{path, find, replace}] applied to the branch's current file. Never touches the default branch, never force-pushes, never writes .github/.",
