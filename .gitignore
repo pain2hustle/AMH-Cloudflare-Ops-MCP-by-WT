@@ -13,3 +13,4 @@ cfopser-audit.log
 worker/.dev.vars
 .wrangler/
 dist/
+worker/live/*.bak-*

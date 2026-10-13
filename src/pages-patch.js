@@ -42,6 +42,26 @@ function pagesJsonBlocks(html) {
   return out;
 }
 
+// worker.checks: [{path, status, contains?}] — plus worker.expect_title on "/".
+async function pagesHealth(deployUrl, worker) {
+  const results = [];
+  const checks = [...(worker.expect_title ? [{ path: "/", status: 200, contains: `<title>${worker.expect_title}</title>` }] : []), ...(worker.checks || [])];
+  for (const c of checks) {
+    let got = null;
+    for (let i = 0; i < 6; i++) {
+      if (i) await new Promise((r) => setTimeout(r, 3000));
+      try {
+        const res = await fetch(new URL(c.path, deployUrl).toString(), { redirect: "follow" });
+        const body = await res.text();
+        got = { path: c.path, status: res.status, ok: res.status === (c.status || 200) && (!c.contains || body.includes(c.contains)) };
+      } catch (e) { got = { path: c.path, ok: false, error: String(e.message || e).slice(0, 100) }; }
+      if (got.ok) break;
+    }
+    results.push(got);
+  }
+  return { ok: results.length > 0 && results.every((x) => x.ok), results };
+}
+
 async function pagesReadFile(client, args) {
   const account = pagesAccount(args.account), project = pagesProject(args.project);
   const path = pagesPath(args.path);
@@ -69,11 +89,19 @@ async function pagesPatch(client, args, env, actor) {
   const branch = String(args.branch || p.production_branch || "main").trim();
   if (!/^[A-Za-z0-9._/-]{1,80}$/.test(branch)) throw new Error("bad branch");
   const production = branch === p.production_branch;
-  if (PAGES_PROTECTED.has(project) && production) return { error: `${project} production is not patchable yet (its live _worker can't be carried over by the API). Patch a preview branch, or ask Splice/Claude.` };
   const live = p.canonical_deployment;
   if (!live || !live.id) return { error: "project has no live production deployment to patch onto" };
   const { result: base } = await client.request("GET", `/accounts/${account}/pages/projects/${project}/deployments/${live.id}`);
-  if (base.uses_functions) return { error: `${project}'s live deployment runs Functions; a patch can't carry them over. Not patchable from here.` };
+  // Sites with server code (_worker / Functions): Cloudflare never returns the deployed worker, so the
+  // owner's deploy script stores the exact _worker.bundle wrangler uploaded, tagged with the deployment
+  // it went live as. A patch re-attaches it only if live is still that deployment (or one of our patches).
+  let worker = null;
+  if (base.uses_functions || PAGES_PROTECTED.has(project)) {
+    worker = env && env.CLOUDFLARE_OPS_OAUTH ? await env.CLOUDFLARE_OPS_OAUTH.get(`pages:worker:${account}:${project}`, "json") : null;
+    if (!worker || !worker.bundle_b64) return { error: `${project} runs server code and the hub has no saved worker bundle for it. The owner's deploy script must store it first.` };
+    const known = [worker.for_deployment, ...(worker.deployments || [])];
+    if (!known.includes(live.id)) return { error: `${project} live deployment (${live.id.slice(0, 8)}) is not the one the saved worker bundle belongs to (${String(worker.for_deployment).slice(0, 8)}). Someone deployed outside the hub; the owner must refresh it (npm run deploy in amh-hive). Nothing deployed.` };
+  }
   const manifest = { ...(base.files || {}) };
   if (!Object.keys(manifest).length) return { error: "Cloudflare returned an empty file list for the live deployment; refusing to patch" };
 
@@ -170,10 +198,29 @@ async function pagesPatch(client, args, env, actor) {
   if (args.commit_hash) form.append("commit_hash", String(args.commit_hash).slice(0, 64));
   form.append("commit_dirty", "true");
   for (const [name, text] of Object.entries(special)) form.append(name, new File([text], name, { type: "text/plain" }));
+  if (worker) {
+    form.append("_worker.bundle", new File([b64ToBytes(worker.bundle_b64)], "_worker.bundle"));
+    if (worker.routes) form.append("_routes.json", new File([worker.routes], "_routes.json"));
+  }
   const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/pages/projects/${project}/deployments`, { method: "POST", headers: { authorization: `Bearer ${client._token}` }, body: form });
   const j = await r.json().catch(() => ({}));
   if (!j.success) throw new Error(`create deployment failed: ${(j.errors && j.errors[0] && j.errors[0].message) || r.status}`);
   if (specialFromArgs) await pagesSpecialPut(env, account, project, special);
+
+  // Server-code sites: prove the new deployment still works (title + worker endpoints) or roll back.
+  if (worker && production) {
+    const health = await pagesHealth(j.result.url, worker);
+    if (!health.ok) {
+      let rolled = null;
+      try { await client.request("POST", `/accounts/${account}/pages/projects/${project}/deployments/${live.id}/rollback`); rolled = live.id; } catch (e) { rolled = "ROLLBACK FAILED: " + String(e.message || e).slice(0, 120); }
+      return { error: "health check failed after deploy; rolled back automatically", rolled_back_to: rolled, health, deployment: { id: j.result.id, url: j.result.url } };
+    }
+    worker.deployments = [...new Set([...(worker.deployments || []), worker.for_deployment, j.result.id])].slice(-50);
+    worker.for_deployment = j.result.id;
+    worker.updated_by_patch = new Date().toISOString();
+    await env.CLOUDFLARE_OPS_OAUTH.put(`pages:worker:${account}:${project}`, JSON.stringify(worker));
+    plan.health = health;
+  }
 
   // check each changed file on the new deployment's own URL (bypasses any proxy/cache in front of the domain)
   const checks = [];
@@ -211,7 +258,7 @@ async function pagesSaveSpecial(client, args, env) {
 var PAGES_PATCH_TOOL_DEFS = [
   { name: "pages_read_file", description: "Read the RAW text of one file exactly as the live production deployment serves it (no summarizer, no proxy). Use find to get the exact snippet(s) around a string; else returns content in chunks (offset/length). Read-only.",
     inputSchema: { type: "object", properties: { account: { type: "string" }, project: { type: "string" }, path: { type: "string", description: "e.g. insights.html" }, find: { type: "string" }, around: { type: "number", description: "chars of context each side (default 300)" }, offset: { type: "number" }, length: { type: "number" } }, required: ["account", "project", "path"] } },
-  { name: "pages_patch", description: "Change ONLY a few files on a live Pages site (no PC, no full file set). Best: edits [{path, find, replace}] — the hub fetches the live file, replaces the exact text (must match once), and deploys. Or files [{path, content}] for whole changed files. The hub copies the live deployment's file list, swaps in the changes (and removes any in delete), keeps _redirects/_headers, and deploys. Every other file stays exactly as live. Dry-run by default; apply=true deploys. branch = production branch goes LIVE, any other = preview. Returns rollback_hint. Not for artificialmindhive production or sites with Functions.",
+  { name: "pages_patch", description: "Change ONLY a few files on a live Pages site (no PC, no full file set). Best: edits [{path, find, replace}] — the hub fetches the live file, replaces the exact text (must match once), and deploys. Or files [{path, content}] for whole changed files. The hub copies the live deployment's file list, swaps in the changes (and removes any in delete), keeps _redirects/_headers, and deploys. Every other file stays exactly as live. Dry-run by default; apply=true deploys. branch = production branch goes LIVE, any other = preview. Returns rollback_hint. Sites with server code (artificialmindhive) re-attach the owner-saved worker bundle and get a title + API health check after deploy, with automatic rollback on failure.",
     inputSchema: { type: "object", properties: {
       account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1)" },
       project: { type: "string" }, branch: { type: "string", description: "default = production branch (LIVE)" },
