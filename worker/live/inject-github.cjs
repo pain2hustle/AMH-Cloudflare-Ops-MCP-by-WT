@@ -1,4 +1,4 @@
-// Injects src/github-tools.js into the live hub bundle (run after inject-pages-patch.cjs) -> 0.8.0.
+// Injects src/github-tools.js into the live hub bundle (run after inject-pages-patch.cjs) -> 0.8.1.
 const fs = require("fs"), path = require("path");
 const f = path.join(__dirname, "index.js");
 let s = fs.readFileSync(f, "utf8");
@@ -16,6 +16,6 @@ rep("      const namespaces = (await listUpstreams(env)).map((u) => u.namespace)
       }
       const namespaces = (await listUpstreams(env)).map((u) => u.namespace);
       const fed = isFederated(toolName, namespaces);`);
-s = s.replace(/version: "0\.7\.0"/, 'version: "0.8.0"');
+s = s.replace(/version: "0\.7\.0"/, 'version: "0.8.1"');
 fs.writeFileSync(f, s);
-console.log("injected github tools 0.8.0");
+console.log("injected github tools 0.8.1");

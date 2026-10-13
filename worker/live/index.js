@@ -2489,6 +2489,11 @@ async function pagesPatch(client, args, env, actor) {
   if (worker) {
     form.append("_worker.bundle", new File([b64ToBytes(worker.bundle_b64)], "_worker.bundle"));
     if (worker.routes) form.append("_routes.json", new File([worker.routes], "_routes.json"));
+    // anything else wrangler sent for this project (Functions routing config, wrangler config hash, ...)
+    for (const [name, part] of Object.entries(worker.extra || {})) {
+      if (part.file) form.append(name, new File([b64ToBytes(part.b64)], name));
+      else form.append(name, new TextDecoder().decode(b64ToBytes(part.b64)));
+    }
   }
   const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/pages/projects/${project}/deployments`, { method: "POST", headers: { authorization: `Bearer ${client._token}` }, body: form });
   const j = await r.json().catch(() => ({}));
@@ -2775,7 +2780,7 @@ async function runPagesDeployTool(name, args, client, altClient) {
 var SERVER = {
   name: "cloudflare-ops-mcp",
   title: "AMH Walrus Tusk Cloudflare Ops MCP \u2014 SafeTry Agent Harness",
-  version: "0.8.0"
+  version: "0.8.1"
 };
 var INDEXNOW_KEY = "d4f02a51e05cfee056bc027685262a64";
 var MGMT_TOOL_DEFS = [

@@ -20,7 +20,7 @@ rep("  if (PAGES_DEPLOY_TOOLS.has(name)) return await runPagesDeployTool(",
     } catch (e) { return { error: String((e && e.message) || e).slice(0, 600) }; }
   }
   if (PAGES_DEPLOY_TOOLS.has(name)) return await runPagesDeployTool(`);
-rep('version: "0.6.3"', 'version: "0.7.0"');
+rep('version: "0.6.3"', 'version: "0.8.1"');
 rep("A deploy replaces the whole site, so send every file.", "A deploy replaces the whole site, so send every file. To change only a few files on a live site use pages_patch (or pass patch=true with edits [{path,find,replace}] here).");
 rep("Details of one Pages deployment: url, branch, stages, commit message. Read-only.", "Details of one Pages deployment: url, branch, stages, commit message. Pass path (+ optional find) to read that file's RAW live text instead. Read-only.");
 fs.writeFileSync(f, s);
