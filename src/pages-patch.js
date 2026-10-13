@@ -17,6 +17,39 @@ async function pagesSpecialPut(env, account, project, special) {
   await env.CLOUDFLARE_OPS_OAUTH.put(`pages:special:${account}:${project}`, JSON.stringify({ ...special, saved: new Date().toISOString() }));
 }
 
+// Fetch one file as it is served by a deployment's own URL (no proxy, no custom-domain cache).
+// Pages 308s /x.html -> /x, so redirects are followed but must stay on the same page.
+async function pagesFetchLiveFile(deployUrl, path) {
+  const u = new URL(path, deployUrl);
+  const res = await fetch(u.toString(), { redirect: "follow" });
+  const landed = new URL(res.url || u.toString()).pathname.replace(/\/$/, "");
+  const want = path.replace(/\.html$/, "").replace(/\/index$/, "").replace(/\/$/, "");
+  if (res.status !== 200) throw new Error(`${path} returned ${res.status} on the live deployment`);
+  if (landed !== want && landed !== path) throw new Error(`${path} redirected to ${landed}; read that path instead`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+async function pagesReadFile(client, args) {
+  const account = pagesAccount(args.account), project = pagesProject(args.project);
+  const path = pagesPath(args.path);
+  const p = await pagesGetProject(client, account, project);
+  const live = p.canonical_deployment;
+  if (!live || !live.url) return { error: "no live production deployment" };
+  const text = new TextDecoder().decode(await pagesFetchLiveFile(live.url, path));
+  const out = { project, path, live_deployment: live.id, bytes: text.length };
+  const find = args.find != null ? String(args.find) : "";
+  if (find) {
+    const around = Math.min(Math.max(Number(args.around) || 300, 0), 4000);
+    const hits = [];
+    let i = text.indexOf(find);
+    while (i !== -1 && hits.length < 10) { hits.push({ at: i, snippet: text.slice(Math.max(0, i - around), i + find.length + around) }); i = text.indexOf(find, i + 1); }
+    let n = 0, j = text.indexOf(find); while (j !== -1) { n++; j = text.indexOf(find, j + 1); }
+    return { ...out, find, occurrences: n, hits };
+  }
+  const offset = Math.max(Number(args.offset) || 0, 0), length = Math.min(Math.max(Number(args.length) || 20000, 1), 60000);
+  return { ...out, offset, length, more: offset + length < text.length, content: text.slice(offset, offset + length) };
+}
+
 async function pagesPatch(client, args, env, actor) {
   const account = pagesAccount(args.account), project = pagesProject(args.project);
   const p = await pagesGetProject(client, account, project);
@@ -31,9 +64,29 @@ async function pagesPatch(client, args, env, actor) {
   const manifest = { ...(base.files || {}) };
   if (!Object.keys(manifest).length) return { error: "Cloudflare returned an empty file list for the live deployment; refusing to patch" };
 
-  const files = Array.isArray(args.files) ? args.files : [];
+  const files = Array.isArray(args.files) ? args.files.slice() : [];
+  const editLog = [];
+  const edits = Array.isArray(args.edits) ? args.edits : [];
+  if (edits.length) {
+    const byPath = new Map();
+    for (const e of edits) { const ep = pagesPath(e.path); if (!byPath.has(ep)) byPath.set(ep, []); byPath.get(ep).push(e); }
+    for (const [ep, list] of byPath) {
+      if (!manifest[ep]) throw new Error(`${ep} is not in the live site; send it in files to add it`);
+      let text = new TextDecoder().decode(await pagesFetchLiveFile(base.url, ep));
+      for (const e of list) {
+        const find = String(e.find ?? ""), repl = String(e.replace ?? "");
+        if (!find) throw new Error("each edit needs find (exact text from the live file)");
+        let n = 0, k = text.indexOf(find); while (k !== -1) { n++; k = text.indexOf(find, k + find.length); }
+        const want = e.count != null ? Number(e.count) : 1;
+        if (n !== want) throw new Error(`${ep}: find text occurs ${n} time(s), expected ${want}. Use pages_read_file with find to see the exact live text.`);
+        text = text.split(find).join(repl);
+        editLog.push({ path: ep, occurrences: n, find_chars: find.length, replace_chars: repl.length });
+      }
+      files.push({ path: ep, content: text });
+    }
+  }
   const deletes = (Array.isArray(args.delete) ? args.delete : []).map(pagesPath);
-  if (!files.length && !deletes.length) throw new Error("files: give ONLY the files you changed, as [{path, content}] or [{path, content_base64}]");
+  if (!files.length && !deletes.length) throw new Error("give edits [{path, find, replace}] (best) or files [{path, content}] with ONLY the changed files");
   if (files.length > PATCH_MAX_FILES) throw new Error(`too many files for a patch (max ${PATCH_MAX_FILES}); use pages_deploy for a full site`);
 
   const stored = await pagesSpecialGet(env, account, project);
@@ -63,7 +116,7 @@ async function pagesPatch(client, args, env, actor) {
   const plan = {
     project, account, branch, production, domains_affected: production ? p.domains : [],
     base_deployment: live.id, live_files: Object.keys(base.files || {}).length,
-    changed, deleted: deletes.filter((d) => manifest[d]), delete_not_found: missingDeletes,
+    changed, edits: editLog, deleted: deletes.filter((d) => manifest[d]), delete_not_found: missingDeletes,
     special_files: Object.keys(special), special_source: specialFromArgs ? "sent in this call" : "hub saved copy",
     rollback_hint: { tool: "pages_rollback", deployment_id: live.id },
   };
@@ -135,10 +188,13 @@ async function pagesSaveSpecial(client, args, env) {
 }
 
 var PAGES_PATCH_TOOL_DEFS = [
-  { name: "pages_patch", description: "Change ONLY a few files on a live Pages site (no PC, no full file set). The hub copies the live deployment's file list, swaps in the files you send (and removes any in delete), keeps _redirects/_headers, and deploys. Every other file stays exactly as live. Dry-run by default; apply=true deploys. branch = production branch goes LIVE, any other = preview. Returns rollback_hint. Not for artificialmindhive production or sites with Functions.",
+  { name: "pages_read_file", description: "Read the RAW text of one file exactly as the live production deployment serves it (no summarizer, no proxy). Use find to get the exact snippet(s) around a string; else returns content in chunks (offset/length). Read-only.",
+    inputSchema: { type: "object", properties: { account: { type: "string" }, project: { type: "string" }, path: { type: "string", description: "e.g. insights.html" }, find: { type: "string" }, around: { type: "number", description: "chars of context each side (default 300)" }, offset: { type: "number" }, length: { type: "number" } }, required: ["account", "project", "path"] } },
+  { name: "pages_patch", description: "Change ONLY a few files on a live Pages site (no PC, no full file set). Best: edits [{path, find, replace}] — the hub fetches the live file, replaces the exact text (must match once), and deploys. Or files [{path, content}] for whole changed files. The hub copies the live deployment's file list, swaps in the changes (and removes any in delete), keeps _redirects/_headers, and deploys. Every other file stays exactly as live. Dry-run by default; apply=true deploys. branch = production branch goes LIVE, any other = preview. Returns rollback_hint. Not for artificialmindhive production or sites with Functions.",
     inputSchema: { type: "object", properties: {
       account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1)" },
       project: { type: "string" }, branch: { type: "string", description: "default = production branch (LIVE)" },
+      edits: { type: "array", description: "exact find/replace on live files", items: { type: "object", properties: { path: { type: "string" }, find: { type: "string" }, replace: { type: "string" }, count: { type: "number", description: "expected matches, default 1" } }, required: ["path", "find", "replace"] } },
       files: { type: "array", description: "ONLY the changed/new files", items: { type: "object", properties: { path: { type: "string" }, content: { type: "string" }, content_base64: { type: "string" } }, required: ["path"] } },
       delete: { type: "array", items: { type: "string" }, description: "paths to remove from the site" },
       commit_message: { type: "string" }, apply: { type: "boolean" }, no_redirects: { type: "boolean" },
