@@ -157,7 +157,7 @@ async function pagesPatch(client, args, env, actor) {
   }
   if (total > PAGES_MAX_BYTES) throw new Error("patch over 60 MiB");
   if (!special._redirects && !special._headers && args.no_redirects !== true) {
-    return { error: `the hub has no saved _redirects/_headers for ${project}, and Cloudflare doesn't return them. Include them in files, or pass no_redirects=true if the site has none.` };
+    return { error: `the hub has no saved _redirects/_headers for ${project}, and Cloudflare doesn't return them. Fix (once per site): if the site's source is on GitHub, read its _redirects and _headers with repo_read and save them with pages_special_files (or include them in files). If you're not sure, ask the user. If the site has neither file, pass no_redirects=true.` };
   }
 
   const changed = entries.map((e) => ({ path: e.path, action: manifest[e.path] ? (manifest[e.path] === e.hash ? "same" : "replace") : "add", bytes: e.size }));

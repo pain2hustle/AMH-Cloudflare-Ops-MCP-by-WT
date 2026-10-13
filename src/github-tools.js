@@ -11,7 +11,7 @@ var GH_BRANCH_RE = /^(grok|agent)\/[A-Za-z0-9._-]{1,60}$/;
 var GH_MAX_FILES = 100, GH_MAX_BYTES = 20 * 1024 * 1024;
 
 async function gh(env, method, path, body, accept) {
-  if (!env.GITHUB_TOKEN) throw new Error("hub has no GITHUB_TOKEN secret");
+  if (!env.GITHUB_TOKEN) throw new Error("no GitHub token: add one at /setup");
   const r = await fetch(`https://api.github.com${path}`, {
     method,
     headers: { authorization: `Bearer ${env.GITHUB_TOKEN}`, accept: accept || "application/vnd.github+json", "user-agent": "amh-cfops-hub", "x-github-api-version": "2022-11-28", ...(body ? { "content-type": "application/json" } : {}) },
@@ -22,11 +22,14 @@ async function gh(env, method, path, body, accept) {
   if (!r.ok) { const e = new Error(`GitHub ${method} ${path.split("?")[0]}: ${r.status} ${j.message || ""}`.trim()); e.status = r.status; throw e; }
   return j;
 }
-function ghRepo(repo) {
+// owners/token can be overridden per request (WT user keys use their own GitHub token + login)
+function ghOwners(env) { return (env && env.GH_OWNERS_OVERRIDE) || GH_OWNERS; }
+function ghRepo(repo, env) {
+  const OWNERS = ghOwners(env);
   const s = String(repo || "").trim().replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, "");
-  const name = s.includes("/") ? s.split("/") : [GH_OWNER, s];
-  const owner = GH_OWNERS.find((o) => o === name[0].toLowerCase());
-  if (!owner || !/^[A-Za-z0-9._-]{1,100}$/.test(name[1])) throw new Error(`repo must be ${GH_OWNERS.join(" or ")}/<name>`);
+  const name = s.includes("/") ? s.split("/") : [OWNERS[0], s];
+  const owner = OWNERS.find((o) => o.toLowerCase() === name[0].toLowerCase());
+  if (!owner || !/^[A-Za-z0-9._-]{1,100}$/.test(name[1])) throw new Error(`repo must be ${OWNERS.join(" or ")}/<name>`);
   return `${owner}/${name[1]}`;
 }
 function ghPath(p) {
@@ -48,12 +51,13 @@ async function ghRepoList(env, args) {
     if (r.length < 100) break;
   }
   const q = String(args.q || "").toLowerCase();
-  return { owners: GH_OWNERS, repos: out.filter((r) => GH_OWNERS.includes(r.owner.login.toLowerCase()) && (!q || (r.name + " " + (r.description || "")).toLowerCase().includes(q)))
+  const OWNERS = ghOwners(env).map((o) => o.toLowerCase());
+  return { owners: ghOwners(env), repos: out.filter((r) => OWNERS.includes(r.owner.login.toLowerCase()) && (!q || (r.name + " " + (r.description || "")).toLowerCase().includes(q)))
     .map((r) => ({ repo: r.full_name, private: r.private, default_branch: r.default_branch, pushed_at: r.pushed_at, description: r.description, url: r.html_url })) };
 }
 
 async function ghRead(env, args) {
-  const repo = ghRepo(args.repo), path = ghPath(args.path || "");
+  const repo = ghRepo(args.repo, env), path = ghPath(args.path || "");
   const ref = args.ref ? `?ref=${encodeURIComponent(String(args.ref))}` : "";
   const meta = await gh(env, "GET", `/repos/${repo}/contents/${ghEnc(path)}${ref}`);
   if (Array.isArray(meta)) return { repo, path: path || "/", ref: args.ref || "default", entries: meta.map((e) => ({ name: e.name, path: e.path, type: e.type, size: e.size })) };
@@ -72,14 +76,14 @@ async function ghRead(env, args) {
 }
 
 async function ghSearch(env, args) {
-  const repo = ghRepo(args.repo), q = String(args.query || "").trim();
+  const repo = ghRepo(args.repo, env), q = String(args.query || "").trim();
   if (!q) throw new Error("query required");
   const r = await gh(env, "GET", `/search/code?per_page=20&q=${encodeURIComponent(q + " repo:" + repo)}`);
   return { repo, query: q, total: r.total_count, results: (r.items || []).map((x) => ({ path: x.path, url: x.html_url })) };
 }
 
 async function ghCommitPush(env, args, actor) {
-  const repo = ghRepo(args.repo), branch = String(args.branch || "").trim();
+  const repo = ghRepo(args.repo, env), branch = String(args.branch || "").trim();
   if (!GH_BRANCH_RE.test(branch)) throw new Error("branch must be grok/<name> or agent/<name>");
   const message = String(args.message || "").trim();
   if (!message) throw new Error("message required");
@@ -137,17 +141,17 @@ async function ghCommitPush(env, args, actor) {
 }
 
 async function ghOpenPr(env, args) {
-  const repo = ghRepo(args.repo), branch = String(args.branch || "").trim();
+  const repo = ghRepo(args.repo, env), branch = String(args.branch || "").trim();
   if (!GH_BRANCH_RE.test(branch)) throw new Error("branch must be grok/<name> or agent/<name>");
   const info = await gh(env, "GET", `/repos/${repo}`);
   const open = await gh(env, "GET", `/repos/${repo}/pulls?state=open&head=${repo.split("/")[0]}:${encodeURIComponent(branch)}`);
   if (open.length) return { ok: true, existing: true, number: open[0].number, url: open[0].html_url };
-  const pr = await gh(env, "POST", `/repos/${repo}/pulls`, { title: String(args.title || branch).slice(0, 200), head: branch, base: info.default_branch, body: String(args.body || "Opened by an agent through the cfops hub. Austin reviews and merges.").slice(0, 20000) });
+  const pr = await gh(env, "POST", `/repos/${repo}/pulls`, { title: String(args.title || branch).slice(0, 200), head: branch, base: info.default_branch, body: String(args.body || "Opened by an agent through the Walrus Tusk MCP hub. Review and merge.").slice(0, 20000) });
   return { ok: true, number: pr.number, url: pr.html_url };
 }
 
 async function ghMergePr(env, args) {
-  const repo = ghRepo(args.repo);
+  const repo = ghRepo(args.repo, env);
   let num = Number(args.number) || 0;
   if (!num && args.branch) {
     const open = await gh(env, "GET", `/repos/${repo}/pulls?state=open&head=${repo.split("/")[0]}:${encodeURIComponent(String(args.branch))}`);
