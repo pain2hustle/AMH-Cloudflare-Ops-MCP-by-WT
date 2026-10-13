@@ -158,7 +158,7 @@ function wtuToolDefs() {
     c.description = c.description.replace(/pain2hustle1?\/\*?(<name>)?/g, "your").replace(/Austin(['’]s)?/g, "your").replace(/amh \(pain2hustle1\) or doors \(austinsdoors1\)/g, "your account");
     return c;
   };
-  return [...WTU_EXTRA_DEFS, ...WTU_PAGES_TOOLS.map(pick), ...WTU_REPO_TOOLS.map(pick)].filter(Boolean).map(fix);
+  return [...WTU_EXTRA_DEFS, ...WTU_PAGES_TOOLS.map(pick), ...WTU_REPO_TOOLS.map(pick), ...AUTODEPLOY_TOOL_DEFS].filter(Boolean).map(fix);
 }
 function wtuAccount(creds, wanted) {
   const list = creds.cf_accounts || [];
@@ -201,6 +201,12 @@ async function wtuCallTool(name, args, env, authContext, origin) {
       const env2 = { ...env, GITHUB_TOKEN: creds.gh_token, GH_OWNERS_OVERRIDE: creds.gh_owners || [creds.gh_login] };
       return await runGithubTool(name, args, env2, `wtu:${authContext.userId}`);
     }
+    if (name === "site_autodeploy" || name === "site_autodeploy_status") {
+      if (!creds.gh_token) return { error: `site_autodeploy needs a GitHub token too. Add one at ${setup}` };
+      const env2 = { ...env, GITHUB_TOKEN: creds.gh_token, GH_OWNERS_OVERRIDE: creds.gh_owners || [creds.gh_login] };
+      if (name === "site_autodeploy_status") return await siteAutodeployStatus(env2, args);
+      return await siteAutodeploy(new CloudflareClient({ token: creds.cf_token }), creds.cf_token, wtuAccount(creds, args.account), env2, args);
+    }
     return { error: `${name} isn't available on user keys` };
   } catch (e) { return { error: String((e && e.message) || e).slice(0, 600) }; }
 }
@@ -227,7 +233,7 @@ b.style.display='none';o.innerHTML='<b class=ok>Your key (save it now, shown onc
   return head("Setup") + `
 <h1>Walrus <b>Tusk</b> setup</h1><p class="sub">Your tokens are encrypted and only ever used for your own accounts. You can delete them any time.</p>
 <div class="card"><h2>Cloudflare token</h2><ol><li>Open <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank">Cloudflare → API Tokens</a> → <b>Create Token</b> → <b>Custom token</b>.</li><li>Permissions: <b>Account → Cloudflare Pages → Edit</b>. Optional: <b>Zone → Analytics → Read</b>.</li><li>Account resources: your account. Create, then copy the token.</li></ol></div>
-<div class="card"><h2>GitHub token (optional)</h2><ol><li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">GitHub → Fine-grained token</a>.</li><li>Repository access: the repos you want your AI to edit.</li><li>Permissions: <b>Contents: Read and write</b>, <b>Pull requests: Read and write</b>.</li></ol><p class="sub" style="margin:8px 0 0">Your AI can then commit to <code>grok/…</code> or <code>agent/…</code> branches and open/merge PRs. It can't force-push, delete branches, or touch <code>.github/</code>.</p></div>
+<div class="card"><h2>GitHub token (optional)</h2><ol><li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">GitHub → Fine-grained token</a>.</li><li>Repository access: the repos you want your AI to edit.</li><li>Permissions: <b>Contents</b>, <b>Pull requests</b> → Read and write. For sites with server code also <b>Secrets</b>, <b>Workflows</b>, <b>Actions</b> → Read and write (used once, by auto-deploy setup).</li></ol><p class="sub" style="margin:8px 0 0">Your AI can then commit to <code>grok/…</code> or <code>agent/…</code> branches and open/merge PRs. It can't force-push, delete branches, or touch <code>.github/</code>.</p></div>
 <div class="card"><h2>Save</h2><label>Your Walrus Tusk key</label><input id="k" placeholder="wtu_…" autocomplete="off"><label>Cloudflare API token</label><input id="cf" type="password" autocomplete="off"><label>GitHub token (optional)</label><input id="gh" type="password" autocomplete="off"><button id="save">Check &amp; save</button><div id="res" class="out"></div></div>
 <script>const k=document.getElementById('k');k.value=(location.hash.slice(1)||(()=>{try{return localStorage.getItem('wtu')||''}catch(e){return''}})());
 document.getElementById('save').onclick=async()=>{const b=document.getElementById('save');b.disabled=true;b.textContent='Checking…';const r=await fetch('/setup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({key:k.value.trim(),cloudflare_token:document.getElementById('cf').value.trim(),github_token:document.getElementById('gh').value.trim()})});const j=await r.json();const o=document.getElementById('res');b.disabled=false;b.textContent='Check & save';

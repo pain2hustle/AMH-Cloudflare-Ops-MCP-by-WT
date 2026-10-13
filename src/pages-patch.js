@@ -98,7 +98,7 @@ async function pagesPatch(client, args, env, actor) {
   let worker = null;
   if (base.uses_functions || PAGES_PROTECTED.has(project)) {
     worker = env && env.CLOUDFLARE_OPS_OAUTH ? await env.CLOUDFLARE_OPS_OAUTH.get(`pages:worker:${account}:${project}`, "json") : null;
-    if (!worker || !worker.bundle_b64) return { error: `${project} runs server code and the hub has no saved worker bundle for it. The owner's deploy script must store it first.` };
+    if (!worker || !worker.bundle_b64) return { error: `${project} runs server code and the hub has no saved worker bundle for it, so it can't be patched in place. On a Walrus Tusk user key, run site_autodeploy once (deploys the site from its GitHub repo on every merge), then change it with repo_commit_push + repo_open_pr + repo_merge_pr.` };
     const known = [worker.for_deployment, ...(worker.deployments || [])];
     if (!known.includes(live.id)) return { error: `${project} live deployment (${live.id.slice(0, 8)}) is not the one the saved worker bundle belongs to (${String(worker.for_deployment).slice(0, 8)}). Someone deployed outside the hub; the owner must refresh it (npm run deploy in amh-hive). Nothing deployed.` };
   }
