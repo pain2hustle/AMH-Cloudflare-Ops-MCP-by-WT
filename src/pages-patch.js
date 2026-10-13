@@ -29,6 +29,19 @@ async function pagesFetchLiveFile(deployUrl, path) {
   return new Uint8Array(await res.arrayBuffer());
 }
 
+// JSON bodies of <script> tags (TradingView-style widget configs, ld+json, inline data).
+function pagesJsonBlocks(html) {
+  const out = [];
+  const re = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+  let m;
+  while ((m = re.exec(html))) {
+    const body = m[1].trim();
+    if (!/^[\[{]/.test(body)) continue;
+    try { JSON.parse(body); out.push({ ok: true }); } catch (e) { out.push({ ok: false, error: String(e.message || e).slice(0, 140) }); }
+  }
+  return out;
+}
+
 async function pagesReadFile(client, args) {
   const account = pagesAccount(args.account), project = pagesProject(args.project);
   const path = pagesPath(args.path);
@@ -81,6 +94,14 @@ async function pagesPatch(client, args, env, actor) {
         if (n !== want) throw new Error(`${ep}: find text occurs ${n} time(s), expected ${want}. Use pages_read_file with find to see the exact live text.`);
         text = text.split(find).join(repl);
         editLog.push({ path: ep, occurrences: n, find_chars: find.length, replace_chars: repl.length });
+      }
+      if (/\.html?$/i.test(ep)) {
+        const before = new TextDecoder().decode(await pagesFetchLiveFile(base.url, ep));
+        const broke = pagesJsonBlocks(before).filter((b) => b.ok).length - pagesJsonBlocks(text).filter((b) => b.ok).length;
+        if (broke > 0) {
+          const bad = pagesJsonBlocks(text).filter((b) => !b.ok).map((b) => b.error).slice(0, 3);
+          throw new Error(`${ep}: this edit breaks ${broke} JSON block(s) in <script> tags (e.g. a widget config). Nothing deployed. ${bad.join(" | ")}`);
+        }
       }
       files.push({ path: ep, content: text });
     }
