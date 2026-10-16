@@ -8,7 +8,7 @@
 
 <p align="center"><a href="https://artificialmindhive.com/WalrusTooth"><strong>🦣 Walrus Tusk home</strong></a> · <a href="https://artificialmindhive.com/wtfaq">FAQ</a> · <a href="https://artificialmindhive.com/wtdocs">Docs</a></p>
 
-# AMH Cloudflare Ops MCP by Walrus Tusk (WT)
+# Walrus Tusk (WT) — by Austin Little / Artificial Mind Hive
 
 **An approval-gated Cloudflare operations suite with an optional private Agent Harness: bounded delegation, deterministic verification, OAuth-isolated MCP tools, and verified deploy checks without handing agents raw account credentials.**
 
@@ -43,6 +43,21 @@ Cloudflare Ops MCP is especially useful for Cloudflare operators who need repeat
 > **No owner's API key in Git or in your client.** Public users authorize Cloudflare directly. OAuth access and refresh tokens stay server-side in KV; the connector key is stored only as a SHA-256 hash and is bound to one OAuth grant.
 
 ---
+
+## From your phone to a live site
+
+Created by **Austin Little / Artificial Mind Hive**. Start in a connected AI app, or use **[WALO](https://walohq.com/) and its configured WhatsApp route**. Shared jobs, handoffs and results are visible on the [WALO Agent Board](https://walohq.com/board/).
+
+<p><a href="https://walohq.com/"><img src="https://artificialmindhive.com/walo-logo.png" width="30" alt="WALO"></a> &nbsp; <img src="https://amhagentbook.com/poem/icons/grok.svg" width="22" alt="Grok / xAI"> Grok &nbsp; <img src="https://amhagentbook.com/poem/icons/claude.ico" width="22" alt="Claude / Anthropic"> Claude &nbsp; <img src="https://amhagentbook.com/poem/icons/chatgpt.ico" width="22" alt="OpenAI"> ChatGPT / Codex</p>
+
+- **AI app:** configured MCP client → WT Ops → authorized Cloudflare change → live verification.
+- **WhatsApp:** configured WALO connection → named agent task → WT Ops → result and task log.
+- **Git is optional for a direct Pages patch.** It can separately preserve source or wake a runner; direct publishing does not automatically commit source.
+- **PC off:** cloud-hosted jobs can run remotely. A local model, local CLI or local Blender job needs its host running.
+
+The owner’s recorded handoff test published [this page](https://amhagentbook.com/handoff-test/bridge-20261015/) through Grok and Codex, with Claude checks. Client support and account permissions vary; this is not a promise that every AI app supports every tool. Direct MCP calls do not automatically become WALO chat entries. Provider names identify compatibility/contributors, not endorsement. Grok and Groq are separate.
+
+Examples: change a heading and verify it live; fix code with a bounded review; generate an asset with an available image tool and publish it; add a sourced research note to [Prime Hunt](https://amhagentbook.com/poem/lab/prime-hunt/). Read the [phone workflow details](PHONE-TO-LIVE.md), [Superposition](https://amhagentbook.com/poem/), and [AMH Academy](https://artificialmindhive.com/academy/).
 
 ## What Cloudflare Ops MCP handles
 
