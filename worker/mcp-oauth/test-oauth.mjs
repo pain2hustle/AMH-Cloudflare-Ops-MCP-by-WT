@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { build } from 'esbuild';
+globalThis.Cloudflare={compatibilityFlags:{global_fetch_strictly_public:true}};
+await build({entryPoints:['mcp-oauth.mjs'],outfile:'test-bundle.mjs',bundle:true,format:'esm',platform:'node',plugins:[{name:'runtime-stub',setup(b){b.onResolve({filter:/^cloudflare:workers$/},()=>({path:'stub',namespace:'stub'}));b.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:'export class WorkerEntrypoint {}'}));}}]});
+const {createOAuthWorker,ORIGIN,RESOURCE}=await import('./test-bundle.mjs?'+Date.now());
+const values=new Map();
+const kv={async get(k,o){const v=values.get(k);if(!v||v.exp<Date.now())return null;return (o==='json'||o?.type==='json')?JSON.parse(v.data):v.data;},async put(k,v,o={}){values.set(k,{data:v,exp:o.expirationTtl?Date.now()+o.expirationTtl*1000:Infinity});},async delete(k){values.delete(k)},async list(o={}){return{keys:[...values.keys()].filter(k=>k.startsWith(o.prefix||'')).map(name=>({name})),list_complete:true,cursor:''}}};
+let enabled=true;
+const valid=new Set(['owner-test-key','wtu_tenant-test-key']);
+const authorize=async(e,k)=>({ok:enabled&&valid.has(k),mode:k==='owner-test-key'?'admin':'user'});
+const legacy={async fetch(r,e){const k=(r.headers.get('authorization')||'').replace(/^Bearer /,'');return Response.json({legacy:true,mode:k==='owner-test-key'?'admin':'user'},{status:(await authorize(e,k)).ok?200:401})}};
+const worker=createOAuthWorker(legacy,authorize), env={CLOUDFLARE_OPS_OAUTH:kv};
+const call=(path,init={})=>worker.fetch(new Request(path.startsWith('http')?path:ORIGIN+path,init),env,{waitUntil(p){p.catch(()=>{})}});
+const post=(path,body,headers={})=>call(path,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded',...headers},body:new URLSearchParams(body)});
+const expectStatus=async(r,status)=>{assert.equal(r.status,status,await r.clone().text());return r;};
+const discovery=await(await call('/.well-known/oauth-protected-resource/mcp')).json();assert.equal(discovery.resource,RESOURCE);
+const metadata=await(await call('/.well-known/oauth-authorization-server')).json();assert.equal(metadata.issuer,ORIGIN);assert.ok(metadata.code_challenge_methods_supported.includes('S256'));assert.equal(metadata.client_id_metadata_document_supported,true);
+let r=await expectStatus(await call('/mcp',{method:'POST',body:'{}'}),401);assert.match(r.headers.get('www-authenticate'),/resource_metadata/);
+for(const target of [ORIGIN+'/mcp','https://cloudflare-ops-mcp.pain2hustle1.workers.dev/mcp'])await expectStatus(await call(target,{method:'POST',headers:{authorization:'Bearer owner-test-key'},body:'{}'}),200);
+await expectStatus(await call('/mcp?key=owner-test-key',{method:'POST',body:'{}'}),200);
+async function register(){r=await expectStatus(await call('/oauth/register',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({client_name:'AMH test <script>',redirect_uris:['https://chatgpt.com/connector_platform_oauth_redirect'],token_endpoint_auth_method:'none',grant_types:['authorization_code','refresh_token'],response_types:['code']})}),201);return r.json();}
+const client=await register();
+const verifier='x'.repeat(64),challenge=Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier))).toString('base64url');
+const params={response_type:'code',client_id:client.client_id,redirect_uri:client.redirect_uris[0],scope:'wt:operate offline_access',resource:RESOURCE,state:'test-state',code_challenge:challenge,code_challenge_method:'S256'};
+async function begin(overrides={}){return call('/oauth/authorize?'+new URLSearchParams({...params,...overrides}));}
+async function consent(){const response=await expectStatus(await begin(),200);const html=await response.text();assert.ok(!html.includes('test <script>'));assert.ok(html.includes('chatgpt.com'));return{cookie:response.headers.getSetCookie().map(c=>c.split(';')[0]).join('; '),handle:html.match(/name="handle" value="([^"]+)"/)[1]};}
+async function approve(c,key='owner-test-key'){return post('/oauth/authorize',{handle:c.handle,key,decision:'approve'},{origin:ORIGIN,cookie:c.cookie});}
+let consentState=await consent();await expectStatus(await approve({...consentState,cookie:''}),400);
+consentState=await consent();await expectStatus(await approve(consentState,'bad-key'),401);
+await expectStatus(await post('/oauth/authorize',{handle:consentState.handle,key:'owner-test-key',decision:'approve'},{origin:'https://attacker.test',cookie:consentState.cookie}),403);
+r=await expectStatus(await approve(consentState),302);const callback=new URL(r.headers.get('location'));assert.equal(callback.searchParams.get('state'),'test-state');assert.equal(callback.searchParams.get('iss'),ORIGIN);assert.ok(!callback.href.includes('owner-test-key'));
+await expectStatus(await approve(consentState),400);
+const code=callback.searchParams.get('code');
+const exchange={grant_type:'authorization_code',client_id:client.client_id,code,redirect_uri:params.redirect_uri,resource:RESOURCE,code_verifier:verifier};
+await expectStatus(await post('/oauth/token',{...exchange,code_verifier:'y'.repeat(64)}),400);
+await expectStatus(await post('/oauth/token',{...exchange,resource:'https://attacker.test/mcp'}),400);
+r=await expectStatus(await post('/oauth/token',exchange),200);const tokens=await r.json();assert.ok(tokens.access_token&&tokens.refresh_token);
+await expectStatus(await call('/mcp',{method:'POST',headers:{authorization:'Bearer '+tokens.access_token},body:'{}'}),200);
+assert.ok(!JSON.stringify([...values]).includes('owner-test-key'),'Connector key must only be stored encrypted');
+r=await expectStatus(await post('/oauth/token',{grant_type:'refresh_token',refresh_token:tokens.refresh_token,client_id:client.client_id,resource:RESOURCE}),200);const refreshed=await r.json();assert.ok(refreshed.access_token);
+enabled=false;await expectStatus(await call('/mcp',{method:'POST',headers:{authorization:'Bearer '+refreshed.access_token},body:'{}'}),401);
+await expectStatus(await post('/oauth/token',{grant_type:'refresh_token',refresh_token:refreshed.refresh_token,client_id:client.client_id,resource:RESOURCE}),400);enabled=true;
+const replayConsent=await consent();const replayRedirect=await approve(replayConsent);const replayCode=new URL(replayRedirect.headers.get('location')).searchParams.get('code');
+await expectStatus(await post('/oauth/token',{...exchange,code:replayCode}),200);
+await expectStatus(await post('/oauth/token',{...exchange,code:replayCode}),400);
+const bad=await begin({redirect_uri:'https://attacker.test/steal'});assert.equal(bad.status,400);assert.equal(bad.headers.get('location'),null);
+const plain=await begin({code_challenge_method:'plain'});assert.ok([302,400].includes(plain.status));
+const denied=await consent();r=await expectStatus(await post('/oauth/authorize',{handle:denied.handle,decision:'deny'},{origin:ORIGIN,cookie:denied.cookie}),302);assert.equal(new URL(r.headers.get('location')).searchParams.get('error'),'access_denied');
+await expectStatus(await call('/oauth/register',{method:'POST',body:'x'.repeat(17000)}),413);
+assert.ok([...values.keys()].every(k=>k.startsWith('mcp-oauth-v1:')));
+fs.writeFileSync('tests.json',JSON.stringify({passed:true,checks:['discovery','DCR','S256','consent and CSRF','exact redirect URI','resource audience','encrypted keys','one-use code','refresh','revoked underlying key','legacy bearer and query key','Workers alias','deny','bounded body','namespace isolation']},null,2));
+console.log('PASS: OAuth flow, refresh, security cases, and legacy connections.');

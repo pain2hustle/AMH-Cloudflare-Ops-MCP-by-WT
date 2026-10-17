@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "checks": [
+    "discovery",
+    "DCR",
+    "S256",
+    "consent and CSRF",
+    "exact redirect URI",
+    "resource audience",
+    "encrypted keys",
+    "one-use code",
+    "refresh",
+    "revoked underlying key",
+    "legacy bearer and query key",
+    "Workers alias",
+    "deny",
+    "bounded body",
+    "namespace isolation"
+  ]
+}

@@ -1,3 +1,5 @@
+> **2026-10-17 OAuth update:** index.js is now built by ../mcp-oauth/build.mjs from the recovered production baseline and the OAuth wrapper. See [MCP OAuth](../mcp-oauth/README.md). Preserve this wrapper and the global_fetch_strictly_public compatibility flag in subsequent releases.
+
 # Live hub bundle (what mcp.artificialmindhive.com actually runs)
 
 `index.js` here is the exact code deployed to the `cloudflare-ops-mcp` Worker (pain2hustle1).
