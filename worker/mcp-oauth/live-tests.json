@@ -1,0 +1,14 @@
+{
+  "discovery": true,
+  "phoneConsent": true,
+  "chatgptCIMD": true,
+  "codeExchange": true,
+  "oauthInitialize": true,
+  "tools": 97,
+  "legacyToolsUnchanged": true,
+  "workerAlias": true,
+  "refresh": true,
+  "testGrantRevoked": true,
+  "landingPreserved": true,
+  "setupPreserved": true
+}

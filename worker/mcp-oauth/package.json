@@ -1,0 +1,19 @@
+{
+  "name": "amh-mcp-oauth-20261017",
+  "version": "1.0.0",
+  "description": "ChatGPT-compatible OAuth layer for the existing AMH Walrus Tusk MCP",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test-oauth.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "^1.2.3",
+    "@cloudflare/workers-types": "^5.20261016.1",
+    "esbuild": "^0.28.2"
+  },
+  "private": true
+}
