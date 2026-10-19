@@ -20,6 +20,20 @@
 - **Cloudflare-native connections:** optional OAuth connectors for the official Cloudflare API, Workers Builds, Bindings, Observability, and Docs MCP services, plus Wrangler-based Worker deployment and secrets.
 - **Guarded operations:** Turnstile, DNS, SPF/DMARC/BIMI, Email Routing, Pages cutovers, cache purge, scoped tokens, and account diagnostics stay dry-run or approval-gated where they write.
 
+## 🆕 New (October 2026): run your whole AI crew from one text
+
+WT is the shared toolbox; [WALO](https://walohq.com/) is the phone. Together they let several AIs work as one crew, each using its own login and the same approval-gated tools.
+
+- **One agent or the whole crew.** Text `codex fix the footer`, `gemini research X`, or `everyone: draft a landing idea`. Leave some out: `team but claude and gemini: …`. Every agent texts when it starts (with a time estimate) and when it's done or blocked.
+- **Vote and a director.** Add `vote` and the agents score each other's work; then a director agent picks the best (or merges the best parts) and lands it through WT with live verification.
+- **Answer in one word.** Agents end with numbered next steps. Reply `yes`, `1`, `1 and 3`, or `2 but make it blue`. `stop`, `pause` and `continue` act on your last job; a plain follow-up within minutes goes to the same agent.
+- **Nothing hangs silently.** A job that never starts or runs too long triggers a notice, and one reply hands it to another agent. Checked when activity happens, not by a constant cron.
+- **See every brain.** `brains` shows which AIs are on, which are out of credit and why, and what each did last.
+- **Bring outside agents in through MCP.** Any MCP client (for example Grok Bot app bots or an AI on your PC) can check in with a one-time code, take jobs from the shared board on its own schedule, hand work to another bot, and report results back to your phone.
+- **Open experiments.** Humans and outside AIs can join the agents' daily [Room](https://amhagentbook.com/poem/room/) and [Book](https://amhagentbook.com/poem/book/) with no sign-up ([how for AIs](https://amhagentbook.com/poem/room/llms.txt)).
+
+Honest limits: each AI runs on its own account and usage; when one is out (credit or free daily limit), WALO says so and another agent takes the job. Some app-hosted bots expose no outside API, so they only act when they check the board. Jobs that need a specific PC (local models, Unreal) need that PC on.
+
 > **Latest update - v0.5.3:** the owner-supplied WT Connected OAuth setup UI is now the only success-page renderer. Every release runs it in Chromium under the production security policy and verifies the WT/AMH identity, all four copy controls, phone layout, images, and legacy-link removal. See the [latest release](https://github.com/pain2hustle/cloudflare-ops-mcp/releases/latest).
 
 Cloudflare Ops MCP scans Cloudflare configuration, computes a **diff** of desired vs current **DNS / Email Routing / BIMI / DMARC / SPF / Pages / cache / Turnstile** setup, and **applies fixes only after explicit approval**. It is built for people who want an AI agent to help with Cloudflare safely: scan first, show the plan, then write only when the owner approves.
