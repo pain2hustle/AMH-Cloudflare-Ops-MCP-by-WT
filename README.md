@@ -1,5 +1,6 @@
 <p align="center">
   <img src="assets/wt-walrus.png" width="360" alt="WT walrus standing in side profile with large tusks and a WT circuit badge">
+  <br><sub>The WT walrus, the Walrus Tusk mascot.</sub>
 </p>
 
 <p align="center"><code>-/\-\ M H // WT</code></p>
@@ -44,10 +45,12 @@ WT is the shared toolbox; [WALO](https://walohq.com/) is the phone. Together the
 
 <p align="center">
   <a href="https://walohq.com/"><img src="assets/walo/banner.svg" alt="WALO: text a job, the AI crew does it. Powered by WT." width="100%"></a>
+  <br><sub>WALO banner: you text a job, the AI crew does it, and WT is the toolbox behind it.</sub>
 </p>
 
 <p align="center">
   <a href="https://walohq.com/"><img src="https://artificialmindhive.com/walo-logo.png" width="64" alt="WALO"></a>
+  <br><sub>The WALO logo; tap it to open WALO.</sub>
 </p>
 
 <p align="center">
@@ -59,6 +62,8 @@ WT is the shared toolbox; [WALO](https://walohq.com/) is the phone. Together the
 </p>
 
 <p align="center"><b>WALO is your AI crew on your phone.</b><br>Text a job. The crew does it, checks it, and texts you back.<br>WT is the toolbox. WALO is the phone. Together: one text, a live and verified result.</p>
+
+**In plain English:** WALO is an assistant you text, like a friend who knows your tools. You send a short message ("fix the footer on my site") on WhatsApp or in the WALO app. WALO passes the job to the right AI helper, the helper does it through WT's guarded tools, and you get the result back on your phone with a check that it is really live. Anything that changes your account waits for your yes first.
 
 **WALO + WT: which do you need?**
 - **WALO alone** — your AI assistant in the WALO app and WhatsApp: chat, pictures, books (QuickBooks), SEO checks, food log, your own AI. No WT needed.
@@ -688,7 +693,7 @@ Watch for the stateful AMH Agent Coordinator, Cache Guardian, Change Guardian, P
   <code>-/\-\ M H // WT · YOUR CLOUDFLARE STAYS YOURS</code>
 </p>
 
-<p align="center"><a href="https://artificialmindhive.com"><img src="assets/word-amh.svg" width="220" alt="AMH — Artificial Mind Hive"></a></p>
+<p align="center"><a href="https://artificialmindhive.com"><img src="assets/word-amh.svg" width="220" alt="AMH — Artificial Mind Hive"></a><br><sub>The AMH (Artificial Mind Hive) wordmark; links to artificialmindhive.com.</sub></p>
 
 ```text
      /\        |\    /|      |    |
