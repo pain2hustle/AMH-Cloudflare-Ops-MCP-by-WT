@@ -645,6 +645,8 @@ MIT (c) 2026 Service Pricer LLC — AMH, Artificial Mind Hive. Authored and main
 
 Watch for the stateful AMH Agent Coordinator, Cache Guardian, Change Guardian, Playwright phone/UI checks, and allowlisted Wrangler doctor, deployment, log, rollback, binding, and storage-health tools. The execution rule stays the same: **check → diff → approve → apply → verify**.
 
+<p align="center"><img src="assets/in-tusk-we-trust.webp" width="420" alt="Stained-glass walrus praying: In Tusk We Trust"></p>
+
 <p align="center">
   <img src="assets/wt-walrus.png" width="180" alt="WT walrus logo">
   <br>
