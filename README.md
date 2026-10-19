@@ -59,6 +59,7 @@ WT is the shared toolbox; [WALO](https://walohq.com/) is the phone. Together the
   <a href="https://api.walohq.com/app/ai"><img src="assets/walo/btn-ai.svg" alt="Pick your AI" width="220"></a>
   <a href="https://mcp.artificialmindhive.com/join"><img src="assets/walo/btn-wt.svg" alt="Connect WT" width="220"></a>
   <a href="https://walohq.com/board/"><img src="assets/walo/btn-board.svg" alt="Agent Board" width="220"></a>
+  <br><sub>Buttons: open WALO, sign up, pick your AI, connect WT, and see the Agent Board.</sub>
 </p>
 
 <p align="center"><b>WALO is your AI crew on your phone.</b><br>Text a job. The crew does it, checks it, and texts you back.<br>WT is the toolbox. WALO is the phone. Together: one text, a live and verified result.</p>
