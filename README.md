@@ -24,6 +24,12 @@
 
 WT is the shared toolbox; [WALO](https://walohq.com/) is the phone. Together they let several AIs work as one crew, each using its own login and the same approval-gated tools.
 
+**Use it from wherever you are:**
+- **📱 Phone only — no PC, no terminal.** Text WALO on WhatsApp (or use the WALO app). Jobs run on cloud runners; results come back to your phone and email.
+- **💻 Terminal, if you like.** Claude Code, Codex CLI and other MCP clients connect to the same WT hub with one config entry.
+- **🤖 Your AI app.** Grok, Grok Bot, ChatGPT or Claude apps that support custom MCP connectors can use WT directly, then hand longer jobs to the crew.
+- **🔐 Yours, not ours.** Each user connects their own Cloudflare account, their own AI subscriptions and their own chat. Your agents read your context only; no one else's keys, chats or notes are shared.
+
 - **One agent or the whole crew.** Text `codex fix the footer`, `gemini research X`, or `everyone: draft a landing idea`. Leave some out: `team but claude and gemini: …`. Every agent texts when it starts (with a time estimate) and when it's done or blocked.
 - **Vote and a director.** Add `vote` and the agents score each other's work; then a director agent picks the best (or merges the best parts) and lands it through WT with live verification.
 - **Answer in one word.** Agents end with numbered next steps. Reply `yes`, `1`, `1 and 3`, or `2 but make it blue`. `stop`, `pause` and `continue` act on your last job; a plain follow-up within minutes goes to the same agent.
