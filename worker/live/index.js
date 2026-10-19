@@ -6012,10 +6012,10 @@ async function inboxPut(env, t) {
 async function inboxGet(env, id) {
   if (!/^[a-z0-9]+-[0-9a-f]{8}$/.test(String(id || ""))) throw new Error("bad task id");
   const t = await env.CLOUDFLARE_OPS_OAUTH.get(`task:${id}`, "json");
-  if (!t) throw new Error("no such task (done tasks expire after 90 days)");
+  if (!t) throw new Error("no such task");
   return t;
 }
-var inboxView = (t) => ({ id: t.id, to: t.to, from: t.from, status: t.status, text: t.text, created: t.created, claimed_by: t.claimed_by || null, claimed: t.claimed || null, finished: t.finished || null, result: t.result || null, notify: !!t.notify });
+var inboxView = (t) => ({ id: t.id, to: t.to, from: t.from, status: t.status, text: t.text, created: t.created, claimed_by: t.claimed_by || null, claimed: t.claimed || null, finished: t.finished || null, result: t.result || null, notify: !!t.notify, ...(t.receipt_only ? {receipt_only: true, details_removed_at: t.details_removed_at} : {}) });
 async function inboxNotify(env, t) {
   try {
     const out = await callFederated(env, "walo", "walo_notify", { template: "ping", text: `Task ${t.id} ${t.status} by ${t.claimed_by || t.to}: ${String(t.text).slice(0, 80)}` });
@@ -6041,26 +6041,81 @@ async function inboxDurableCall(name, args, env, who) {
   if (name === "finish_task" && out.ok && out.task.notify) Object.assign(out, await inboxNotify(env, out.task));
   return out;
 }
+// WALO task detail retention: owner chose seven days on 2026-10-19.
+var INBOX_DETAIL_MS = 7 * 86400000;
+function inboxCompactTask(t, now = Date.now()) {
+  if (t.receipt_only || t.status !== 'done') return t;
+  const finished = Date.parse(t.finished);
+  if (!Number.isFinite(finished) || now - finished < INBOX_DETAIL_MS) return t;
+  const result = String(t.result || '');
+  // Legacy runners sometimes called a handoff or approval 'done'. Preserve
+  // these until a reviewer explicitly resolves the missing deliverable.
+  if (/not done|not complete|needs approval|awaiting approval|still pending|handed (?:off|to)|handoff:|couldn.t|could not|blocked/i.test(result)) return t;
+  const report = result.split(/Phone report:\s*/i).pop().replace(/\s+/g, ' ').trim();
+  const usage = result.match(/^\[usage\][^\n]{0,160}/m)?.[0] || '';
+  const links = [...new Set(result.match(/https?:\/\/[^\s<>"']+/g) || [])]
+    .filter(link => !/[?&](?:token|key|signature|sig|code)=/i.test(link)).slice(0, 4).map(link => link.slice(0, 300));
+  return {
+    id: t.id, to: t.to, from: t.from, status: t.status, created: t.created,
+    claimed_by: t.claimed_by || null, claimed: t.claimed || null, finished: t.finished,
+    text: String(t.text || '').replace(/\s+/g, ' ').slice(0, 160),
+    result: (usage ? usage + '\n' : '') + report.slice(0, 600) + (links.length ? '\nEvidence: ' + links.join(' ') : ''),
+    notify: !!t.notify, receipt_only: true, details_removed_at: new Date(now).toISOString()
+  };
+}
+async function inboxRetentionSweep(storage, now = Date.now()) {
+  return storage.transaction(async tx => {
+    const previous = await tx.get('board:retention') || {};
+    if (previous.next > now) return previous;
+    const entries = await tx.list({prefix: 'board:task:', limit: 200, ...(previous.cursor ? {startAfter: previous.cursor} : {})});
+    let compacted = 0;
+    for (const [key, entry] of entries) {
+      const task = inboxCompactTask(entry.task, now);
+      // Clear the old expiry on every record: unresolved work must not expire.
+      if (task !== entry.task || entry.expires != null) await tx.put(key, {task, expires: null});
+      if (task !== entry.task) compacted++;
+    }
+    const cursor = entries.size === 200 ? [...entries.keys()].pop() : null;
+    const status = {detail_days: 7, last_sweep: new Date(now).toISOString(), compacted: (previous.compacted || 0) + compacted,
+      cursor, next: now + (cursor ? 60000 : 86400000)};
+    await tx.put('board:retention', status);
+    return status;
+  });
+}
+async function inboxScheduleBoard(state) {
+  const retention = await state.storage.get('board:retention');
+  const migration = await state.storage.get('board:meta');
+  const next = Math.min(retention?.next || Date.now() + 1000,
+    migration?.migration === 'pending' ? migration.next : Infinity);
+  const alarm = await state.storage.getAlarm();
+  if (alarm == null || alarm > next) await state.storage.setAlarm(next);
+}
+async function inboxBoardAlarm(state, env, meta) {
+  try {
+    await inboxRetentionSweep(state.storage);
+    await inboxBoardMigrationAlarm(state, env, meta);
+  } finally {
+    await inboxScheduleBoard(state);
+  }
+}
+
 function inboxBoardKV(storage) {
   return {
     async get(key2) {
       const entry = await storage.get("board:" + key2);
       if (!entry) return null;
-      if (entry.expires <= Date.now()) {
-        await storage.delete("board:" + key2);
-        return null;
-      }
-      return entry.task;
+      const task = inboxCompactTask(entry.task);
+      if (task !== entry.task || entry.expires != null) await storage.put("board:" + key2, {task, expires: null});
+      return task;
     },
     async put(key2, value, options) {
-      await storage.put("board:" + key2, { task: JSON.parse(value), expires: Date.now() + options.expirationTtl * 1e3 });
+      await storage.put("board:" + key2, { task: JSON.parse(value), expires: null });
     },
     async list() {
       const entries = await storage.list({ prefix: "board:task:" });
       const keys = [];
       for (const [key2, entry] of entries) {
-        if (entry.expires > Date.now()) keys.push({ name: key2.slice(6) });
-        else await storage.delete(key2);
+        keys.push({ name: key2.slice(6) });
       }
       return { keys, list_complete: true };
     }
@@ -6071,13 +6126,11 @@ async function inboxImport(storage, tasks) {
     if (!task || !/^[a-z0-9]+-[0-9a-f]{8}$/.test(task.id)) continue;
     const key2 = "board:task:" + task.id;
     if (await storage.get(key2)) continue;
-    const stamp = Date.parse(task.finished || task.claimed || task.created);
-    const expires = stamp + INBOX_TTL * 1e3;
-    if (expires > Date.now()) await storage.put(key2, { task, expires });
+    await storage.put(key2, { task: inboxCompactTask(task), expires: null });
   }
 }
 async function inboxBoardInit(state, env) {
-  if (await state.storage.get("board:meta")) return;
+  if (await state.storage.get("board:meta")) { await inboxScheduleBoard(state); return; }
   const tasks = await Promise.all(INBOX_LEGACY_IDS.map((id) => env.CLOUDFLARE_OPS_OAUTH.get("task:" + id, "json")));
   await state.storage.transaction(async (tx) => {
     if (await tx.get("board:meta")) return;
@@ -6091,7 +6144,7 @@ async function inboxBoardInit(state, env) {
     });
   });
   const meta = await state.storage.get("board:meta");
-  if (meta.migration === "pending" && !await state.storage.getAlarm()) await state.storage.setAlarm(meta.next);
+  await inboxScheduleBoard(state);
 }
 async function inboxBoardFetch(request, state, env) {
   const body = await request.json();
@@ -6111,11 +6164,12 @@ async function inboxBoardFetch(request, state, env) {
   if (body.name === "list_tasks" || body.name === "my_tasks") {
     const meta = await state.storage.get("board:meta");
     out.storage = "durable-object";
+    out.retention = {detail_days: 7, unresolved_expire: false, receipts: "compact", ...(await state.storage.get("board:retention") || {}), next_alarm: await state.storage.getAlarm()};
     out.legacy_history = { status: meta.migration, pages: meta.pages, next: meta.next || null };
   }
   return Response.json(out);
 }
-async function inboxBoardAlarm(state, env, meta) {
+async function inboxBoardMigrationAlarm(state, env, meta) {
   if (meta.migration !== "pending") return;
   if (Date.now() < meta.next) {
     await state.storage.setAlarm(meta.next);
