@@ -653,6 +653,8 @@ Watch for the stateful AMH Agent Coordinator, Cache Guardian, Change Guardian, P
   <code>-/\-\ M H // WT · YOUR CLOUDFLARE STAYS YOURS</code>
 </p>
 
+<p align="center"><a href="https://artificialmindhive.com"><img src="assets/word-amh.svg" width="220" alt="AMH — Artificial Mind Hive"></a></p>
+
 ```text
      /\        |\    /|      |    |
     /--\       | \  / |      |----|

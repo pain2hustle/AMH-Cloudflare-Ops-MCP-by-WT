@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="120" viewBox="0 0 240 120" role="img" aria-label="AMH">
+<style>text{font:900 80px 'Arial Black','Segoe UI Black','Segoe UI',Helvetica,Arial,sans-serif;fill:#ffd08a;stroke:#f5a524;stroke-width:2.5;filter:url(#g);animation:p 2.8s ease-in-out infinite}@keyframes p{0%,100%{opacity:1}50%{opacity:.72}}</style>
+<defs><filter id="g" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="5" result="b"/><feFlood flood-color="#f5a524"/><feComposite in2="b" operator="in"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<text x="120" y="90" text-anchor="middle" textLength="210" lengthAdjust="spacingAndGlyphs">AMH</text></svg>
