@@ -7,7 +7,7 @@
 
 <p align="center"><sub><strong>WT WALRUS TUSK</strong></sub></p>
 
-<p align="center"><a href="https://walohq.com/"><img src="https://artificialmindhive.com/walo-logo.png" width="22" alt="WALO" align="absmiddle"> <strong>WALO</strong></a> · <a href="https://artificialmindhive.com/WalrusTooth"><strong>🦣 Walrus Tusk home</strong></a> · <a href="https://artificialmindhive.com/wtfaq">FAQ</a> · <a href="https://artificialmindhive.com/wtdocs">Docs</a></p>
+<p align="center"><a href="https://walohq.com/"><img src="https://artificialmindhive.com/walo-logo.png" width="22" alt="WALO" align="absmiddle"> <strong>WALO</strong></a> · <a href="https://artificialmindhive.com/WalrusTooth"><strong>🦣 Walrus Tusk home</strong></a> · <a href="https://artificialmindhive.com/wtfaq">FAQ</a> · <a href="https://artificialmindhive.com/wtdocs">Docs</a> · <a href="https://walohq.com/board/">Agent Board</a></p>
 
 # Walrus Tusk (WT) — by Austin Little / Artificial Mind Hive
 
@@ -26,17 +26,9 @@
   <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-ready-5A4FCF" alt="MCP ready"></a>
   <a href="#safety-model-the-whole-point"><img src="https://img.shields.io/badge/writes-approval--gated-2EA44F" alt="Approval-gated writes"></a>
   <a href="https://walohq.com/"><img src="https://img.shields.io/badge/WhatsApp-via%20WALO-25D366?logo=whatsapp&logoColor=white" alt="WhatsApp via WALO"></a>
-  <a href="https://github.com/pain2hustle/cloudflare-ops-mcp/releases/latest"><img src="https://img.shields.io/badge/release-v0.5.3-0969DA" alt="Latest release v0.5.3"></a>
+  <a href="https://github.com/pain2hustle/AMH-Cloudflare-Ops-MCP-by-WT/releases/latest"><img src="https://img.shields.io/badge/release-v0.5.3-0969DA" alt="Latest release v0.5.3"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT license"></a>
   <a href="https://artificialmindhive.com/wtdocs"><img src="https://img.shields.io/badge/docs-WT-0A66C2" alt="WT docs"></a>
-</p>
-
-<p align="center">
-  <a href="https://walohq.com/"><img src="https://artificialmindhive.com/walo-logo.png" width="22" alt="WALO logo" align="absmiddle"> <strong>WALO</strong></a> &nbsp;·&nbsp;
-  <a href="https://artificialmindhive.com/WalrusTooth"><img src="assets/wt-walrus.png" width="22" alt="Walrus Tusk logo" align="absmiddle"> <strong>Walrus Tusk home</strong></a> &nbsp;·&nbsp;
-  <a href="https://walohq.com/board/"><strong>📋 Agent Board</strong></a> &nbsp;·&nbsp;
-  <a href="https://walohq.com/go/"><strong>✨ Sign up</strong></a>
-  <br><sub>Quick links: WALO (the phone), Walrus Tusk (the toolbox), the Agent Board (shared jobs) and WALO sign-up.</sub>
 </p>
 
 ## 🆕 New (October 2026): run your whole AI crew from one text
@@ -46,11 +38,6 @@ WT is the shared toolbox; [WALO](https://walohq.com/) is the phone. Together the
 <p align="center">
   <a href="https://walohq.com/"><img src="assets/walo/banner.svg" alt="WALO: text a job, the AI crew does it. Powered by WT." width="100%"></a>
   <br><sub>WALO banner: you text a job, the AI crew does it, and WT is the toolbox behind it.</sub>
-</p>
-
-<p align="center">
-  <a href="https://walohq.com/"><img src="https://artificialmindhive.com/walo-logo.png" width="64" alt="WALO"></a>
-  <br><sub>The WALO logo; tap it to open WALO.</sub>
 </p>
 
 <p align="center">
@@ -93,7 +80,7 @@ WT is the shared toolbox; [WALO](https://walohq.com/) is the phone. Together the
 
 Honest limits: each AI runs on its own account and usage; when one is out (credit or free daily limit), WALO says so and another agent takes the job. Some app-hosted bots expose no outside API, so they only act when they check the board. Jobs that need a specific PC (local models, Unreal) need that PC on.
 
-> **Latest update - v0.5.3:** the owner-supplied WT Connected OAuth setup UI is now the only success-page renderer. Every release runs it in Chromium under the production security policy and verifies the WT/AMH identity, all four copy controls, phone layout, images, and legacy-link removal. See the [latest release](https://github.com/pain2hustle/cloudflare-ops-mcp/releases/latest).
+> **Latest update - v0.5.3:** the owner-supplied WT Connected OAuth setup UI is now the only success-page renderer. Every release runs it in Chromium under the production security policy and verifies the WT/AMH identity, all four copy controls, phone layout, images, and legacy-link removal. See the [latest release](https://github.com/pain2hustle/AMH-Cloudflare-Ops-MCP-by-WT/releases/latest).
 
 Cloudflare Ops MCP scans Cloudflare configuration, computes a **diff** of desired vs current **DNS / Email Routing / BIMI / DMARC / SPF / Pages / cache / Turnstile** setup, and **applies fixes only after explicit approval**. It is built for people who want an AI agent to help with Cloudflare safely: scan first, show the plan, then write only when the owner approves.
 
