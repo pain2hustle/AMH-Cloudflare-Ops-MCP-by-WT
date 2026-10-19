@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" role="img" aria-label="WALO: text a job, the AI crew does it. Powered by WT.">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#06122b"/><stop offset="1" stop-color="#0b3a4a"/></linearGradient>
+<linearGradient id="a" x1="0" x2="1"><stop offset="0" stop-color="#25d366"/><stop offset="1" stop-color="#4fc3f7"/></linearGradient></defs>
+<rect width="1200" height="420" rx="28" fill="url(#g)"/>
+<g fill="#ffffff" opacity=".7"><circle cx="90" cy="60" r="2"/><circle cx="300" cy="350" r="2"/><circle cx="520" cy="40" r="1.5"/><circle cx="1100" cy="90" r="2"/><circle cx="980" cy="370" r="1.5"/><circle cx="760" cy="60" r="1.5"/></g>
+<rect x="60" y="60" width="300" height="300" rx="44" fill="#0a1f3f" stroke="url(#a)" stroke-width="5"/>
+<rect x="105" y="100" width="210" height="150" rx="26" fill="#25d366"/>
+<path d="M140 250 L130 292 L180 250 Z" fill="#25d366"/>
+<text x="210" y="196" font-family="Arial,Helvetica,sans-serif" font-size="52" font-weight="800" fill="#06122b" text-anchor="middle">text it.</text>
+<g fill="#4fc3f7"><circle cx="140" cy="326" r="11"/><circle cx="190" cy="326" r="11"/><circle cx="240" cy="326" r="11"/><circle cx="290" cy="326" r="11"/></g>
+<text x="420" y="170" font-family="Arial,Helvetica,sans-serif" font-size="128" font-weight="900" fill="url(#a)">WALO</text>
+<text x="424" y="240" font-family="Arial,Helvetica,sans-serif" font-size="44" font-weight="700" fill="#ffffff">Text a job. The AI crew does it.</text>
+<text x="424" y="300" font-family="Arial,Helvetica,sans-serif" font-size="32" fill="#bfe9ff">Your phone  →  WALO  →  WT tools  →  done and verified</text>
+<text x="424" y="352" font-family="Arial,Helvetica,sans-serif" font-size="26" fill="#8fb3c9">WhatsApp · web app · Agent Board</text>
+</svg>

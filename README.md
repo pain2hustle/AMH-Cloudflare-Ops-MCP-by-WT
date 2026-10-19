@@ -24,7 +24,23 @@
 
 WT is the shared toolbox; [WALO](https://walohq.com/) is the phone. Together they let several AIs work as one crew, each using its own login and the same approval-gated tools.
 
-<p><a href="https://walohq.com/"><img src="https://artificialmindhive.com/walo-logo.png" width="44" alt="WALO"></a></p>
+<p align="center">
+  <a href="https://walohq.com/"><img src="assets/walo/banner.svg" alt="WALO: text a job, the AI crew does it. Powered by WT." width="100%"></a>
+</p>
+
+<p align="center">
+  <a href="https://walohq.com/"><img src="https://artificialmindhive.com/walo-logo.png" width="64" alt="WALO"></a>
+</p>
+
+<p align="center">
+  <a href="https://walohq.com/"><img src="assets/walo/btn-walo.svg" alt="WALO" width="220"></a>
+  <a href="https://walohq.com/go/"><img src="assets/walo/btn-signup.svg" alt="Sign up for WALO" width="220"></a>
+  <a href="https://api.walohq.com/app/ai"><img src="assets/walo/btn-ai.svg" alt="Pick your AI" width="220"></a>
+  <a href="https://mcp.artificialmindhive.com/join"><img src="assets/walo/btn-wt.svg" alt="Connect WT" width="220"></a>
+  <a href="https://walohq.com/board/"><img src="assets/walo/btn-board.svg" alt="Agent Board" width="220"></a>
+</p>
+
+<p align="center"><b>WALO is your AI crew on your phone.</b><br>Text a job. The crew does it, checks it, and texts you back.<br>WT is the toolbox. WALO is the phone. Together: one text, a live and verified result.</p>
 
 **WALO + WT: which do you need?**
 - **WALO alone** — your AI assistant in the WALO app and WhatsApp: chat, pictures, books (QuickBooks), SEO checks, food log, your own AI. No WT needed.
