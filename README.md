@@ -20,6 +20,24 @@
 - **Cloudflare-native connections:** optional OAuth connectors for the official Cloudflare API, Workers Builds, Bindings, Observability, and Docs MCP services, plus Wrangler-based Worker deployment and secrets.
 - **Guarded operations:** Turnstile, DNS, SPF/DMARC/BIMI, Email Routing, Pages cutovers, cache purge, scoped tokens, and account diagnostics stay dry-run or approval-gated where they write.
 
+<p align="center">
+  <a href="https://developers.cloudflare.com/"><img src="https://img.shields.io/badge/Cloudflare-native-F38020?logo=cloudflare&logoColor=white" alt="Cloudflare-native"></a>
+  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-ready-5A4FCF" alt="MCP ready"></a>
+  <a href="#safety-model-the-whole-point"><img src="https://img.shields.io/badge/writes-approval--gated-2EA44F" alt="Approval-gated writes"></a>
+  <a href="https://walohq.com/"><img src="https://img.shields.io/badge/WhatsApp-via%20WALO-25D366?logo=whatsapp&logoColor=white" alt="WhatsApp via WALO"></a>
+  <a href="https://github.com/pain2hustle/cloudflare-ops-mcp/releases/latest"><img src="https://img.shields.io/badge/release-v0.5.3-0969DA" alt="Latest release v0.5.3"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT license"></a>
+  <a href="https://artificialmindhive.com/wtdocs"><img src="https://img.shields.io/badge/docs-WT-0A66C2" alt="WT docs"></a>
+</p>
+
+<p align="center">
+  <a href="https://walohq.com/"><img src="https://artificialmindhive.com/walo-logo.png" width="22" alt="WALO logo" align="absmiddle"> <strong>WALO</strong></a> &nbsp;·&nbsp;
+  <a href="https://artificialmindhive.com/WalrusTooth"><img src="assets/wt-walrus.png" width="22" alt="Walrus Tusk logo" align="absmiddle"> <strong>Walrus Tusk home</strong></a> &nbsp;·&nbsp;
+  <a href="https://walohq.com/board/"><strong>📋 Agent Board</strong></a> &nbsp;·&nbsp;
+  <a href="https://walohq.com/go/"><strong>✨ Sign up</strong></a>
+  <br><sub>Quick links: WALO (the phone), Walrus Tusk (the toolbox), the Agent Board (shared jobs) and WALO sign-up.</sub>
+</p>
+
 ## 🆕 New (October 2026): run your whole AI crew from one text
 
 WT is the shared toolbox; [WALO](https://walohq.com/) is the phone. Together they let several AIs work as one crew, each using its own login and the same approval-gated tools.
