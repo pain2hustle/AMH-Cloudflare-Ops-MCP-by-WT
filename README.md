@@ -97,7 +97,7 @@ Cloudflare Ops MCP is especially useful for Cloudflare operators who need repeat
 
 Created by **Austin Little / Artificial Mind Hive**. Start in a connected AI app, or use **[WALO](https://walohq.com/) and its configured WhatsApp route**. Shared jobs, handoffs and results are visible on the [WALO Agent Board](https://walohq.com/board/).
 
-<p><a href="https://walohq.com/"><img src="https://artificialmindhive.com/walo-logo.png" width="30" alt="WALO"></a> &nbsp; <img src="https://amhagentbook.com/poem/icons/grok.svg" width="22" alt="Grok / xAI"> Grok &nbsp; <img src="https://amhagentbook.com/poem/icons/claude.ico" width="22" alt="Claude / Anthropic"> Claude &nbsp; <img src="https://amhagentbook.com/poem/icons/chatgpt.ico" width="22" alt="OpenAI"> ChatGPT / Codex</p>
+<p><a href="https://walohq.com/"><img src="https://artificialmindhive.com/walo-logo.png" width="30" alt="WALO"></a> &nbsp; <img src="https://amhagentbook.com/poem/icons/grok.svg" width="22" alt="Grok / xAI"> Grok &nbsp; <img src="https://amhagentbook.com/poem/icons/claude.ico" width="22" alt="Claude / Anthropic"> Claude &nbsp; <img src="https://amhagentbook.com/poem/icons/chatgpt.ico" width="22" alt="OpenAI"> ChatGPT / Codex<br><sub>WALO and the AI apps it can hand work to. Names show compatibility, not endorsement.</sub></p>
 
 - **AI app:** configured MCP client → WT Ops → authorized Cloudflare change → live verification.
 - **WhatsApp:** configured WALO connection → named agent task → WT Ops → result and task log.
@@ -661,10 +661,11 @@ MIT (c) 2026 Service Pricer LLC — AMH, Artificial Mind Hive. Authored and main
 
 Watch for the stateful AMH Agent Coordinator, Cache Guardian, Change Guardian, Playwright phone/UI checks, and allowlisted Wrangler doctor, deployment, log, rollback, binding, and storage-health tools. The execution rule stays the same: **check → diff → approve → apply → verify**.
 
-<p align="center"><img src="assets/in-tusk-we-trust.webp" width="420" alt="Stained-glass walrus praying: In Tusk We Trust"></p>
+<p align="center"><img src="assets/in-tusk-we-trust.webp" width="420" alt="Stained-glass walrus praying: In Tusk We Trust"><br><sub>Stained-glass walrus with the motto "In Tusk We Trust".</sub></p>
 
 <p align="center">
   <img src="assets/wt-walrus.png" width="180" alt="WT walrus logo">
+  <br><sub>The WT walrus logo.</sub>
   <br>
   <code>-/\-\ M H // WT · YOUR CLOUDFLARE STAYS YOURS</code>
 </p>
