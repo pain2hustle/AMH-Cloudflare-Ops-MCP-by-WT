@@ -26,7 +26,7 @@
   <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-ready-5A4FCF" alt="MCP ready"></a>
   <a href="#safety-model-the-whole-point"><img src="https://img.shields.io/badge/writes-approval--gated-2EA44F" alt="Approval-gated writes"></a>
   <a href="https://walohq.com/"><img src="https://img.shields.io/badge/WhatsApp-via%20WALO-25D366?logo=whatsapp&logoColor=white" alt="WhatsApp via WALO"></a>
-  <a href="https://github.com/pain2hustle/AMH-Cloudflare-Ops-MCP-by-WT/releases/latest"><img src="https://img.shields.io/badge/release-v0.5.3-0969DA" alt="Latest release v0.5.3"></a>
+  <a href="https://github.com/pain2hustle/AMH-Cloudflare-Ops-MCP-by-WT/releases/latest"><img src="https://img.shields.io/badge/release-v0.14.1-0969DA" alt="Latest release v0.14.1"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT license"></a>
   <a href="https://artificialmindhive.com/wtdocs"><img src="https://img.shields.io/badge/docs-WT-0A66C2" alt="WT docs"></a>
 </p>
