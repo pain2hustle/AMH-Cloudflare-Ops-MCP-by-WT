@@ -22,6 +22,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm ci --prefix worker/mcp-oauth
       - run: npx playwright install --with-deps chromium
       - run: npm test
       - run: npm run test:connected-ui
