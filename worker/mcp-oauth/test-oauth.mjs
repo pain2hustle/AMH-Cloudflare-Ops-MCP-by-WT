@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { build } from 'esbuild';
 globalThis.Cloudflare={compatibilityFlags:{global_fetch_strictly_public:true}};
-await build({entryPoints:['mcp-oauth.mjs'],outfile:'test-bundle.mjs',bundle:true,format:'esm',platform:'node',plugins:[{name:'runtime-stub',setup(b){b.onResolve({filter:/^cloudflare:workers$/},()=>({path:'stub',namespace:'stub'}));b.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:'export class WorkerEntrypoint {}'}));}}]});
+const here=new URL('.',import.meta.url).pathname.replace(/^\/([A-Za-z]:)/,'$1');
+await build({entryPoints:[here+'mcp-oauth.mjs'],outfile:here+'test-bundle.mjs',bundle:true,format:'esm',platform:'node',plugins:[{name:'runtime-stub',setup(b){b.onResolve({filter:/^cloudflare:workers$/},()=>({path:'stub',namespace:'stub'}));b.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:'export class WorkerEntrypoint {}'}));}}]});
 const {createOAuthWorker,ORIGIN,RESOURCE}=await import('./test-bundle.mjs?'+Date.now());
 const values=new Map();
 const kv={async get(k,o){const v=values.get(k);if(!v||v.exp<Date.now())return null;return (o==='json'||o?.type==='json')?JSON.parse(v.data):v.data;},async put(k,v,o={}){values.set(k,{data:v,exp:o.expirationTtl?Date.now()+o.expirationTtl*1000:Infinity});},async delete(k){values.delete(k)},async list(o={}){return{keys:[...values.keys()].filter(k=>k.startsWith(o.prefix||'')).map(name=>({name})),list_complete:true,cursor:''}}};
@@ -49,5 +50,5 @@ const plain=await begin({code_challenge_method:'plain'});assert.ok([302,400].inc
 const denied=await consent();r=await expectStatus(await post('/oauth/authorize',{handle:denied.handle,decision:'deny'},{origin:ORIGIN,cookie:denied.cookie}),302);assert.equal(new URL(r.headers.get('location')).searchParams.get('error'),'access_denied');
 await expectStatus(await call('/oauth/register',{method:'POST',body:'x'.repeat(17000)}),413);
 assert.ok([...values.keys()].every(k=>k.startsWith('mcp-oauth-v1:')));
-fs.writeFileSync('tests.json',JSON.stringify({passed:true,checks:['discovery','DCR','S256','consent and CSRF','exact redirect URI','resource audience','encrypted keys','one-use code','refresh','revoked underlying key','legacy bearer and query key','Workers alias','deny','bounded body','namespace isolation']},null,2));
+fs.writeFileSync(here+'tests.json',JSON.stringify({passed:true,checks:['discovery','DCR','S256','consent and CSRF','exact redirect URI','resource audience','encrypted keys','one-use code','refresh','revoked underlying key','legacy bearer and query key','Workers alias','deny','bounded body','namespace isolation']},null,2));
 console.log('PASS: OAuth flow, refresh, security cases, and legacy connections.');
