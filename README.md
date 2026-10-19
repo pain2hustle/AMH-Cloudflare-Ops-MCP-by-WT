@@ -24,6 +24,19 @@
 
 WT is the shared toolbox; [WALO](https://walohq.com/) is the phone. Together they let several AIs work as one crew, each using its own login and the same approval-gated tools.
 
+<p><a href="https://walohq.com/"><img src="https://artificialmindhive.com/walo-logo.png" width="44" alt="WALO"></a></p>
+
+**WALO + WT: which do you need?**
+- **WALO alone** — your AI assistant in the WALO app and WhatsApp: chat, pictures, books (QuickBooks), SEO checks, food log, your own AI. No WT needed.
+- **WT alone** — Cloudflare + site tools inside an AI app or a terminal (MCP). Works great there, but **not from a phone by itself**: the phone part is WALO.
+- **Together** — phone → WALO → WT tools → the whole AI crew. Text a job, get it done and verified, see it on the [Agent Board](https://walohq.com/board/).
+
+**Set up in a minute — no download** (do it now or any time later):
+1. **[Sign up for WALO](https://walohq.com/go/)** — email or Google, one tap. The WALO app is a web app: open it on your phone and *Add to Home Screen*.
+2. **[Pick your AI](https://api.walohq.com/app/ai)** (optional) — use WALO's free brain, or paste your own Grok / ChatGPT / Claude / Gemini key. WALO tests it before saving.
+3. **[Connect WT](https://mcp.artificialmindhive.com/join)** (optional) — sign in with your own Cloudflare account (OAuth, one tap). Your keys stay yours; WT never shows them to any AI.
+4. **WhatsApp:** early access while Meta finishes verifying WALO's number — [link your number](https://api.walohq.com/app/link) and you'll be in as soon as it opens. Until then, everything works in the WALO app.
+
 **Use it from wherever you are:**
 - **📱 Phone only — no PC, no terminal.** Text WALO on WhatsApp (or use the WALO app). Jobs run on cloud runners; results come back to your phone and email.
 - **💻 Terminal, if you like.** Claude Code, Codex CLI and other MCP clients connect to the same WT hub with one config entry.
