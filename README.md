@@ -9,9 +9,15 @@
 
 <p align="center"><a href="https://walohq.com/"><img src="https://artificialmindhive.com/walo-logo.png" width="22" alt="WALO" align="absmiddle"> <strong>WALO</strong></a> · <a href="https://artificialmindhive.com/WalrusTooth"><strong>🦣 Walrus Tusk home</strong></a> · <a href="https://artificialmindhive.com/wtfaq">FAQ</a> · <a href="https://artificialmindhive.com/wtdocs">Docs</a> · <a href="https://walohq.com/board/">Agent Board</a></p>
 
-# Walrus Tusk (WT) — by Austin Little / Artificial Mind Hive
+# AMH WT (Walrus Tusk) — by Austin Little / Artificial Mind Hive
 
-**An approval-gated Cloudflare operations suite with an optional private Agent Harness: bounded delegation, deterministic verification, OAuth-isolated MCP tools, and verified deploy checks without handing agents raw account credentials.**
+**AMH WT lets your AI work on your Cloudflare sites safely: it looks first, shows you the change, waits for your yes, then publishes and checks it's really live. Your AI never gets your raw account keys.**
+
+**Three easy ways in:**
+
+- 📱 **Just text it — no PC, no terminal.** Send the job to [WALO](https://walohq.com/) on WhatsApp. A cloud agent (Claude, Codex, Grok or Gemini) does it with WT and texts you back the checked result. Grok Bot app bots and PC agents can join the same crew.
+- 🤖 **In your AI app.** Add WT as a custom connector in Grok, Claude or ChatGPT on your phone or computer ([get your key](https://mcp.artificialmindhive.com/join)), then say "list my sites".
+- 💻 **On your PC, if you want.** Claude Code, Codex or the `cfops` command line use the same tools and the same approval rules.
 
 - **Private Agent Harness:** a front-desk agent (Jack, the built-in office manager) takes your job, splits it into small pieces, hands each piece to a specialist agent, watches the limits, and tells you who did what. Reusable profiles mean you set an agent up once and call it again by name. 14 skill playbooks switch on by themselves when the job matches: deploy without breaking the live site, check the live site on phone and desktop, put a broken landing page back, prove an email really arrived, hand work to another agent in a short note, review security, reach private tools safely, research with real sources, publish to NothingUnseen, keep each agent briefed on the owner's setup, catch errors early, and ask Claude for a second opinion.
 - **SafeTry controls (the safety rails):** agents can only look until you say yes. Nothing that changes your account happens without your approval. Agents get small, specific tools, never an open command line. Each user's data stays separate from everyone else's, old records are cleaned up on a schedule, and every action is written to a log that shows if anyone tampers with it.
@@ -82,7 +88,7 @@ Honest limits: each AI runs on its own account and usage; when one is out (credi
 
 > **Latest update - v0.5.3:** the owner-supplied WT Connected OAuth setup UI is now the only success-page renderer. Every release runs it in Chromium under the production security policy and verifies the WT/AMH identity, all four copy controls, phone layout, images, and legacy-link removal. See the [latest release](https://github.com/pain2hustle/AMH-Cloudflare-Ops-MCP-by-WT/releases/latest).
 
-Cloudflare Ops MCP scans Cloudflare configuration, computes a **diff** of desired vs current **DNS / Email Routing / BIMI / DMARC / SPF / Pages / cache / Turnstile** setup, and **applies fixes only after explicit approval**. It is built for people who want an AI agent to help with Cloudflare safely: scan first, show the plan, then write only when the owner approves.
+AMH WT scans Cloudflare configuration, computes a **diff** of desired vs current **DNS / Email Routing / BIMI / DMARC / SPF / Pages / cache / Turnstile** setup, and **applies fixes only after explicit approval**. It is built for people who want an AI agent to help with Cloudflare safely: scan first, show the plan, then write only when the owner approves.
 
 Version 0.5.3 works five ways:
 
@@ -96,9 +102,9 @@ For repository-connected deployments, see [GIT-INTEGRATION.md](GIT-INTEGRATION.m
 
 Machine discovery is available at [robots.txt](https://mcp.artificialmindhive.com/robots.txt), [sitemap.xml](https://mcp.artificialmindhive.com/sitemap.xml), [llms.txt](https://mcp.artificialmindhive.com/llms.txt), and [walrus-tusk.md](https://mcp.artificialmindhive.com/walrus-tusk.md). These describe the public landing and documentation; authenticated MCP and OAuth callback routes remain excluded from crawling.
 
-Cloudflare Ops MCP is especially useful for Cloudflare operators who need repeatable DNS hygiene across many zones: SPF cleanup, DMARC enforcement, BIMI records, MX checks, DKIM discovery, Cloudflare Email Routing, TXT verification records, safe DNS upserts, and audit logs for every approved write.
+AMH WT is especially useful for Cloudflare operators who need repeatable DNS hygiene across many zones: SPF cleanup, DMARC enforcement, BIMI records, MX checks, DKIM discovery, Cloudflare Email Routing, TXT verification records, safe DNS upserts, and audit logs for every approved write.
 
-> **Unofficial Cloudflare tool.** Cloudflare Ops MCP is made by **AMH - Artificial Mind Hive**, operated by **Service Pricer LLC**. It is independent, third-party, open-source software. It is **not affiliated with, endorsed by, sponsored by, or made by Cloudflare, Inc.** "Cloudflare" and "Wrangler" are referenced only to describe compatibility with Cloudflare's platform and official developer tooling. You are responsible for every DNS, Email Routing, DMARC, BIMI, SPF, or Worker change you approve and apply.
+> **Unofficial Cloudflare tool.** AMH WT is made by **AMH - Artificial Mind Hive**, operated by **Service Pricer LLC**. It is independent, third-party, open-source software. It is **not affiliated with, endorsed by, sponsored by, or made by Cloudflare, Inc.** "Cloudflare" and "Wrangler" are referenced only to describe compatibility with Cloudflare's platform and official developer tooling. You are responsible for every DNS, Email Routing, DMARC, BIMI, SPF, or Worker change you approve and apply.
 
 > **No owner's API key in Git or in your client.** Public users authorize Cloudflare directly. OAuth access and refresh tokens stay server-side in KV; the connector key is stored only as a SHA-256 hash and is bound to one OAuth grant.
 
@@ -119,9 +125,9 @@ The owner’s recorded handoff test published [this page](https://amhagentbook.c
 
 Examples: change a heading and verify it live; fix code with a bounded review; generate an asset with an available image tool and publish it; add a sourced research note to [Prime Hunt](https://amhagentbook.com/poem/lab/prime-hunt/). Read the [phone workflow details](PHONE-TO-LIVE.md), [Superposition](https://amhagentbook.com/poem/), and [AMH Academy](https://artificialmindhive.com/academy/).
 
-## What Cloudflare Ops MCP handles
+## What AMH WT handles
 
-Cloudflare Ops MCP is focused on the Cloudflare tasks that regularly break launches, email trust, bot checks, cache freshness, brand display, and AI-agent workflows:
+AMH WT is focused on the Cloudflare tasks that regularly break launches, email trust, bot checks, cache freshness, brand display, and AI-agent workflows:
 
 - DNS record scan, lookup, create, update, no-op detection, and guarded delete.
 - SPF detection and planning so you do not accidentally create multiple SPF records.
@@ -174,7 +180,7 @@ Options:
 
 ## Why build this with Wrangler?
 
-Wrangler is Cloudflare's official developer CLI. Cloudflare Ops MCP can run without Wrangler as a local CLI/library, but Wrangler is the right path when you want a remote MCP server because it deploys the Worker, stores secrets, tails logs, and manages Cloudflare bindings from the same toolchain Cloudflare documents.
+Wrangler is Cloudflare's official developer CLI. AMH WT can run without Wrangler as a local CLI/library, but Wrangler is the right path when you want a remote MCP server because it deploys the Worker, stores secrets, tails logs, and manages Cloudflare bindings from the same toolchain Cloudflare documents.
 
 Use Wrangler when you want:
 
@@ -195,7 +201,7 @@ Use the plain CLI when you only need one local terminal to scan or fix a zone.
 
 **Agent-safe Cloudflare writes**
 
-Cloudflare Ops MCP keeps the write path narrow: scan the target, show the diff, wait for explicit approval, then apply only the requested DNS, DMARC, BIMI, SPF, Email Routing, Pages, cache, or Turnstile change.
+AMH WT keeps the write path narrow: scan the target, show the diff, wait for explicit approval, then apply only the requested DNS, DMARC, BIMI, SPF, Email Routing, Pages, cache, or Turnstile change.
 
 </td>
 </tr>
@@ -305,9 +311,10 @@ For current research, `cfops-google-research` opens and traces primary sources i
 ## Install
 
 ```sh
-npm install cloudflare-ops-mcp
-# or run the CLI without installing:
-npx cloudflare-ops-mcp scan example.com
+git clone https://github.com/pain2hustle/AMH-Cloudflare-Ops-MCP-by-WT
+cd AMH-Cloudflare-Ops-MCP-by-WT
+npm link        # adds the cfops command (not published on npm yet)
+cfops scan example.com
 ```
 
 Requires **Node.js >= 18** (for the built-in global `fetch`). No other
@@ -385,7 +392,7 @@ codex mcp add cloudflare-ops --url https://mcp.artificialmindhive.com/mcp \
 Then set `CFOPS_CONNECTOR_KEY` in your own environment. Do not commit it. See [OAUTH.md](OAUTH.md) for status, revocation, refresh behavior, and self-hosting.
 ### Public-use credential model
 
-Cloudflare Ops MCP does **not** ship with an API key, shared account, hosted proxy token, or any hidden credentials. Every operator must bring one of these:
+AMH WT does **not** ship with an API key, shared account, hosted proxy token, or any hidden credentials. Every operator must bring one of these:
 
 - a scoped Cloudflare API token in their own environment for local CLI/library use;
 - a scoped Cloudflare API token stored as their own Worker secret for self-hosted MCP use;
