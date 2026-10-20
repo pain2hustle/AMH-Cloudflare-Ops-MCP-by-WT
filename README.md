@@ -15,9 +15,9 @@
 
 **Three easy ways in:**
 
-- 📱 **Just text it — no PC, no terminal.** Send the job to [WALO](https://walohq.com/) on WhatsApp. A cloud agent (Claude, Codex, Grok or Gemini) does it with WT and texts you back the checked result. Grok Bot app bots and PC agents can join the same crew.
+- 📱 **Just text it — no PC, no terminal.** Send the job to [WALO](https://walohq.com/) on WhatsApp. A cloud agent (Claude, ChatGPT/Codex, Grok or Gemini) does it with WT and texts you back the checked result. Grok Bot app bots and PC agents can join the same crew.
 - 🤖 **In your AI app.** Add WT as a custom connector in Grok, Claude or ChatGPT on your phone or computer ([get your key](https://mcp.artificialmindhive.com/join)), then say "list my sites".
-- 💻 **On your PC, if you want.** Claude Code, Codex or the `cfops` command line use the same tools and the same approval rules.
+- 💻 **On your PC, if you want.** Claude Code, ChatGPT's Codex or the `cfops` command line use the same tools and the same approval rules.
 
 - **Private Agent Harness:** a front-desk agent (Jack, the built-in office manager) takes your job, splits it into small pieces, hands each piece to a specialist agent, watches the limits, and tells you who did what. Reusable profiles mean you set an agent up once and call it again by name. 14 skill playbooks switch on by themselves when the job matches: deploy without breaking the live site, check the live site on phone and desktop, put a broken landing page back, prove an email really arrived, hand work to another agent in a short note, review security, reach private tools safely, research with real sources, publish to NothingUnseen, keep each agent briefed on the owner's setup, catch errors early, and ask Claude for a second opinion.
 - **SafeTry controls (the safety rails):** agents can only look until you say yes. Nothing that changes your account happens without your approval. Agents get small, specific tools, never an open command line. Each user's data stays separate from everyone else's, old records are cleaned up on a schedule, and every action is written to a log that shows if anyone tampers with it.
