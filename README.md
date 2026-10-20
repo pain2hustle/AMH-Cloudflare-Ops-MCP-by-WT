@@ -443,15 +443,20 @@ cfops <command> <domain> [options]
 | --- | --- |
 | `scan <domain>` | Full read-only snapshot: DNS, SPF, DKIM, DMARC, BIMI, Email Routing. |
 | `plan <domain> [--inbox x@y]` | Report desired vs current email-auth posture (no writes). |
-| `dns <domain> --type T --name N --content C [--ttl n] [--proxied] [--apply]` | Upsert a DNS record (create / update / no-op). |
-| `email <domain> --forward a@b=to@c [--catch-all to@c] [--apply]` | Plan/apply Email Routing forward rules + catch-all. |
+| `dns <domain> --type T --name N --content C [--ttl n] [--proxied] [--record-id id] [--apply]` | Upsert a DNS record (create / update / no-op). If several records share the name it refuses and asks for --record-id, so nothing gets overwritten. |
+| `email <domain> --forward a@b=to@c [--forward ...] [--catch-all to@c] [--apply]` | Plan/apply Email Routing forward rules + catch-all. |
 | `dmarc <domain> --policy quarantine [--rua mailto:x] [--pct 25] [--apply]` | Change **only** the DMARC `p=` (and `rua`/`pct`), safely. |
 | `bimi <domain> --logo <url> [--vmc <url>] [--apply] [--force]` | Set `default._bimi` TXT (refuses if DMARC=`none` unless `--force`). |
+| `purge <domain> [--everything] [--url <abs-url> ...] [--apply]` | Purge the Cloudflare cache: the whole zone (default) or specific URLs. Needs Zone > Cache Purge. |
+| `pages <domain> --target <project.pages.dev> [--no-www] [--wildcard] [--apply]` | Point the domain at Cloudflare Pages: removes conflicting apex/www records and adds proxied CNAMEs. |
+| `turnstile <domain> [--name N] [--mode managed\|non-interactive\|invisible] [--also d2 ...] [--apply]` | Create a Turnstile bot-check widget; prints the public sitekey and the secret (once). Needs Account > Turnstile (Edit). |
 | `verify <domain>` | Verify the API token, then resolve the zone. |
 
 Global flags: `--apply` (perform the write; default is dry-run), `--force`
 (BIMI DMARC override / delete), `--audit <path>` (audit log location),
 `-h`/`--help`.
+
+Token: set CLOUDFLARE_API_TOKEN to a scoped token with Zone (Read) + DNS (Edit) + Email Routing Rules (Edit), plus Cache Purge or Turnstile only if you use those commands. Never use the Global API Key.
 
 **Everything is a dry-run until you add `--apply`.** BIMI needs a **hosted
 SVG Tiny-PS logo URL** that you supply via `--logo` (and, for Gmail/Apple Mail
