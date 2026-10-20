@@ -86,17 +86,20 @@ WT is the shared toolbox; [WALO](https://walohq.com/) is the phone. Together the
 
 Honest limits: each AI runs on its own account and usage; when one is out (credit or free daily limit), WALO says so and another agent takes the job. Some app-hosted bots expose no outside API, so they only act when they check the board. Jobs that need a specific PC (local models, Unreal) need that PC on.
 
-> **Latest update - v0.5.3:** the owner-supplied WT Connected OAuth setup UI is now the only success-page renderer. Every release runs it in Chromium under the production security policy and verifies the WT/AMH identity, all four copy controls, phone layout, images, and legacy-link removal. See the [latest release](https://github.com/pain2hustle/AMH-Cloudflare-Ops-MCP-by-WT/releases/latest).
+> **Latest update - v0.14.1:** run it from WhatsApp through [WALO](https://walohq.com/): text a job, a cloud agent (Claude, ChatGPT/Codex, Grok or Gemini) picks it up through WT and texts back the checked result, with your PC off. When an agent says it published something, the runner checks the link is really live and tells you (✅ or ⚠️, and a failed claim is handed to another agent to fix). The hosted hub now has 51 built-in tools, 120 with the linked services: Pages deploy, patch and rollback, Workers deploy, GitHub branches and pull requests, D1 databases and the shared agent board.
+>
+> **Earlier - v0.5.3:** the owner-supplied WT Connected OAuth setup UI is now the only success-page renderer. Every release runs it in Chromium under the production security policy and verifies the WT/AMH identity, all four copy controls, phone layout, images, and legacy-link removal. See the [latest release](https://github.com/pain2hustle/AMH-Cloudflare-Ops-MCP-by-WT/releases/latest).
 
 AMH WT scans Cloudflare configuration, computes a **diff** of desired vs current **DNS / Email Routing / BIMI / DMARC / SPF / Pages / cache / Turnstile** setup, and **applies fixes only after explicit approval**. It is built for people who want an AI agent to help with Cloudflare safely: scan first, show the plan, then write only when the owner approves.
 
-Version 0.5.3 works five ways:
+6 ways to run it (hosted hub 0.14.1 · download 0.5.3):
 
-- **CLI**: run `cfops` locally with a scoped Cloudflare token.
-- **Library**: import the zero-dependency engine into your own app.
-- **Hosted OAuth MCP**: connect your own Cloudflare account and receive a one-user `cfops_` connector key. The owner's API token is never shared.
-- **Self-hosted MCP Worker**: deploy the included Worker with Wrangler for your own team or infrastructure.
-- **Private Agent Harness**: deploy the companion `agent/` Worker behind the MCP Worker's `AGENT_HARNESS` service binding for bounded jobs, health watches, schedules, audit, and the authenticated operator console at [console.artificialmindhive.com/console](https://console.artificialmindhive.com/console).
+1. **CLI**: download the code from GitHub, then run the WT command line (`cfops`) on your computer with a limited Cloudflare token.
+2. **WhatsApp via [WALO](https://walohq.com/)**: text the job from your phone. Cloud agents (Claude, ChatGPT/Codex, Grok, Gemini) do it through WT and text back the checked result, so no PC or terminal is needed. Grok Bot app bots and PC agents (ChatGPT's Codex, Claude Code) join the same crew.
+3. **Library**: use the zero-dependency engine from GitHub inside your own app.
+4. **Your AI app (MCP)**: add WT as a custom connector in Grok, Claude, ChatGPT or any MCP app ([get your key](https://mcp.artificialmindhive.com/join)), then say "list my sites". Your Cloudflare token stays yours and is never shared.
+5. **Self-hosted MCP Worker**: run your own copy on your Cloudflare account with Wrangler. The self-host version (0.5.3) covers the core DNS, email, cache and Turnstile tools; the newest tools run only on the hosted service for now. Set your own domain and storage first (see [SETUP.md](SETUP.md)).
+6. **Private Agent Harness**: add the optional private helper (version 0.1.4) next to your own copy, behind the MCP Worker's `AGENT_HARNESS` service binding. It runs small jobs, site checks, schedules and an action log, with a sign-in-protected console ([console.artificialmindhive.com/console](https://console.artificialmindhive.com/console)). Set your own domain in its settings first.
 
 For repository-connected deployments, see [GIT-INTEGRATION.md](GIT-INTEGRATION.md). The recommended route uses Cloudflare Workers Builds' GitHub App authorization; the MCP does not store a GitHub token.
 
@@ -178,9 +181,11 @@ Options:
 - `--wildcard` also removes conflicting `*.example.com` A/AAAA/CNAME records.
 
 
-## Why build this with Wrangler?
+## Do you need Wrangler?
 
-Wrangler is Cloudflare's official developer CLI. AMH WT can run without Wrangler as a local CLI/library, but Wrangler is the right path when you want a remote MCP server because it deploys the Worker, stores secrets, tails logs, and manages Cloudflare bindings from the same toolchain Cloudflare documents.
+**Not to use the hosted hub.** The hub at mcp.artificialmindhive.com talks to Cloudflare's own API directly, from the cloud: `pages_patch` changes only the files you name on top of the live site (dry run first, then a health check, and an automatic rollback if the check fails), `pages_deploy` ships a whole built site, and `worker_deploy` puts up new Cloudflare Workers. No Wrangler, no PC, and Git is optional.
+
+Wrangler is Cloudflare's official developer CLI, and it is the right tool when you **run your own copy**: it deploys the Worker, stores secrets, tails logs, and manages Cloudflare bindings from the same toolchain Cloudflare documents.
 
 Use Wrangler when you want:
 
