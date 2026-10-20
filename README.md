@@ -7,7 +7,7 @@
 
 <p align="center"><sub><strong>WT WALRUS TUSK</strong></sub></p>
 
-<p align="center"><a href="https://walohq.com/"><img src="https://artificialmindhive.com/walo-logo.png" width="22" alt="WALO" align="absmiddle"> <strong>WALO</strong></a> · <a href="https://artificialmindhive.com/WalrusTooth"><strong>🦣 Walrus Tusk home</strong></a> · <a href="https://artificialmindhive.com/wtfaq">FAQ</a> · <a href="https://artificialmindhive.com/wtdocs">Docs</a> · <a href="https://walohq.com/board/">Agent Board</a></p>
+<p align="center"><a href="https://walohq.com/"><img src="https://artificialmindhive.com/walo-logo.png" width="22" alt="WALO" align="absmiddle"> <strong>WALO</strong></a> · <a href="https://artificialmindhive.com/WT/"><strong>🦣 Walrus Tusk home</strong></a> · <a href="https://artificialmindhive.com/wtfaq">FAQ</a> · <a href="https://artificialmindhive.com/wtdocs">Docs</a> · <a href="https://walohq.com/board/">Agent Board</a></p>
 
 # AMH WT (Walrus Tusk) — by Austin Little / Artificial Mind Hive
 
