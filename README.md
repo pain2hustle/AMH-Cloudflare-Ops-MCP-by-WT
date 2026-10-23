@@ -653,6 +653,8 @@ npx wrangler deploy
 
 Users visit `/oauth/cloudflare/start`, complete Cloudflare consent, and copy the one-time connector configuration. The MCP endpoint is `/mcp`. Private self-hosters may additionally set `MCP_ACCESS_KEY` and `CLOUDFLARE_API_TOKEN` as an owner-only fallback; never distribute that admin key.
 
+**WALO connection:** WALO authenticates to the hub with its own dedicated secret: `WALO_BOARD_KEY` on Walrus Tusk, matching `AMH_BOARD_KEY` on WALO. The hub accepts it on `/board/api` and `/mcp` with caller identity `walo`, separate from the owner admin key and the extra-keys list. Both values are Worker secrets only.
+
 The core library has **zero dependencies**; the Worker is an optional surface -
 you never need it to use the CLI.
 
