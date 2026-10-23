@@ -1789,6 +1789,7 @@ async function authorizeConnector(env, provided) {
       if (await timingSafeEqual(provided, k)) return { ok: true, mode: "admin", connectionId: null };
     }
   }
+  if (env.WALO_BOARD_KEY && await timingSafeEqual(provided, env.WALO_BOARD_KEY)) return { ok: true, mode: "admin", caller: "walo", connectionId: null };
   if (!env.CLOUDFLARE_OPS_OAUTH) return { ok: false, reason: "oauth_storage_unavailable" };
   const keyHash = await sha256Hex(provided);
   const raw = await env.CLOUDFLARE_OPS_OAUTH.get(`session:${keyHash}`);
