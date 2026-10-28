@@ -2098,7 +2098,7 @@ __name(getOAuthConfigStatus, "getOAuthConfigStatus");
 // Upload flow mirrors `wrangler pages deploy`: upload-token -> check-missing -> upload ->
 // upsert-hashes -> create deployment with a {path: hash} manifest.
 
-var PAGES_ACCOUNT_ALIASES = { amh: "0ebf6d65d7a9ddccd41cba0b8bd1414c", doors: "1d5fae607a857fc56cd575763bf8f3bc" };
+var PAGES_ACCOUNT_ALIASES = { amh: "0ebf6d65d7a9ddccd41cba0b8bd1414c", doors: "1d5fae607a857fc56cd575763bf8f3bc", artificialmindhive: "a08783a0d3715df907ed5ccad38f0dcf" };
 var PAGES_PROTECTED = new Set(["artificialmindhive"]);
 var PAGES_MAX_FILES = 2000, PAGES_MAX_BYTES = 60 * 1024 * 1024, PAGES_MAX_FILE = 25 * 1024 * 1024;
 var PAGES_TYPES = { html: "text/html", htm: "text/html", css: "text/css", js: "application/javascript", mjs: "application/javascript", json: "application/json", txt: "text/plain", xml: "application/xml", svg: "image/svg+xml", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", avif: "image/avif", ico: "image/x-icon", woff: "font/woff", woff2: "font/woff2", ttf: "font/ttf", mp4: "video/mp4", webm: "video/webm", mp3: "audio/mpeg", pdf: "application/pdf", webmanifest: "application/manifest+json", wasm: "application/wasm", glb: "model/gltf-binary" };
@@ -2106,7 +2106,7 @@ var PAGES_TYPES = { html: "text/html", htm: "text/html", css: "text/css", js: "a
 function pagesAccount(a) {
   const s = String(a || "").trim().toLowerCase();
   const id = PAGES_ACCOUNT_ALIASES[s] || s;
-  if (!/^[a-f0-9]{32}$/.test(id)) throw new Error("account must be amh, doors, or a 32-hex account id");
+  if (!/^[a-f0-9]{32}$/.test(id)) throw new Error("account must be amh, doors, artificialmindhive, or a 32-hex account id");
   return id;
 }
 function pagesProject(p) {
@@ -6736,6 +6736,19 @@ async function runHarnessTool(name, args, env, authContext) {
   return response.ok ? output : { error: output.error || `Harness returned HTTP ${response.status}` };
 }
 __name(runHarnessTool, "runHarnessTool");
+// Shared owner/agent Pages credentials stay in Worker secrets, never tool arguments.
+function pagesOwnerAccountClient(env, authContext, accountId) {
+  if (authContext?.mode !== "admin") return null;
+  if (accountId === "a08783a0d3715df907ed5ccad38f0dcf") {
+    const token = env.CLOUDFLARE_API_TOKEN_ARTIFICIALMINDHIVE;
+    if (!token) throw new Error("Artificialmindhive Pages credential is not configured");
+    return new CloudflareClient({ token });
+  }
+  if (accountId === "1d5fae607a857fc56cd575763bf8f3bc" && env.CLOUDFLARE_API_TOKEN_DOORS)
+    return new CloudflareClient({ token: env.CLOUDFLARE_API_TOKEN_DOORS });
+  return null;
+}
+
 async function runTool(name, args, env, authContext) {
   if (HARNESS_TOOLS.has(name)) return runHarnessTool(name, args, env, authContext);
   if (name === "token_audit_settings") {
@@ -6763,7 +6776,7 @@ async function runTool(name, args, env, authContext) {
   if (name === "pages_patch" || name === "pages_special_files" || name === "pages_read_file") {
     try {
       let c = client;
-      if (authContext?.mode === "admin" && env.CLOUDFLARE_API_TOKEN_DOORS && args.account && pagesAccount(args.account) === "1d5fae607a857fc56cd575763bf8f3bc") c = new CloudflareClient({ token: env.CLOUDFLARE_API_TOKEN_DOORS });
+      if (args.account) c = pagesOwnerAccountClient(env, authContext, pagesAccount(args.account)) || c;
       if (name === "pages_read_file") return await pagesReadFile(c, args);
       return name === "pages_patch" ? await pagesPatch(c, args, env, authContext?.connectionId || authContext?.mode) : await pagesSaveSpecial(c, args, env);
     } catch (e) { return { error: String((e && e.message) || e).slice(0, 600) }; }
@@ -6776,7 +6789,7 @@ async function runTool(name, args, env, authContext) {
     if (authContext?.mode !== "admin") return { error: "site_views is for the owner and agent keys" };
     try { return await siteViews(env, args); } catch (e) { return { error: String((e && e.message) || e).slice(0, 400) }; }
   }
-  if (PAGES_DEPLOY_TOOLS.has(name)) return await runPagesDeployTool(name, args, client, (acct) => authContext?.mode === "admin" && env.CLOUDFLARE_API_TOKEN_DOORS && acct === "1d5fae607a857fc56cd575763bf8f3bc" ? new CloudflareClient({ token: env.CLOUDFLARE_API_TOKEN_DOORS }) : null);
+  if (PAGES_DEPLOY_TOOLS.has(name)) return await runPagesDeployTool(name, args, client, (acct) => pagesOwnerAccountClient(env, authContext, acct));
   const domain = String(args.domain || "").trim();
   const DOMAINLESS = /* @__PURE__ */ new Set(["list_tokens", "revoke_token", "account_doctor", "pages_branch_check"]);
   if (!domain && !DOMAINLESS.has(name)) return { error: "domain is required" };
@@ -7407,7 +7420,12 @@ __name(siteViews, "siteViews");
 var SITE_SETUP_TOOLS = new Set(["pages_create_project", "pages_add_domain", "worker_deploy", "d1_create", "d1_query", "d1_exec"]);
 async function siteSetupTool(name, args, env) {
   const accountId = pagesAccount(args.account);
-  const token = accountId === "1d5fae607a857fc56cd575763bf8f3bc" ? env.CLOUDFLARE_API_TOKEN_DOORS : env.CLOUDFLARE_API_TOKEN;
+  // Additional owner credential is intentionally limited to dedicated Pages actions.
+  if (accountId === "a08783a0d3715df907ed5ccad38f0dcf" && !["pages_create_project", "pages_add_domain"].includes(name))
+    return { error: "Artificialmindhive shared credential is available only for Pages tools" };
+  const token = accountId === "a08783a0d3715df907ed5ccad38f0dcf"
+    ? env.CLOUDFLARE_API_TOKEN_ARTIFICIALMINDHIVE
+    : accountId === "1d5fae607a857fc56cd575763bf8f3bc" ? env.CLOUDFLARE_API_TOKEN_DOORS : env.CLOUDFLARE_API_TOKEN;
   if (!token) return { error: "no hub token for that account" };
   const base = "https://api.cloudflare.com/client/v4/accounts/" + accountId;
   const cf = async (path, init = {}) => {
