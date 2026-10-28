@@ -57,7 +57,7 @@ test('patch anchors reject repeated or already-patched source',()=>{const h=harn
 test('integration preserves exact previous bundle after removing three additions',()=>{
  const candidate=fs.readFileSync(candidatePath,'utf8'),edits=JSON.parse(fs.readFileSync(root+'/repo-edits.json','utf8'));let reverted=candidate;
  for(const edit of edits.reverse()){assert.equal(reverted.split(edit.replace).length,2);reverted=reverted.replace(edit.replace,()=>edit.find);}
- assert.equal(hash(reverted),'ee9d60a732bada8014ccd97343aa0d3aa30420068a2fa9cef93c7838c8ca4524');
+ assert.equal(hash(reverted),'a0230879a74ad72a1a144f5b71a9c335fb95a391a19027932795f4d7ae7f16ff');
 });
 
 test('format/comment-only notification differences preserve exact token semantics',()=>{const h=harness(),oldFn=h.ctx.WALO_DIAGNOSTIC_EDITS['walo-mcp'][0][0],formatted=oldFn.replace(/^\s*\/\/.*\n/gm,'').replace(/\n  /g,'\n    ');const patched=h.ctx.wdPatch('walo-mcp',formatted+'\n');assert.equal(patched,h.ctx.WALO_DIAGNOSTIC_EDITS['walo-mcp'][0][1]+'\n');});

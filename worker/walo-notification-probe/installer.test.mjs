@@ -1,7 +1,7 @@
 import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import vm from 'node:vm';import crypto from 'node:crypto';import test from 'node:test';import assert from 'node:assert/strict';
 const root=path.dirname(fileURLToPath(import.meta.url)),candidatePath=fs.existsSync(root+'/mcp-candidate.mjs')?root+'/mcp-candidate.mjs':root+'/../live/index.js',bundle=fs.readFileSync(candidatePath,'utf8'),module=bundle.slice(bundle.indexOf('var NP_EDITS = '),bundle.indexOf('var APIARY_REPAIR_TOOL_DEF = '));
 const helpers=bundle.slice(bundle.indexOf('function arCanon('),bundle.indexOf('function arArgs('))+bundle.slice(bundle.indexOf('async function arModuleHashes('),bundle.indexOf('async function arSnapshot('));
-const hash=b=>crypto.createHash('sha256').update(b).digest('hex'),old='379b637e-a753-4297-8dd0-e533420ad103',next='22222222-2222-4222-8222-222222222222';
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex'),old='2d990542-53a8-4aad-9186-abf38f83cdfb',next='22222222-2222-4222-8222-222222222222';
 function harness(script='walo-mcp'){
  const ledger=new Map(),calls=[];let active=old,latest=old,mutations=0,failUpload=false,drift=false;
  const settings={compatibility_date:'2026-01-01',compatibility_flags:['nodejs_compat'],bindings:[{name:'TOKEN',type:'secret_text'},{name:'VAR',type:'plain_text',text:'PRIVATE_CONFIGURATION'}]};
@@ -12,7 +12,7 @@ function harness(script='walo-mcp'){
  }};
  vm.createContext(ctx);vm.runInContext(helpers+module,ctx);
  const original=ctx.NP_EDITS.map(x=>x[0]).join('\n'),sources=new Map([[old,original]]);
- const realHash=ctx.arHash;ctx.arHash=async v=>v===original?'26e489a5dc7b9d18b3dd6001d158238aaa98f1931f4e1b0e0057e228de5fb220':realHash(v);
+ const realHash=ctx.arHash;ctx.arHash=async v=>v===original?'1ec09e32b618bae6177976a24f05960a7f077eee5cff3f9c006d65ba4d8cce42':realHash(v);
  const resource=id=>({script:{etag:hash(sources.get(id))},script_runtime:{compatibility_date:'2026-01-01',exports:['default']},bindings:settings.bindings.map(b=>({...b}))});
  ctx.fetch=async(url,init={})=>{
   calls.push({url,method:init.method||'GET'});assert.ok(url.startsWith('https://api.cloudflare.com/client/v4/accounts/1d5fae607a857fc56cd575763bf8f3bc/workers/scripts/'+script+'/'));
