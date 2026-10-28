@@ -1,6 +1,6 @@
 {
   "base_sha256": "2c9e36fa8c985c613f3ba34ab46efa07206b4ac9f3bde1545b44cbe2c5c12451",
-  "candidate_sha256": "bea61abe20d0c96a27422edd4445eca9dbe8adbb3152194a95ea1355e3d93e78",
-  "module_sha256": "26d3ab0b1bc1a99cb0f52789757430ce1bf43a2a931dd0a79273c8537e47e711",
-  "bytes": 662128
+  "candidate_sha256": "b5af6e447e702c1840f9ced53235651e9ec6165f085f5d2d29e75a2df5eb33ff",
+  "module_sha256": "28c8c644db19265e14012ee8aa75dffe7cbc1d5dbb366b29c2b686574374f193",
+  "bytes": 662771
 }

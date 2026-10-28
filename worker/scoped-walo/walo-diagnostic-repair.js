@@ -48,7 +48,7 @@ async function wdSnapshot(env,script,preview=false){
  wdAssert(!settings.migrations,'Migration changes not permitted');
  const main=body.modules.find(m=>m.name===body.main_module),bytes=await main.blob.arrayBuffer(),code=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
  wdAssert(await arHash(code)===await arHash(bytes),'Source encoding mismatch');
- let candidate=null,comparison=null;try{candidate=wdPatch(script,code);}catch(e){if(!preview||script!=='walo-mcp')throw e;comparison=await wdNotifyComparison(code);}
+ let candidate=null,comparison=null;try{candidate=await wdPatchCurrent(script,code);}catch(e){if(!preview||script!=='walo-mcp')throw e;comparison=await wdNotifyComparison(code);}
  const modules=await arModuleHashes(body);
  wdAssert(arCanon(await wdCurrent(env,script))===arCanon(active),'Concurrent deployment during inspection');
  const settingsHash=await arHash(arCanon(wdSettings(settings))),resourcesHash=await arHash(arCanon(wdResources(v)));
@@ -169,5 +169,17 @@ async function wdNotifyComparison(code){
  };
  let at=0;while(at<actual.length&&at<expected.length&&actual[at]===expected[at])at++;
  return {function_sha256:await arHash(fn),same_tokens:arCanon(actual)===arCanon(expected),actual_token_count:actual.length,expected_token_count:expected.length,first_difference:at,actual_tokens:await redact(actual),expected_tokens:await redact(expected)};
+}
+
+async function wdPatchCurrent(script,code){
+ if(script==='walo-mcp'&&code.split(WALO_DIAGNOSTIC_EDITS['walo-mcp'][0][0]).length!==2){
+  const fn=wdNotifyFunction(code);
+  // Live source inspected through hashed-literal token comparison on 2026-10-28.
+  // Exact bundled function: unchanged relay URL/key/owner/template; compiler formatting,
+  // 2000 -> 2e3, redundant parentheses and escaped warning literals differ from source.
+  if(await arHash(fn)==='c593570f5e00d08fd43b965c4723e2c6c2b169c73278fa2d665466e5c1f147bf')
+   return code.replace(fn,()=>WALO_DIAGNOSTIC_EDITS['walo-mcp'][0][1]);
+ }
+ return wdPatch(script,code);
 }
 
