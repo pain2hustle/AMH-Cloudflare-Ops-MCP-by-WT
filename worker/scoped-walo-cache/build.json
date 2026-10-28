@@ -1,0 +1,10 @@
+{
+  "base_sha256": "b5af6e447e702c1840f9ced53235651e9ec6165f085f5d2d29e75a2df5eb33ff",
+  "candidate_sha256": "ee9d60a732bada8014ccd97343aa0d3aa30420068a2fa9cef93c7838c8ca4524",
+  "module_sha256": "4e8516d9c3536b671fa94965974ed94829e78e85540dc02a13b2d8557f3c4d44",
+  "bytes": 675292,
+  "resolvers": {
+    "resolveTenant": "f2185ee7da530cba712e4247f8f9e1dd2fb5b5ff95830533b886e220b5f3a5ec",
+    "resolveTenantByRelayKey": "55dc279b9f88e54f3a268bd11ad570b6fbfc3227ed1092c611439a6a814282cc"
+  }
+}
