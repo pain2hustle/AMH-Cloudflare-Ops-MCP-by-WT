@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const root=new URL('.',import.meta.url);
 const source=fs.readFileSync(new URL('apiary-read.js',root),'utf8');
-const bundle=fs.readFileSync(new URL('proposed-worker-index.js',root),'utf8');
+const bundle=fs.readFileSync(new URL('../../worker/live/index.js',root),'utf8');
 const account='1d5fae607a857fc56cd575763bf8f3bc', version='00000000-1111-2222-3333-444444444444';
 const actor={mode:'admin'}, env={CLOUDFLARE_API_TOKEN_DOORS:'fixture-doors',CLOUDFLARE_API_TOKEN:'fixture-default',CLOUDFLARE_API_TOKEN_ARTIFICIALMINDHIVE:'fixture-pages'};
 function harness(response){const calls=[];const scope=vm.createContext({URLSearchParams,CloudflareClient:class{constructor(o){calls.push({constructorToken:o.token});}async request(method,path){calls.push({method,path});if(response instanceof Error)throw response;return typeof response==='function'?response(method,path):response;}}});vm.runInContext(source,scope);return {scope,calls,run:(n,a={},e=env,u=actor)=>scope.runApiaryReadTool(n,a,e,u)};}
