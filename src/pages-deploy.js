@@ -5,7 +5,7 @@
 // Upload flow mirrors `wrangler pages deploy`: upload-token -> check-missing -> upload ->
 // upsert-hashes -> create deployment with a {path: hash} manifest.
 
-var PAGES_ACCOUNT_ALIASES = { amh: "0ebf6d65d7a9ddccd41cba0b8bd1414c", doors: "1d5fae607a857fc56cd575763bf8f3bc" };
+var PAGES_ACCOUNT_ALIASES = { amh: "0ebf6d65d7a9ddccd41cba0b8bd1414c", doors: "1d5fae607a857fc56cd575763bf8f3bc", artificialmindhive: "a08783a0d3715df907ed5ccad38f0dcf" };
 var PAGES_PROTECTED = new Set(["artificialmindhive"]);
 var PAGES_MAX_FILES = 2000, PAGES_MAX_BYTES = 60 * 1024 * 1024, PAGES_MAX_FILE = 25 * 1024 * 1024;
 var PAGES_TYPES = { html: "text/html", htm: "text/html", css: "text/css", js: "application/javascript", mjs: "application/javascript", json: "application/json", txt: "text/plain", xml: "application/xml", svg: "image/svg+xml", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", avif: "image/avif", ico: "image/x-icon", woff: "font/woff", woff2: "font/woff2", ttf: "font/ttf", mp4: "video/mp4", webm: "video/webm", mp3: "audio/mpeg", pdf: "application/pdf", webmanifest: "application/manifest+json", wasm: "application/wasm", glb: "model/gltf-binary" };
@@ -13,7 +13,7 @@ var PAGES_TYPES = { html: "text/html", htm: "text/html", css: "text/css", js: "a
 function pagesAccount(a) {
   const s = String(a || "").trim().toLowerCase();
   const id = PAGES_ACCOUNT_ALIASES[s] || s;
-  if (!/^[a-f0-9]{32}$/.test(id)) throw new Error("account must be amh, doors, or a 32-hex account id");
+  if (!/^[a-f0-9]{32}$/.test(id)) throw new Error("account must be amh, doors, artificialmindhive, or a 32-hex account id");
   return id;
 }
 function pagesProject(p) {
@@ -180,7 +180,7 @@ async function wranglerDoctor(client, args, altClient) {
 var PAGES_DEPLOY_TOOL_DEFS = [
   { name: "pages_deploy", description: "Deploy a COMPLETE built static site to a Cloudflare Pages project through the API (like `wrangler pages deploy`, no PC needed). Dry-run by default; apply=true uploads and deploys. branch = production branch goes LIVE; any other branch is a preview URL. A deploy replaces the whole site, so send every file. Static only (no functions/). artificialmindhive production is refused.",
     inputSchema: { type: "object", properties: {
-      account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1), or an account id" },
+      account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), artificialmindhive, or an account id" },
       project: { type: "string" }, branch: { type: "string", description: "default = production branch" },
       files: { type: "array", items: { type: "object", properties: { path: { type: "string" }, content: { type: "string", description: "text file contents" }, content_base64: { type: "string", description: "binary file contents" } }, required: ["path"] } },
       commit_message: { type: "string" }, commit_hash: { type: "string" }, apply: { type: "boolean" },

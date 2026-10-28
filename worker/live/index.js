@@ -2058,7 +2058,7 @@ function getOAuthConfigStatus(env, origin = "") {
   };
 }
 __name(getOAuthConfigStatus, "getOAuthConfigStatus");
-var PAGES_ACCOUNT_ALIASES = { amh: "0ebf6d65d7a9ddccd41cba0b8bd1414c", doors: "1d5fae607a857fc56cd575763bf8f3bc" };
+var PAGES_ACCOUNT_ALIASES = { amh: "0ebf6d65d7a9ddccd41cba0b8bd1414c", doors: "1d5fae607a857fc56cd575763bf8f3bc", artificialmindhive: "a08783a0d3715df907ed5ccad38f0dcf" };
 var PAGES_PROTECTED = /* @__PURE__ */ new Set(["artificialmindhive"]);
 var PAGES_MAX_FILES = 2e3;
 var PAGES_MAX_BYTES = 60 * 1024 * 1024;
@@ -2067,7 +2067,7 @@ var PAGES_TYPES = { html: "text/html", htm: "text/html", css: "text/css", js: "a
 function pagesAccount(a) {
   const s = String(a || "").trim().toLowerCase();
   const id = PAGES_ACCOUNT_ALIASES[s] || s;
-  if (!/^[a-f0-9]{32}$/.test(id)) throw new Error("account must be amh, doors, or a 32-hex account id");
+  if (!/^[a-f0-9]{32}$/.test(id)) throw new Error("account must be amh, doors, artificialmindhive, or a 32-hex account id");
   return id;
 }
 function pagesProject(p) {
@@ -2243,7 +2243,7 @@ var PAGES_DEPLOY_TOOL_DEFS = [
     name: "pages_deploy",
     description: "Deploy a COMPLETE built static site to a Cloudflare Pages project through the API (like `wrangler pages deploy`, no PC needed). Dry-run by default; apply=true uploads and deploys. branch = production branch goes LIVE; any other branch is a preview URL. A deploy replaces the whole site, so send every file. To change only a few files on a live site use pages_patch (or pass patch=true with edits [{path,find,replace}] here). Static only (no functions/). artificialmindhive production is refused.",
     inputSchema: { type: "object", properties: {
-      account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1), or an account id" },
+      account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), artificialmindhive, or an account id" },
       project: { type: "string" },
       branch: { type: "string", description: "default = production branch" },
       files: { type: "array", items: { type: "object", properties: { path: { type: "string" }, content: { type: "string", description: "text file contents" }, content_base64: { type: "string", description: "binary file contents" } }, required: ["path"] } },
@@ -2553,7 +2553,7 @@ var PAGES_PATCH_TOOL_DEFS = [
     name: "pages_patch",
     description: "Change ONLY a few files on a live Pages site (no PC, no full file set). Best: edits [{path, find, replace}] \u2014 the hub fetches the live file, replaces the exact text (must match once), and deploys. Or files [{path, content}] for whole changed files. The hub copies the live deployment's file list, swaps in the changes (and removes any in delete), keeps _redirects/_headers, and deploys. Every other file stays exactly as live. Dry-run by default; apply=true deploys. branch = production branch goes LIVE, any other = preview. Returns rollback_hint. Sites with server code (artificialmindhive) re-attach the owner-saved worker bundle and get a title + API health check after deploy, with automatic rollback on failure.",
     inputSchema: { type: "object", properties: {
-      account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1)" },
+      account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" },
       project: { type: "string" },
       branch: { type: "string", description: "default = production branch (LIVE)" },
       edits: { type: "array", description: "exact find/replace on live files", items: { type: "object", properties: { path: { type: "string" }, find: { type: "string" }, replace: { type: "string" }, count: { type: "number", description: "expected matches, default 1" } }, required: ["path", "find", "replace"] } },
@@ -6922,32 +6922,32 @@ var TOOLS = [
   {
     name: "pages_create_project",
     description: "Create a NEW Cloudflare Pages project (empty site at <name>.pages.dev). Dry-run unless apply=true. Then use pages_deploy to put files on it and pages_add_domain for a custom domain.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1)" }, name: { type: "string", description: "lowercase letters, digits, dashes" }, production_branch: { type: "string", description: "default main" }, apply: { type: "boolean" } }, required: ["account", "name"] }
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, name: { type: "string", description: "lowercase letters, digits, dashes" }, production_branch: { type: "string", description: "default main" }, apply: { type: "boolean" } }, required: ["account", "name"] }
   },
   {
     name: "pages_add_domain",
     description: "Attach a custom domain (e.g. tacos.com or www.tacos.com) to a Pages project, or show the status of its domains. If the domain's zone is on the same Cloudflare account, Cloudflare sets up DNS itself; otherwise the result says what record to add. Dry-run unless apply=true.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1)" }, project: { type: "string" }, domain: { type: "string", description: "omit to just list the project's domains" }, apply: { type: "boolean" } }, required: ["account", "project"] }
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, project: { type: "string" }, domain: { type: "string", description: "omit to just list the project's domains" }, apply: { type: "boolean" } }, required: ["account", "project"] }
   },
   {
     name: "worker_deploy",
     description: "Deploy a small Cloudflare Worker (one ES-module file, export default { fetch }) next to a site, e.g. an AI chat endpoint or a form handler. Optional bindings: ai=true gives env.AI (Workers AI, e.g. env.AI.run('@cf/moonshotai/kimi-k2.6', {messages})), d1=[{binding, database_id}] gives env.<binding>, vars={NAME:'value'}. Publishes at <name>.<account>.workers.dev. Refuses to overwrite any Worker the hub didn't create (Austin's existing workers are safe). Dry-run unless apply=true. Remember the account's free AI allowance is shared: add a rate limit to anything public.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1)" }, name: { type: "string" }, code: { type: "string", description: "the module source" }, ai: { type: "boolean" }, d1: { type: "array", items: { type: "object", properties: { binding: { type: "string" }, database_id: { type: "string" } }, required: ["binding", "database_id"] } }, vars: { type: "object" }, compatibility_date: { type: "string" }, apply: { type: "boolean" } }, required: ["account", "name", "code"] }
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, name: { type: "string" }, code: { type: "string", description: "the module source" }, ai: { type: "boolean" }, d1: { type: "array", items: { type: "object", properties: { binding: { type: "string" }, database_id: { type: "string" } }, required: ["binding", "database_id"] } }, vars: { type: "object" }, compatibility_date: { type: "string" }, apply: { type: "boolean" } }, required: ["account", "name", "code"] }
   },
   {
     name: "d1_create",
     description: "Create a new D1 database (or list existing ones when name is omitted). Dry-run unless apply=true.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1)" }, name: { type: "string" }, apply: { type: "boolean" } }, required: ["account"] }
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, name: { type: "string" }, apply: { type: "boolean" } }, required: ["account"] }
   },
   {
     name: "d1_query",
     description: "READ-ONLY SQL on a D1 database (SELECT / WITH / PRAGMA / EXPLAIN only). database = name or id. Returns rows.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1)" }, database: { type: "string" }, sql: { type: "string" }, params: { type: "array" } }, required: ["account", "database", "sql"] }
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, database: { type: "string" }, sql: { type: "string" }, params: { type: "array" } }, required: ["account", "database", "sql"] }
   },
   {
     name: "d1_exec",
     description: "WRITE SQL on a D1 database (CREATE TABLE, INSERT, UPDATE, DELETE...). Dry-run unless apply=true; Austin must approve writes. DROP of a table needs force=true.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1)" }, database: { type: "string" }, sql: { type: "string" }, params: { type: "array" }, apply: { type: "boolean" }, force: { type: "boolean" } }, required: ["account", "database", "sql"] }
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, database: { type: "string" }, sql: { type: "string" }, params: { type: "array" }, apply: { type: "boolean" }, force: { type: "boolean" } }, required: ["account", "database", "sql"] }
   },
   ...INBOX_TOOL_DEFS,
   ...WP_TOOL_DEFS,
@@ -7029,6 +7029,19 @@ async function runHarnessTool(name, args, env, authContext) {
   return response.ok ? output : { error: output.error || `Harness returned HTTP ${response.status}` };
 }
 __name(runHarnessTool, "runHarnessTool");
+// Shared owner/agent Pages credentials stay in Worker secrets, never tool arguments.
+function pagesOwnerAccountClient(env, authContext, accountId) {
+  if (authContext?.mode !== "admin") return null;
+  if (accountId === "a08783a0d3715df907ed5ccad38f0dcf") {
+    const token = env.CLOUDFLARE_API_TOKEN_ARTIFICIALMINDHIVE;
+    if (!token) throw new Error("Artificialmindhive Pages credential is not configured");
+    return new CloudflareClient({ token });
+  }
+  if (accountId === "1d5fae607a857fc56cd575763bf8f3bc" && env.CLOUDFLARE_API_TOKEN_DOORS)
+    return new CloudflareClient({ token: env.CLOUDFLARE_API_TOKEN_DOORS });
+  return null;
+}
+
 async function runTool(name, args, env, authContext) {
   if (HARNESS_TOOLS.has(name)) return runHarnessTool(name, args, env, authContext);
   if (name === "token_audit_settings") {
@@ -7055,7 +7068,7 @@ async function runTool(name, args, env, authContext) {
   if (name === "pages_patch" || name === "pages_special_files" || name === "pages_read_file") {
     try {
       let c = client;
-      if (authContext?.mode === "admin" && env.CLOUDFLARE_API_TOKEN_DOORS && args.account && pagesAccount(args.account) === "1d5fae607a857fc56cd575763bf8f3bc") c = new CloudflareClient({ token: env.CLOUDFLARE_API_TOKEN_DOORS });
+      if (args.account) c = pagesOwnerAccountClient(env, authContext, pagesAccount(args.account)) || c;
       if (name === "pages_read_file") return await pagesReadFile(c, args);
       return name === "pages_patch" ? await pagesPatch(c, args, env, authContext?.connectionId || authContext?.mode) : await pagesSaveSpecial(c, args, env);
     } catch (e) {
@@ -7078,7 +7091,7 @@ async function runTool(name, args, env, authContext) {
       return { error: String(e && e.message || e).slice(0, 400) };
     }
   }
-  if (PAGES_DEPLOY_TOOLS.has(name)) return await runPagesDeployTool(name, args, client, (acct) => authContext?.mode === "admin" && env.CLOUDFLARE_API_TOKEN_DOORS && acct === "1d5fae607a857fc56cd575763bf8f3bc" ? new CloudflareClient({ token: env.CLOUDFLARE_API_TOKEN_DOORS }) : null);
+  if (PAGES_DEPLOY_TOOLS.has(name)) return await runPagesDeployTool(name, args, client, (acct) => pagesOwnerAccountClient(env, authContext, acct));
   const domain = String(args.domain || "").trim();
   const DOMAINLESS = /* @__PURE__ */ new Set(["list_tokens", "revoke_token", "account_doctor", "pages_branch_check"]);
   if (!domain && !DOMAINLESS.has(name)) return { error: "domain is required" };
@@ -7743,7 +7756,12 @@ __name(siteViews, "siteViews");
 var SITE_SETUP_TOOLS = /* @__PURE__ */ new Set(["pages_create_project", "pages_add_domain", "worker_deploy", "d1_create", "d1_query", "d1_exec"]);
 async function siteSetupTool(name, args, env) {
   const accountId = pagesAccount(args.account);
-  const token = accountId === "1d5fae607a857fc56cd575763bf8f3bc" ? env.CLOUDFLARE_API_TOKEN_DOORS : env.CLOUDFLARE_API_TOKEN;
+  // Additional owner credential is intentionally limited to dedicated Pages actions.
+  if (accountId === "a08783a0d3715df907ed5ccad38f0dcf" && !["pages_create_project", "pages_add_domain"].includes(name))
+    return { error: "Artificialmindhive shared credential is available only for Pages tools" };
+  const token = accountId === "a08783a0d3715df907ed5ccad38f0dcf"
+    ? env.CLOUDFLARE_API_TOKEN_ARTIFICIALMINDHIVE
+    : accountId === "1d5fae607a857fc56cd575763bf8f3bc" ? env.CLOUDFLARE_API_TOKEN_DOORS : env.CLOUDFLARE_API_TOKEN;
   if (!token) return { error: "no hub token for that account" };
   const base = "https://api.cloudflare.com/client/v4/accounts/" + accountId;
   const cf = async (path, init = {}) => {
