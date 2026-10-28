@@ -6667,8 +6667,21 @@ async function runApiaryReadTool(name, args, env, authContext) {
     }
     const q=new URLSearchParams({prefix:APIARY_READ_PREFIX,per_page:String(args.per_page??1000)});
     if(args.cursor) q.set('cursor',args.cursor);
-    const {result, result_info:info} = await client.request('GET', `${root}/r2/buckets/${APIARY_READ_BUCKET}/objects?${q}`);
-    if(!Array.isArray(result) || typeof info?.is_truncated !== 'boolean' || (info.delimited?.length)) return {error:'Incomplete or grouped pagination metadata; inventory completeness unverified'};
+    const {result, result_info:rawInfo} = await client.request('GET', `${root}/r2/buckets/${APIARY_READ_BUCKET}/objects?${q}`);
+    let info = rawInfo;
+    // The REST API omits optional result_info on its terminal short page.
+    // Confirm the boundary with a fixed-prefix start_after probe before ending.
+    if (!info && Array.isArray(result) && result.length < (args.per_page ?? 1000)) {
+      if(result.some(x=>typeof x.key!=='string' || !x.key.startsWith(APIARY_READ_PREFIX) || !Number.isSafeInteger(x.size) || x.size<0)) return {error:'Unexpected terminal object metadata; inventory unverified'};
+      if(result.length) {
+        const last = result.map(x=>x.key).sort().at(-1);
+        const terminalQuery = new URLSearchParams({prefix:APIARY_READ_PREFIX,per_page:'1',start_after:last});
+        const terminal = await client.request('GET', `${root}/r2/buckets/${APIARY_READ_BUCKET}/objects?${terminalQuery}`);
+        if(!Array.isArray(terminal.result) || terminal.result.length || (terminal.result_info && (terminal.result_info.is_truncated !== false || terminal.result_info.delimited?.length))) return {error:'Terminal boundary probe did not confirm exhaustion; inventory incomplete'};
+      }
+      info = {is_truncated:false};
+    }
+    if(!Array.isArray(result) || typeof info?.is_truncated !== 'boolean' || (info.delimited?.length)) return {error:'Incomplete or grouped pagination metadata; inventory completeness unverified',shape:{result_is_array:Array.isArray(result),object_count:Array.isArray(result)?result.length:null,info_present:!!info,truncated_type:typeof info?.is_truncated,truncated:typeof info?.is_truncated==='boolean'?info.is_truncated:null,cursor_present:typeof info?.cursor==='string'&&!!info.cursor,delimited_type:typeof info?.delimited,delimited_count:Array.isArray(info?.delimited)?info.delimited.length:null}};
     if(info.is_truncated && (typeof info.cursor !== 'string' || !info.cursor || info.cursor===args.cursor)) return {error:'Missing or repeated continuation cursor; inventory incomplete'};
     if(result.some(x=>typeof x.key!=='string' || !x.key.startsWith(APIARY_READ_PREFIX) || !Number.isSafeInteger(x.size) || x.size<0)) return {error:'Unexpected object metadata; inventory unverified'};
     return {account:APIARY_READ_ACCOUNT,bucket:APIARY_READ_BUCKET,prefix:APIARY_READ_PREFIX,objects:result.map(x=>({key:x.key,size:x.size,etag:apiaryReadText(x.etag),last_modified:apiaryReadText(x.last_modified),content_type:apiaryReadText(x.http_metadata?.contentType)})),next_cursor:info.is_truncated?info.cursor:null,page_exhausted:!info.is_truncated,inventory_complete:false};
