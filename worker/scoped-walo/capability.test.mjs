@@ -59,3 +59,7 @@ test('integration preserves exact previous bundle after removing three additions
  for(const edit of edits.reverse()){assert.equal(reverted.split(edit.replace).length,2);reverted=reverted.replace(edit.replace,()=>edit.find);}
  assert.equal(hash(reverted),'2c9e36fa8c985c613f3ba34ab46efa07206b4ac9f3bde1545b44cbe2c5c12451');
 });
+
+test('format/comment-only notification differences preserve exact token semantics',()=>{const h=harness(),oldFn=h.ctx.WALO_DIAGNOSTIC_EDITS['walo-mcp'][0][0],formatted=oldFn.replace(/^\s*\/\/.*\n/gm,'').replace(/\n  /g,'\n    ');const patched=h.ctx.wdPatch('walo-mcp',formatted+'\n');assert.equal(patched,h.ctx.WALO_DIAGNOSTIC_EDITS['walo-mcp'][0][1]+'\n');});
+test('operator token boundaries are not collapsed',()=>{const h=harness();assert.notEqual(JSON.stringify(h.ctx.wdTokens('a++ +b')),JSON.stringify(h.ctx.wdTokens('a+ ++b')));});
+test('changed notification logic is refused and source literals are hashed',async()=>{const h=harness(),oldFn=h.ctx.WALO_DIAGNOSTIC_EDITS['walo-mcp'][0][0],changed=oldFn.replace('WA_OWNER','DIFFERENT_OWNER').replace('"POST"','"SECRET_UNKNOWN_LITERAL"')+'\n';assert.throws(()=>h.ctx.wdPatch('walo-mcp',changed));const result=await h.ctx.wdNotifyComparison(changed);assert.equal(result.same_tokens,false);assert.ok(!JSON.stringify(result).includes('SECRET_UNKNOWN_LITERAL'));assert.ok(result.function_sha256);});

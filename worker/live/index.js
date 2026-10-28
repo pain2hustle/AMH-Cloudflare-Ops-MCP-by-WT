@@ -6716,6 +6716,7 @@ function wdArgs(a){
 function wdPatch(script,code){
  wdAssert(!code.includes('function safeRelayDiagnostics(')&&!code.includes('upstream_subcode: safeCode(graphError.error_subcode)'),'Diagnostics already present; inspect current release');
  const edits=WALO_DIAGNOSTIC_EDITS[script];
+ if(script==='walo-mcp'&&code.split(edits[0][0]).length===1){const fn=wdNotifyFunction(code);wdAssert(arCanon(wdTokens(fn))===arCanon(wdTokens(edits[0][0])),'Notification logic differs from reviewed patch');return code.replace(fn,()=>edits[0][1]);}
  for(const [find,replacement]of edits){wdAssert(code.split(find).length===2,'Reviewed diagnostic patch anchor mismatch');code=code.replace(find,()=>replacement);}
  return code;
 }
@@ -6739,15 +6740,16 @@ async function wdCode(env,script,v){
  wdAssert(main&&modules.length>0&&modules.length<=100&&modules.some(m=>m.name===main)&&new Set(modules.map(m=>m.name)).size===modules.length,'Unexpected module layout');
  return {main_module:main,modules};
 }
-async function wdSnapshot(env,script){
+async function wdSnapshot(env,script,preview=false){
  const active=await wdCurrent(env,script),id=active.versions[0].version_id,v=await wdVersion(env,script,id),settings=await wdApi(env,script,'/settings'),body=await wdCode(env,script,v);
  wdAssert(!settings.migrations,'Migration changes not permitted');
  const main=body.modules.find(m=>m.name===body.main_module),bytes=await main.blob.arrayBuffer(),code=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
  wdAssert(await arHash(code)===await arHash(bytes),'Source encoding mismatch');
- const candidate=wdPatch(script,code),modules=await arModuleHashes(body);
+ let candidate=null,comparison=null;try{candidate=wdPatch(script,code);}catch(e){if(!preview||script!=='walo-mcp')throw e;comparison=await wdNotifyComparison(code);}
+ const modules=await arModuleHashes(body);
  wdAssert(arCanon(await wdCurrent(env,script))===arCanon(active),'Concurrent deployment during inspection');
  const settingsHash=await arHash(arCanon(wdSettings(settings))),resourcesHash=await arHash(arCanon(wdResources(v)));
- const safe={account:WALO_DIAGNOSTIC_ACCOUNT,script,active,base_version:id,base_etag:v.resources.script.etag,main_module:body.main_module,module_hashes:modules,settings_sha256:settingsHash,resources_sha256:resourcesHash,candidate_sha256:await arHash(candidate),patch_sha256:WALO_DIAGNOSTIC_PATCH_SHA[script]};
+ const safe={account:WALO_DIAGNOSTIC_ACCOUNT,script,active,base_version:id,base_etag:v.resources.script.etag,main_module:body.main_module,module_hashes:modules,settings_sha256:settingsHash,resources_sha256:resourcesHash,candidate_sha256:candidate===null?null:await arHash(candidate),comparison,patch_sha256:WALO_DIAGNOSTIC_PATCH_SHA[script]};
  return {safe:{...safe,snapshot_sha256:await arHash(arCanon(safe)),rollback_version:id,rollback_verified:true,bindings:(settings.bindings||[]).map(b=>({name:b.name,type:b.type})),edits:WALO_DIAGNOSTIC_EDITS[script].length},settings,version:v,body,candidate};
 }
 function wdRid(script){return 'walo-diagnostic-20261028-v1-'+script;}
@@ -6788,7 +6790,7 @@ async function runWaloDiagnosticRepair(args,env,authContext){
  if(!env.CLOUDFLARE_API_TOKEN_DOORS||!env.RATE_LIMITER_DO)return {error:'Existing repair bindings unavailable; no fallback attempted'};
  const script=args.script;
  try{
-  if(action==='inspect'){const s=await wdSnapshot(env,script);return {...s.safe,production_changed:false};}
+  if(action==='inspect'){const s=await wdSnapshot(env,script,true);return {...s.safe,production_changed:false};}
   const record=(await wdLedger(env,script,{action:'get'})).record;
   if(action==='status')return {script,record:record||null,active:await wdCurrent(env,script)};
   if(action==='rollback')return await wdRollback(env,script,record);
@@ -6839,6 +6841,31 @@ async function runWaloDiagnosticRepair(args,env,authContext){
    return {error:'WALO diagnostic activation failed',reason:wdError(e),rollback};
   }
  }catch(e){return {error:'WALO repair stopped',reason:wdError(e)};}
+}
+
+function wdNotifyFunction(code){
+ const start=code.indexOf('async function notifyAustin('),end=code.indexOf('\n}\n',start);
+ wdAssert(start>=0&&end>start&&end-start<16000&&code.indexOf('async function notifyAustin(',start+1)<0,'Notification function boundary mismatch');
+ return code.slice(start,end+2);
+}
+function wdTokens(code){
+ const tokens=[];let i=0;
+ while(i<code.length){
+  const c=code[i];if(/\s/.test(c)){i++;continue;}
+  if(code.slice(i,i+2)==='//'){const end=code.indexOf('\n',i+2);i=end<0?code.length:end+1;continue;}
+  if(code.slice(i,i+2)==='/*'){const end=code.indexOf('*/',i+2);wdAssert(end>=0,'Unclosed comment');i=end+2;continue;}
+  if(c==='"'||c==="'"||c==='\x60'){let j=i+1;for(;j<code.length;j++){if(code[j]==='\\'){j++;continue;}if(code[j]===c)break;}wdAssert(j<code.length,'Unclosed source literal');tokens.push(code.slice(i,j+1));i=j+1;continue;}
+  const match=/^(?:[A-Za-z_$][\w$]*|\d+(?:\.\d+)?|===|!==|=>|==|!=|<=|>=|&&|\|\||\?\?|\?\.|\+\+|--|\*\*|\+=|-=|\*=|\/=|\.\.\.)/.exec(code.slice(i));
+  tokens.push(match?match[0]:c);i+=match?match[0].length:1;
+ }
+ return tokens;
+}
+async function wdNotifyComparison(code){
+ const fn=wdNotifyFunction(code),actual=wdTokens(fn),expected=wdTokens(WALO_DIAGNOSTIC_EDITS['walo-mcp'][0][0]),redact=async ts=>{
+  const out=[];for(const t of ts)out.push(/^["'\x60]/.test(t)||/^\d{7,}$/.test(t)?{literal_sha256:await arHash(t),bytes:new TextEncoder().encode(t).length}:t);return out;
+ };
+ let at=0;while(at<actual.length&&at<expected.length&&actual[at]===expected[at])at++;
+ return {function_sha256:await arHash(fn),same_tokens:arCanon(actual)===arCanon(expected),actual_token_count:actual.length,expected_token_count:expected.length,first_difference:at,actual_tokens:await redact(actual),expected_tokens:await redact(expected)};
 }
 
 
