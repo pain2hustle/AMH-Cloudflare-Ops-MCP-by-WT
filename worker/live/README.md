@@ -1,3 +1,5 @@
+> **2026-10-29 source reconciliation:** the canonical live bundle remains byte-for-byte at the verified `cc95c0d` release (SHA-256 `56fbfca69f7fd3730e3e5122a5f09448916ac896f8cd509c2819be5365be9163`). `../mcp-oauth/base-live.mjs` now recovers the complete legacy portion of that release, including the approved Apiary and WALO scoped operations, existing WALO authentication, inbox behavior and Pages account isolation. `npm run test:live-source-parity` builds to a separate temporary output and verifies preservation without overwriting this artifact. See [source integration](../../docs/walo-source-integration-20261029.md). This reconciliation does not redeploy production or repeat any one-time repair.
+
 > **2026-10-17 OAuth update:** index.js is now built by ../mcp-oauth/build.mjs from the recovered production baseline and the OAuth wrapper. See [MCP OAuth](../mcp-oauth/README.md). Preserve this wrapper and the global_fetch_strictly_public compatibility flag in subsequent releases.
 
 # Live hub bundle (what mcp.artificialmindhive.com actually runs)

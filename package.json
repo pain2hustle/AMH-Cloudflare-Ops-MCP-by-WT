@@ -26,7 +26,9 @@
     "oauth:create:deploy": "node scripts/cloudflare-oauth-create.mjs %CLOUDFLARE_ACCOUNT_ID% %CLOUDFLARE_OPS_WORKER_ORIGIN% --deploy",
     "verify:live": "node scripts/verify-live.mjs",
     "worker:deploy:verified": "node scripts/deploy-verified.mjs --dir worker --url https://mcp.artificialmindhive.com/?format=json --expect 0.5.3",
-    "agent:deploy:verified": "node scripts/deploy-verified.mjs --dir agent --url https://console.artificialmindhive.com/health --expect 0.1.4"
+    "agent:deploy:verified": "node scripts/deploy-verified.mjs --dir agent --url https://console.artificialmindhive.com/health --expect 0.1.4",
+    "test:walo": "node --test worker/scoped-walo/*.test.mjs worker/scoped-walo-cache/*.test.mjs worker/walo-notification-probe/*.test.mjs worker/walo-tenant1-key-repair/*.test.mjs",
+    "test:live-source-parity": "node --test test/live-source-parity.test.mjs"
   },
   "devDependencies": {
     "playwright": "1.62.1"

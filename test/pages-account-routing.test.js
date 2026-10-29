@@ -20,7 +20,7 @@ function fixture(envChanges={}){
  const env={CLOUDFLARE_API_TOKEN:'existing-base-fixture',CLOUDFLARE_API_TOKEN_DOORS:'doors-fixture',CLOUDFLARE_API_TOKEN_ARTIFICIALMINDHIVE:'new-fixture',...envChanges};
  const result=(c,a)=>({selected:c.token,account:a.account,project:a.project,branch:a.branch});
  const ctx=vm.createContext({
-  __name:()=>{},HARNESS_TOOLS:new Set(),SITE_SETUP_TOOLS:new Set(['pages_create_project','pages_add_domain','worker_deploy','d1_create','d1_query','d1_exec']),
+  __name:()=>{},APIARY_READ_TOOLS:new Set(),HARNESS_TOOLS:new Set(),SITE_SETUP_TOOLS:new Set(['pages_create_project','pages_add_domain','worker_deploy','d1_create','d1_query','d1_exec']),
   PAGES_DEPLOY_TOOLS:new Set(['pages_deploy','pages_list_deployments','pages_get_deployment','pages_rollback']),
   getOAuthAccessToken:async(e,auth)=>auth.mode==='admin'?e.CLOUDFLARE_API_TOKEN:'tenant-fixture',
   CloudflareClient:class{constructor({token}){this.token=token}},

@@ -1,7 +1,6 @@
+// legacy.mjs
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
-
-// ../src/client.js
 var CF_BASE = "https://api.cloudflare.com/client/v4";
 function redactToken(str, known) {
   if (str == null) return str;
@@ -82,10 +81,10 @@ var CloudflareClient = class {
     try {
       const doFetch = this._fetch;
       res = await doFetch(url, init);
-    } catch (err) {
+    } catch (err2) {
       throw new CloudflareError(
         redactToken(
-          `Network error calling Cloudflare API: ${err && err.message}`,
+          `Network error calling Cloudflare API: ${err2 && err2.message}`,
           this._token
         )
       );
@@ -136,18 +135,18 @@ var CloudflareClient = class {
    */
   async paginate(path, { perPage = 100 } = {}) {
     const out = [];
-    let page = 1;
+    let page2 = 1;
     for (let guard = 0; guard < 1e3; guard++) {
       const sep = path.includes("?") ? "&" : "?";
       const { result, result_info } = await this.request(
         "GET",
-        `${path}${sep}page=${page}&per_page=${perPage}`
+        `${path}${sep}page=${page2}&per_page=${perPage}`
       );
       if (Array.isArray(result)) out.push(...result);
       const info = result_info || {};
       const totalPages = info.total_pages || 1;
-      if (!info.page || page >= totalPages) break;
-      page += 1;
+      if (!info.page || page2 >= totalPages) break;
+      page2 += 1;
     }
     return out;
   }
@@ -161,8 +160,6 @@ var CloudflareClient = class {
     return result || {};
   }
 };
-
-// ../src/dns.js
 async function listRecords(client, domain, { zoneId } = {}) {
   const zone_id = zoneId || await resolveZoneId(client, domain);
   return client.paginate(`/zones/${zone_id}/dns_records`);
@@ -360,8 +357,6 @@ async function deleteDnsRecord(client, domain, id, opts = {}) {
   return { action: "delete", confirmed: true, id, result };
 }
 __name(deleteDnsRecord, "deleteDnsRecord");
-
-// ../src/dmarc.js
 function unquoteTxt(raw) {
   if (raw == null) return "";
   let s = String(raw).trim();
@@ -509,8 +504,6 @@ async function setDmarcPolicy(client, domain, policy, extra = {}, opts = {}) {
   };
 }
 __name(setDmarcPolicy, "setDmarcPolicy");
-
-// ../src/bimi.js
 function parseBimi(txt) {
   const raw = unquoteTxt(txt);
   const tags = {};
@@ -566,8 +559,8 @@ async function validateBimiSvgUrl(url, fetchImpl) {
       }
     }
     return { ok: warnings.length === 0, https, warnings };
-  } catch (err) {
-    warnings.push(`Could not fetch logo URL: ${err && err.message}`);
+  } catch (err2) {
+    warnings.push(`Could not fetch logo URL: ${err2 && err2.message}`);
     return { ok: false, https, warnings };
   }
 }
@@ -627,8 +620,6 @@ async function setupBimi(client, domain, arg = {}, opts = {}) {
   };
 }
 __name(setupBimi, "setupBimi");
-
-// ../src/zone.js
 async function resolveZoneId(client, domain) {
   const { result } = await client.request(
     "GET",
@@ -701,8 +692,6 @@ async function scanZone(client, domain) {
   };
 }
 __name(scanZone, "scanZone");
-
-// ../src/email.js
 async function getRoutingStatus(client, zoneId) {
   const { result } = await client.request(
     "GET",
@@ -904,8 +893,6 @@ async function setupEmailRouting(client, domain, cfg = {}, opts = {}) {
   };
 }
 __name(setupEmailRouting, "setupEmailRouting");
-
-// ../src/plan.js
 async function planEmailAuth(client, domain, cfg = {}) {
   const snap = await scanZone(client, domain);
   const findings = [];
@@ -1024,12 +1011,10 @@ async function planEmailAuth(client, domain, cfg = {}) {
       message: `Desired forwarding inbox noted: ${cfg.inbox}. Use the 'email' command to create a forward rule.`
     });
   }
-  const ok = !findings.some((f) => f.severity === "error");
-  return { domain, zone_id: snap.zone_id, ok, findings, snapshot: snap };
+  const ok2 = !findings.some((f) => f.severity === "error");
+  return { domain, zone_id: snap.zone_id, ok: ok2, findings, snapshot: snap };
 }
 __name(planEmailAuth, "planEmailAuth");
-
-// ../src/cache.js
 async function resolveCacheZoneId(client, domain) {
   const { result } = await client.request(
     "GET",
@@ -1066,8 +1051,6 @@ async function purgeCache(client, domain, opts = {}) {
   return { action: "purge", apply: true, domain, zoneId, scope, body, result };
 }
 __name(purgeCache, "purgeCache");
-
-// ../src/pages.js
 var DIRECT_CONFLICT_TYPES = /* @__PURE__ */ new Set(["A", "AAAA", "CNAME"]);
 var WWW_CONFLICT_TYPES = /* @__PURE__ */ new Set(["A", "AAAA", "CNAME", "NS"]);
 function normName2(value) {
@@ -1188,11 +1171,11 @@ async function planPagesCutover(client, domain, opts = {}) {
         restored.failed.push({ record: rec, error: re && re.message || String(re) });
       }
     }
-    const err = new Error(
+    const err2 = new Error(
       `pages_cutover FAILED after deleting ${deleted.length} record(s): ${e && e.message || e}. Rollback restored ${restored.ok}/${restored.attempted}.` + (restored.failed.length ? ` ${restored.failed.length} could NOT be restored \u2014 see .restore for the exact records to re-create by hand.` : ` The zone is back to its previous state.`)
     );
-    err.restore = { snapshot, restored, deleted };
-    throw err;
+    err2.restore = { snapshot, restored, deleted };
+    throw err2;
   }
   return {
     action: "pages_cutover",
@@ -1212,8 +1195,6 @@ async function planPagesCutover(client, domain, opts = {}) {
   };
 }
 __name(planPagesCutover, "planPagesCutover");
-
-// ../src/turnstile.js
 var VALID_MODES = /* @__PURE__ */ new Set(["managed", "non-interactive", "invisible"]);
 async function createTurnstileWidget(client, domain, opts = {}) {
   const { name, mode = "managed", extraDomains = [], apply = false } = opts;
@@ -1250,8 +1231,6 @@ async function createTurnstileWidget(client, domain, opts = {}) {
   };
 }
 __name(createTurnstileWidget, "createTurnstileWidget");
-
-// ../src/tokens.js
 var DEFAULT_TTL_SECONDS = 3600;
 var MAX_TTL_SECONDS = 86400;
 var TOKEN_PRESETS = {
@@ -1391,13 +1370,11 @@ async function revokeToken(client, tokenId, opts = {}) {
   return { action: "revoke", apply: true, id: tokenId, result };
 }
 __name(revokeToken, "revokeToken");
-
-// ../src/doctor.js
 async function safeRequest(client, method, path) {
   try {
     return await client.request(method, path);
-  } catch (err) {
-    return { result: null, error: err && err.message || String(err) };
+  } catch (err2) {
+    return { result: null, error: err2 && err2.message || String(err2) };
   }
 }
 __name(safeRequest, "safeRequest");
@@ -1522,8 +1499,6 @@ async function pagesBranchCheck(client, opts = {}) {
   return report;
 }
 __name(pagesBranchCheck, "pagesBranchCheck");
-
-// ../src/federation.js
 var IDX_KEY = "fed:index";
 var up = /* @__PURE__ */ __name((ns) => `fed:upstream:${ns}`, "up");
 var NS_SEP = "__";
@@ -1670,8 +1645,6 @@ async function callFederated(env, ns, toolName, args) {
   return resp.result || {};
 }
 __name(callFederated, "callFederated");
-
-// ../src/policy.js
 var IDX_KEY2 = "policy:index";
 var key = /* @__PURE__ */ __name((tool) => `policy:${tool}`, "key");
 var VALID = /* @__PURE__ */ new Set(["allow", "approve", "block"]);
@@ -1718,8 +1691,6 @@ async function checkPolicy(env, tool, args) {
   return { allowed: true, mode };
 }
 __name(checkPolicy, "checkPolicy");
-
-// oauth.js
 var AUTH_URL = "https://dash.cloudflare.com/oauth2/auth";
 var TOKEN_URL = "https://dash.cloudflare.com/oauth2/token";
 var REVOKE_URL = "https://dash.cloudflare.com/oauth2/revoke";
@@ -1759,8 +1730,8 @@ function randomToken(size = 32) {
 }
 __name(randomToken, "randomToken");
 async function sha256Hex(value) {
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value))));
-  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const digest2 = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value))));
+  return Array.from(digest2, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 __name(sha256Hex, "sha256Hex");
 async function timingSafeEqual(left, right) {
@@ -1796,9 +1767,9 @@ async function renderConnectedHtmlExact(origin, connectorKey, env) {
   const templatePattern = /(<script type="__bundler\/template">)([\s\S]*?)(<\/script>)/;
   if (!templatePattern.test(bundle)) throw new Error("WT Connected UI template payload is missing.");
   bundle = bundle.replace(templatePattern, (_match, open, encoded, close) => {
-    let page = JSON.parse(encoded);
-    page = page.replace("<html><head>", '<html lang="en"><head>\n<title>Connected \u2014 Walrus Tusk // AMH</title>').replace(/\s*<a\s+href="https:\/\/cfops\.nothingunseen\.com"[\s\S]*?<\/a>/gi, "").replace(/\s*<a\s+href="https:\/\/nothingunseen\.com"[\s\S]*?<\/a>/gi, "").replaceAll('href="WT Landing.dc.html"', 'href="https://artificialmindhive.com/WalrusTooth"').replaceAll('href="WT Docs.dc.html"', 'href="https://artificialmindhive.com/wtdocs"').replaceAll('href="WT Agents.dc.html"', 'href="https://console.artificialmindhive.com/console"').replaceAll('href="WT FAQ.dc.html"', 'href="https://artificialmindhive.com/wtfaq"').replaceAll('href="AMH Agent Console.dc.html"', 'href="https://console.artificialmindhive.com/console"').replaceAll('href="WT Console Unlock.dc.html"', 'href="https://console.artificialmindhive.com/console"').replaceAll('href="/docs"', 'href="https://artificialmindhive.com/wtdocs"').replaceAll('href="/agents"', 'href="https://console.artificialmindhive.com/console"').replaceAll('href="/faq"', 'href="https://artificialmindhive.com/wtfaq"').replaceAll('href="/console"', 'href="https://console.artificialmindhive.com/console"').replaceAll('href="/"', 'href="https://artificialmindhive.com/WalrusTooth"').replace(/https:\/\/mcp\.artificialmindhive\.com\/mcp/gi, `${origin}/mcp`).replace(/https:\/\/cfops\.nothingunseen\.com\/mcp/gi, `${origin}/mcp`).replace(/https:\/\/cfops\.nothingunseen\.com/gi, origin).replace(/cfops_[A-Za-z0-9_-]+/g, connectorKey);
-    return open + JSON.stringify(page).replace(/</g, "\\u003c") + close;
+    let page2 = JSON.parse(encoded);
+    page2 = page2.replace("<html><head>", '<html lang="en"><head>\n<title>Connected \u2014 Walrus Tusk // AMH</title>').replace(/\s*<a\s+href="https:\/\/cfops\.nothingunseen\.com"[\s\S]*?<\/a>/gi, "").replace(/\s*<a\s+href="https:\/\/nothingunseen\.com"[\s\S]*?<\/a>/gi, "").replaceAll('href="WT Landing.dc.html"', 'href="https://artificialmindhive.com/WalrusTooth"').replaceAll('href="WT Docs.dc.html"', 'href="https://artificialmindhive.com/wtdocs"').replaceAll('href="WT Agents.dc.html"', 'href="https://console.artificialmindhive.com/console"').replaceAll('href="WT FAQ.dc.html"', 'href="https://artificialmindhive.com/wtfaq"').replaceAll('href="AMH Agent Console.dc.html"', 'href="https://console.artificialmindhive.com/console"').replaceAll('href="WT Console Unlock.dc.html"', 'href="https://console.artificialmindhive.com/console"').replaceAll('href="/docs"', 'href="https://artificialmindhive.com/wtdocs"').replaceAll('href="/agents"', 'href="https://console.artificialmindhive.com/console"').replaceAll('href="/faq"', 'href="https://artificialmindhive.com/wtfaq"').replaceAll('href="/console"', 'href="https://console.artificialmindhive.com/console"').replaceAll('href="/"', 'href="https://artificialmindhive.com/WalrusTooth"').replace(/https:\/\/mcp\.artificialmindhive\.com\/mcp/gi, `${origin}/mcp`).replace(/https:\/\/cfops\.nothingunseen\.com\/mcp/gi, `${origin}/mcp`).replace(/https:\/\/cfops\.nothingunseen\.com/gi, origin).replace(/cfops_[A-Za-z0-9_-]+/g, connectorKey);
+    return open + JSON.stringify(page2).replace(/</g, "\\u003c") + close;
   });
   return bundle.replace(/https:\/\/mcp\.artificialmindhive\.com\/mcp/gi, `${origin}/mcp`).replace(/https:\/\/cfops\.nothingunseen\.com\/mcp/gi, `${origin}/mcp`).replace(/https:\/\/cfops\.nothingunseen\.com/gi, origin).replace(/https:\/\/nothingunseen\.com/gi, "https://artificialmindhive.com").replace(/cfops_[A-Za-z0-9_-]+/g, connectorKey);
 }
@@ -1813,13 +1784,12 @@ async function authorizeConnector(env, provided) {
   if (env.MCP_ACCESS_KEY && await timingSafeEqual(provided, env.MCP_ACCESS_KEY)) {
     return { ok: true, mode: "admin", connectionId: null };
   }
-  // Extra full-power keys, one per outside agent (e.g. Grok), so each can be revoked alone
-  // without rotating the owner's main key. Comma-separated secret MCP_EXTRA_ADMIN_KEYS.
   if (env.MCP_EXTRA_ADMIN_KEYS) {
     for (const k of String(env.MCP_EXTRA_ADMIN_KEYS).split(",").map((x) => x.trim()).filter(Boolean)) {
       if (await timingSafeEqual(provided, k)) return { ok: true, mode: "admin", connectionId: null };
     }
   }
+  if (env.WALO_BOARD_KEY && await timingSafeEqual(provided, env.WALO_BOARD_KEY)) return { ok: true, mode: "admin", caller: "walo", connectionId: null };
   if (!env.CLOUDFLARE_OPS_OAUTH) return { ok: false, reason: "oauth_storage_unavailable" };
   const keyHash = await sha256Hex(provided);
   const raw = await env.CLOUDFLARE_OPS_OAUTH.get(`session:${keyHash}`);
@@ -2088,21 +2058,12 @@ function getOAuthConfigStatus(env, origin = "") {
   };
 }
 __name(getOAuthConfigStatus, "getOAuthConfigStatus");
-
-// index.js
-// ../src/pages-deploy.js
-// pages-deploy.js — Cloudflare Pages deploy/rollback/inspect over the API, no wrangler, no PC.
-// Same rules as every other write here: DRY-RUN unless apply=true. artificialmindhive's
-// production branch is refused outright: that site only ships through the amh-hive
-// build-hive-dist path (raw deploys buried it 4+ times).
-// Upload flow mirrors `wrangler pages deploy`: upload-token -> check-missing -> upload ->
-// upsert-hashes -> create deployment with a {path: hash} manifest.
-
 var PAGES_ACCOUNT_ALIASES = { amh: "0ebf6d65d7a9ddccd41cba0b8bd1414c", doors: "1d5fae607a857fc56cd575763bf8f3bc", artificialmindhive: "a08783a0d3715df907ed5ccad38f0dcf" };
-var PAGES_PROTECTED = new Set(["artificialmindhive"]);
-var PAGES_MAX_FILES = 2000, PAGES_MAX_BYTES = 60 * 1024 * 1024, PAGES_MAX_FILE = 25 * 1024 * 1024;
+var PAGES_PROTECTED = /* @__PURE__ */ new Set(["artificialmindhive"]);
+var PAGES_MAX_FILES = 2e3;
+var PAGES_MAX_BYTES = 60 * 1024 * 1024;
+var PAGES_MAX_FILE = 25 * 1024 * 1024;
 var PAGES_TYPES = { html: "text/html", htm: "text/html", css: "text/css", js: "application/javascript", mjs: "application/javascript", json: "application/json", txt: "text/plain", xml: "application/xml", svg: "image/svg+xml", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", avif: "image/avif", ico: "image/x-icon", woff: "font/woff", woff2: "font/woff2", ttf: "font/ttf", mp4: "video/mp4", webm: "video/webm", mp3: "audio/mpeg", pdf: "application/pdf", webmanifest: "application/manifest+json", wasm: "application/wasm", glb: "model/gltf-binary" };
-
 function pagesAccount(a) {
   const s = String(a || "").trim().toLowerCase();
   const id = PAGES_ACCOUNT_ALIASES[s] || s;
@@ -2117,7 +2078,7 @@ function pagesProject(p) {
 function pagesPath(p) {
   let s = String(p || "").replace(/\\/g, "/").replace(/^\.?\/+/, "");
   const parts = s.split("/");
-  if (!s || s.includes("\0") || parts.some((x) => x === ".." || x === "." || x === "") ) throw new Error(`bad file path: ${p}`);
+  if (!s || s.includes("\0") || parts.some((x) => x === ".." || x === "." || x === "")) throw new Error(`bad file path: ${p}`);
   return "/" + parts.join("/");
 }
 function b64ToBytes(b64) {
@@ -2128,19 +2089,17 @@ function b64ToBytes(b64) {
 }
 function bytesToB64(bytes) {
   let s = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  for (let i = 0; i < bytes.length; i += 32768) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
   return btoa(s);
 }
 async function pagesHash(b64, ext) {
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(b64 + ext));
   return [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, "0")).join("").slice(0, 32);
 }
-
 async function pagesGetProject(client, account, project) {
   const { result } = await client.request("GET", `/accounts/${account}/pages/projects/${project}`);
   return result;
 }
-
 async function pagesListDeployments(client, args) {
   const account = pagesAccount(args.account), project = pagesProject(args.project);
   const limit = Math.min(Math.max(Number(args.limit) || 10, 1), 25);
@@ -2148,11 +2107,12 @@ async function pagesListDeployments(client, args) {
   const { result } = await client.request("GET", `/accounts/${account}/pages/projects/${project}/deployments?per_page=${limit}`);
   const liveId = p.canonical_deployment && p.canonical_deployment.id;
   return {
-    project, production_branch: p.production_branch, domains: p.domains,
-    deployments: (result || []).map((d) => ({ id: d.id, short_id: d.short_id, environment: d.environment, branch: d.deployment_trigger && d.deployment_trigger.metadata && d.deployment_trigger.metadata.branch, url: d.url, created_on: d.created_on, status: d.latest_stage && d.latest_stage.status, serving_production: d.id === liveId })),
+    project,
+    production_branch: p.production_branch,
+    domains: p.domains,
+    deployments: (result || []).map((d) => ({ id: d.id, short_id: d.short_id, environment: d.environment, branch: d.deployment_trigger && d.deployment_trigger.metadata && d.deployment_trigger.metadata.branch, url: d.url, created_on: d.created_on, status: d.latest_stage && d.latest_stage.status, serving_production: d.id === liveId }))
   };
 }
-
 async function pagesGetDeployment(client, args) {
   const account = pagesAccount(args.account), project = pagesProject(args.project);
   const id = String(args.deployment_id || "").trim();
@@ -2160,7 +2120,6 @@ async function pagesGetDeployment(client, args) {
   const { result: d } = await client.request("GET", `/accounts/${account}/pages/projects/${project}/deployments/${id}`);
   return { id: d.id, short_id: d.short_id, environment: d.environment, url: d.url, aliases: d.aliases, created_on: d.created_on, branch: d.deployment_trigger && d.deployment_trigger.metadata && d.deployment_trigger.metadata.branch, commit_message: d.deployment_trigger && d.deployment_trigger.metadata && d.deployment_trigger.metadata.commit_message, stages: (d.stages || []).map((s) => ({ name: s.name, status: s.status })), is_skipped: d.is_skipped };
 }
-
 async function pagesRollback(client, args) {
   const account = pagesAccount(args.account), project = pagesProject(args.project);
   const id = String(args.deployment_id || "").trim();
@@ -2174,7 +2133,6 @@ async function pagesRollback(client, args) {
   const { result } = await client.request("POST", `/accounts/${account}/pages/projects/${project}/deployments/${id}/rollback`);
   return { applied: true, ...plan, new_deployment: result && { id: result.id, url: result.url } };
 }
-
 async function pagesDeploy(client, args) {
   const account = pagesAccount(args.account), project = pagesProject(args.project);
   const p = await pagesGetProject(client, account, project);
@@ -2193,7 +2151,10 @@ async function pagesDeploy(client, args) {
     const bytes = f.content_base64 != null ? b64ToBytes(f.content_base64) : new TextEncoder().encode(String(f.content ?? ""));
     if (bytes.length > PAGES_MAX_FILE) throw new Error(`${path} is over 25 MiB`);
     total += bytes.length;
-    if (path === "/_headers" || path === "/_redirects" || path === "/_routes.json") { special[path.slice(1)] = new TextDecoder().decode(bytes); continue; }
+    if (path === "/_headers" || path === "/_redirects" || path === "/_routes.json") {
+      special[path.slice(1)] = new TextDecoder().decode(bytes);
+      continue;
+    }
     if (path.startsWith("/functions/")) throw new Error("functions/ needs a build step; this tool uploads static files only");
     const ext = (path.match(/\.([a-z0-9]+)$/i) || [])[1] || "";
     const b64 = bytesToB64(bytes);
@@ -2204,29 +2165,31 @@ async function pagesDeploy(client, args) {
   for (const e of entries) e.hash = await pagesHash(e.b64, e.ext);
   const plan = { project, account, branch, production, domains_affected: production ? p.domains : [], files: entries.length + Object.keys(special).length, bytes: total, special_files: Object.keys(special) };
   if (args.apply !== true) return { dry_run: true, ...plan, warning: production ? "PRODUCTION: this replaces the live site on " + (p.domains || []).join(", ") : "preview branch only", next: "call again with apply=true" };
-
-  const { result: up } = await client.request("GET", `/accounts/${account}/pages/projects/${project}/upload-token`);
-  const jwt = up && up.jwt;
+  const { result: up2 } = await client.request("GET", `/accounts/${account}/pages/projects/${project}/upload-token`);
+  const jwt = up2 && up2.jwt;
   if (!jwt) throw new Error("no upload token from Cloudflare");
   const assets = async (path, body) => {
-    const r = await fetch(`https://api.cloudflare.com/client/v4/pages/assets/${path}`, { method: "POST", headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" }, body: JSON.stringify(body) });
-    const j = await r.json().catch(() => ({}));
-    if (!j.success) throw new Error(`pages assets/${path} failed: ${(j.errors && j.errors[0] && j.errors[0].message) || r.status}`);
-    return j.result;
+    const r2 = await fetch(`https://api.cloudflare.com/client/v4/pages/assets/${path}`, { method: "POST", headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+    const j2 = await r2.json().catch(() => ({}));
+    if (!j2.success) throw new Error(`pages assets/${path} failed: ${j2.errors && j2.errors[0] && j2.errors[0].message || r2.status}`);
+    return j2.result;
   };
   const unique = [...new Map(entries.map((e) => [e.hash, e])).values()];
   const missing = new Set(await assets("check-missing", { hashes: unique.map((e) => e.hash) }));
   let batch = [], size = 0;
-  const flush = async () => { if (batch.length) await assets("upload", batch); batch = []; size = 0; };
+  const flush = async () => {
+    if (batch.length) await assets("upload", batch);
+    batch = [];
+    size = 0;
+  };
   for (const e of unique) {
     if (!missing.has(e.hash)) continue;
-    if (batch.length >= 1000 || size + e.b64.length > 40 * 1024 * 1024) await flush();
+    if (batch.length >= 1e3 || size + e.b64.length > 40 * 1024 * 1024) await flush();
     batch.push({ key: e.hash, value: e.b64, metadata: { contentType: e.type }, base64: true });
     size += e.b64.length;
   }
   await flush();
   await assets("upsert-hashes", { hashes: unique.map((e) => e.hash) });
-
   const form = new FormData();
   form.append("manifest", JSON.stringify(Object.fromEntries(entries.map((e) => [e.path, e.hash]))));
   form.append("branch", branch);
@@ -2236,78 +2199,89 @@ async function pagesDeploy(client, args) {
   for (const [name, text] of Object.entries(special)) form.append(name, new File([text], name, { type: "text/plain" }));
   const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/pages/projects/${project}/deployments`, { method: "POST", headers: { authorization: `Bearer ${client._token}` }, body: form });
   const j = await r.json().catch(() => ({}));
-  if (!j.success) throw new Error(`create deployment failed: ${(j.errors && j.errors[0] && j.errors[0].message) || r.status}`);
+  if (!j.success) throw new Error(`create deployment failed: ${j.errors && j.errors[0] && j.errors[0].message || r.status}`);
   return { applied: true, ...plan, uploaded: missing.size, deployment: { id: j.result.id, url: j.result.url, environment: j.result.environment } };
 }
-
 async function wranglerDoctor(client, args, altClient) {
   const out = { accounts: {} };
   const base = client;
   for (const [alias, id] of Object.entries(PAGES_ACCOUNT_ALIASES)) {
-    client = (altClient && altClient(id)) || base;
+    client = altClient && altClient(id) || base;
     try {
       const all = [];
-      for (let page = 1; page <= 10; page++) {
-        const { result } = await client.request("GET", `/accounts/${id}/pages/projects?per_page=10&page=${page}`);
-        all.push(...(result || []));
+      for (let page2 = 1; page2 <= 10; page2++) {
+        const { result } = await client.request("GET", `/accounts/${id}/pages/projects?per_page=10&page=${page2}`);
+        all.push(...result || []);
         if (!result || result.length < 10) break;
       }
       let workers = null;
-      try { const { result } = await client.request("GET", `/accounts/${id}/workers/scripts`); workers = (result || []).map((w) => w.id); } catch (e) { workers = "unreadable: " + String(e.message || e).slice(0, 80); }
+      try {
+        const { result } = await client.request("GET", `/accounts/${id}/workers/scripts`);
+        workers = (result || []).map((w) => w.id);
+      } catch (e) {
+        workers = "unreadable: " + String(e.message || e).slice(0, 80);
+      }
       out.accounts[alias] = { id, pages_projects: all.map((p) => ({ name: p.name, production_branch: p.production_branch, domains: p.domains })), workers };
     } catch (e) {
       out.accounts[alias] = { id, error: String(e.message || e).slice(0, 200) };
     }
   }
   if (args.project) {
-    client = (altClient && altClient(pagesAccount(args.account || "amh"))) || base;
+    client = altClient && altClient(pagesAccount(args.account || "amh")) || base;
     try {
       const account = pagesAccount(args.account || "amh"), project = pagesProject(args.project);
       const p = await pagesGetProject(client, account, project);
       out.project = { name: project, production_branch: p.production_branch, domains: p.domains, live_deployment: p.canonical_deployment && { id: p.canonical_deployment.id, url: p.canonical_deployment.url, created_on: p.canonical_deployment.created_on }, latest: p.latest_deployment && { id: p.latest_deployment.id, env: p.latest_deployment.environment, created_on: p.latest_deployment.created_on } };
-    } catch (e) { out.project = { error: String(e.message || e).slice(0, 200) }; }
+    } catch (e) {
+      out.project = { error: String(e.message || e).slice(0, 200) };
+    }
   }
   return out;
 }
-
 var PAGES_DEPLOY_TOOL_DEFS = [
-  { name: "pages_deploy", description: "Deploy a COMPLETE built static site to a Cloudflare Pages project through the API (like `wrangler pages deploy`, no PC needed). Dry-run by default; apply=true uploads and deploys. branch = production branch goes LIVE; any other branch is a preview URL. A deploy replaces the whole site, so send every file. To change only a few files on a live site use pages_patch (or pass patch=true with edits [{path,find,replace}] here). Static only (no functions/). artificialmindhive production is refused.",
+  {
+    name: "pages_deploy",
+    description: "Deploy a COMPLETE built static site to a Cloudflare Pages project through the API (like `wrangler pages deploy`, no PC needed). Dry-run by default; apply=true uploads and deploys. branch = production branch goes LIVE; any other branch is a preview URL. A deploy replaces the whole site, so send every file. To change only a few files on a live site use pages_patch (or pass patch=true with edits [{path,find,replace}] here). Static only (no functions/). artificialmindhive production is refused.",
     inputSchema: { type: "object", properties: {
-      account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1), or an account id" },
-      project: { type: "string" }, branch: { type: "string", description: "default = production branch" },
+      account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), artificialmindhive, or an account id" },
+      project: { type: "string" },
+      branch: { type: "string", description: "default = production branch" },
       files: { type: "array", items: { type: "object", properties: { path: { type: "string" }, content: { type: "string", description: "text file contents" }, content_base64: { type: "string", description: "binary file contents" } }, required: ["path"] } },
-      commit_message: { type: "string" }, commit_hash: { type: "string" }, apply: { type: "boolean" },
-    }, required: ["account", "project", "files"] } },
-  { name: "pages_list_deployments", description: "List recent deployments of a Pages project, marking the one serving production. Read-only.",
-    inputSchema: { type: "object", properties: { account: { type: "string" }, project: { type: "string" }, limit: { type: "number" } }, required: ["account", "project"] } },
-  { name: "pages_get_deployment", description: "Details of one Pages deployment: url, branch, stages, commit message. Pass path (+ optional find) to read that file's RAW live text instead. Read-only.",
-    inputSchema: { type: "object", properties: { account: { type: "string" }, project: { type: "string" }, deployment_id: { type: "string" } }, required: ["account", "project", "deployment_id"] } },
-  { name: "pages_rollback", description: "Put a past production deployment back live. Dry-run by default; apply=true rolls back. artificialmindhive needs force=true plus a note.",
-    inputSchema: { type: "object", properties: { account: { type: "string" }, project: { type: "string" }, deployment_id: { type: "string" }, apply: { type: "boolean" }, force: { type: "boolean" }, note: { type: "string" } }, required: ["account", "project", "deployment_id"] } },
-  { name: "wrangler_doctor", description: "One-call health check: Pages projects (with production branch + domains) and Workers on both accounts, plus live vs latest deployment for one project. Read-only.",
-    inputSchema: { type: "object", properties: { account: { type: "string" }, project: { type: "string" } } } },
+      commit_message: { type: "string" },
+      commit_hash: { type: "string" },
+      apply: { type: "boolean" }
+    }, required: ["account", "project", "files"] }
+  },
+  {
+    name: "pages_list_deployments",
+    description: "List recent deployments of a Pages project, marking the one serving production. Read-only.",
+    inputSchema: { type: "object", properties: { account: { type: "string" }, project: { type: "string" }, limit: { type: "number" } }, required: ["account", "project"] }
+  },
+  {
+    name: "pages_get_deployment",
+    description: "Details of one Pages deployment: url, branch, stages, commit message. Pass path (+ optional find) to read that file's RAW live text instead. Read-only.",
+    inputSchema: { type: "object", properties: { account: { type: "string" }, project: { type: "string" }, deployment_id: { type: "string" } }, required: ["account", "project", "deployment_id"] }
+  },
+  {
+    name: "pages_rollback",
+    description: "Put a past production deployment back live. Dry-run by default; apply=true rolls back. artificialmindhive needs force=true plus a note.",
+    inputSchema: { type: "object", properties: { account: { type: "string" }, project: { type: "string" }, deployment_id: { type: "string" }, apply: { type: "boolean" }, force: { type: "boolean" }, note: { type: "string" } }, required: ["account", "project", "deployment_id"] }
+  },
+  {
+    name: "wrangler_doctor",
+    description: "One-call health check: Pages projects (with production branch + domains) and Workers on both accounts, plus live vs latest deployment for one project. Read-only.",
+    inputSchema: { type: "object", properties: { account: { type: "string" }, project: { type: "string" } } }
+  }
 ];
-// pages-patch.js — change a FEW files on a live Pages site without sending the whole site.
-// Takes the live production deployment's {path: hash} manifest, swaps in only the files the
-// agent sends (or deletes), and creates a new deployment from that. Every other file stays
-// byte-identical to what is live. _redirects/_headers are not in Cloudflare's manifest, so the
-// hub keeps the last known copy per project in KV (pages:special:<account>:<project>) and
-// re-sends it; a patch is refused if it would silently drop them.
-// Injected into the live hub bundle by inject-pages-patch.cjs (uses helpers from pages-deploy.js).
-
 var PATCH_MAX_FILES = 200;
-
 async function pagesSpecialGet(env, account, project) {
   if (!env || !env.CLOUDFLARE_OPS_OAUTH) return null;
   return await env.CLOUDFLARE_OPS_OAUTH.get(`pages:special:${account}:${project}`, "json");
 }
 async function pagesSpecialPut(env, account, project, special) {
   if (!env || !env.CLOUDFLARE_OPS_OAUTH || !special || !Object.keys(special).length) return;
-  await env.CLOUDFLARE_OPS_OAUTH.put(`pages:special:${account}:${project}`, JSON.stringify({ ...special, saved: new Date().toISOString() }));
+  await env.CLOUDFLARE_OPS_OAUTH.put(`pages:special:${account}:${project}`, JSON.stringify({ ...special, saved: (/* @__PURE__ */ new Date()).toISOString() }));
 }
-
-// Fetch one file as it is served by a deployment's own URL (no proxy, no custom-domain cache).
-// Pages 308s /x.html -> /x, so redirects are followed but must stay on the same page.
 async function pagesFetchLiveFile(deployUrl, path) {
   const u = new URL(path, deployUrl);
   const res = await fetch(u.toString(), { redirect: "follow" });
@@ -2317,40 +2291,42 @@ async function pagesFetchLiveFile(deployUrl, path) {
   if (landed !== want && landed !== path) throw new Error(`${path} redirected to ${landed}; read that path instead`);
   return new Uint8Array(await res.arrayBuffer());
 }
-
-// JSON bodies of <script> tags (TradingView-style widget configs, ld+json, inline data).
 function pagesJsonBlocks(html) {
   const out = [];
   const re = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
   let m;
-  while ((m = re.exec(html))) {
+  while (m = re.exec(html)) {
     const body = m[1].trim();
     if (!/^[\[{]/.test(body)) continue;
-    try { JSON.parse(body); out.push({ ok: true }); } catch (e) { out.push({ ok: false, error: String(e.message || e).slice(0, 140) }); }
+    try {
+      JSON.parse(body);
+      out.push({ ok: true });
+    } catch (e) {
+      out.push({ ok: false, error: String(e.message || e).slice(0, 140) });
+    }
   }
   return out;
 }
-
-// worker.checks: [{path, status, contains?}] — plus worker.expect_title on "/".
 async function pagesHealth(deployUrl, worker) {
   const results = [];
-  const checks = [...(worker.expect_title ? [{ path: "/", status: 200, contains: `<title>${worker.expect_title}</title>` }] : []), ...(worker.checks || [])];
+  const checks = [...worker.expect_title ? [{ path: "/", status: 200, contains: `<title>${worker.expect_title}</title>` }] : [], ...worker.checks || []];
   for (const c of checks) {
     let got = null;
     for (let i = 0; i < 6; i++) {
-      if (i) await new Promise((r) => setTimeout(r, 3000));
+      if (i) await new Promise((r) => setTimeout(r, 3e3));
       try {
         const res = await fetch(new URL(c.path, deployUrl).toString(), { redirect: "follow" });
         const body = await res.text();
         got = { path: c.path, status: res.status, ok: res.status === (c.status || 200) && (!c.contains || body.includes(c.contains)) };
-      } catch (e) { got = { path: c.path, ok: false, error: String(e.message || e).slice(0, 100) }; }
+      } catch (e) {
+        got = { path: c.path, ok: false, error: String(e.message || e).slice(0, 100) };
+      }
       if (got.ok) break;
     }
     results.push(got);
   }
   return { ok: results.length > 0 && results.every((x) => x.ok), results };
 }
-
 async function pagesReadFile(client, args) {
   const account = pagesAccount(args.account), project = pagesProject(args.project);
   const path = pagesPath(args.path);
@@ -2361,17 +2337,23 @@ async function pagesReadFile(client, args) {
   const out = { project, path, live_deployment: live.id, bytes: text.length };
   const find = args.find != null ? String(args.find) : "";
   if (find) {
-    const around = Math.min(Math.max(Number(args.around) || 300, 0), 4000);
+    const around = Math.min(Math.max(Number(args.around) || 300, 0), 4e3);
     const hits = [];
     let i = text.indexOf(find);
-    while (i !== -1 && hits.length < 10) { hits.push({ at: i, snippet: text.slice(Math.max(0, i - around), i + find.length + around) }); i = text.indexOf(find, i + 1); }
-    let n = 0, j = text.indexOf(find); while (j !== -1) { n++; j = text.indexOf(find, j + 1); }
+    while (i !== -1 && hits.length < 10) {
+      hits.push({ at: i, snippet: text.slice(Math.max(0, i - around), i + find.length + around) });
+      i = text.indexOf(find, i + 1);
+    }
+    let n = 0, j = text.indexOf(find);
+    while (j !== -1) {
+      n++;
+      j = text.indexOf(find, j + 1);
+    }
     return { ...out, find, occurrences: n, hits };
   }
-  const offset = Math.max(Number(args.offset) || 0, 0), length = Math.min(Math.max(Number(args.length) || 20000, 1), 60000);
+  const offset = Math.max(Number(args.offset) || 0, 0), length = Math.min(Math.max(Number(args.length) || 2e4, 1), 6e4);
   return { ...out, offset, length, more: offset + length < text.length, content: text.slice(offset, offset + length) };
 }
-
 async function pagesPatch(client, args, env, actor) {
   const account = pagesAccount(args.account), project = pagesProject(args.project);
   const p = await pagesGetProject(client, account, project);
@@ -2381,32 +2363,36 @@ async function pagesPatch(client, args, env, actor) {
   const live = p.canonical_deployment;
   if (!live || !live.id) return { error: "project has no live production deployment to patch onto" };
   const { result: base } = await client.request("GET", `/accounts/${account}/pages/projects/${project}/deployments/${live.id}`);
-  // Sites with server code (_worker / Functions): Cloudflare never returns the deployed worker, so the
-  // owner's deploy script stores the exact _worker.bundle wrangler uploaded, tagged with the deployment
-  // it went live as. A patch re-attaches it only if live is still that deployment (or one of our patches).
   let worker = null;
   if (base.uses_functions || PAGES_PROTECTED.has(project)) {
     worker = env && env.CLOUDFLARE_OPS_OAUTH ? await env.CLOUDFLARE_OPS_OAUTH.get(`pages:worker:${account}:${project}`, "json") : null;
     if (!worker || !worker.bundle_b64) return { error: `${project} runs server code and the hub has no saved worker bundle for it, so it can't be patched in place. On a Walrus Tusk user key, run site_autodeploy once (deploys the site from its GitHub repo on every merge), then change it with repo_commit_push + repo_open_pr + repo_merge_pr.` };
-    const known = [worker.for_deployment, ...(worker.deployments || [])];
+    const known = [worker.for_deployment, ...worker.deployments || []];
     if (!known.includes(live.id)) return { error: `${project} live deployment (${live.id.slice(0, 8)}) is not the one the saved worker bundle belongs to (${String(worker.for_deployment).slice(0, 8)}). Someone deployed outside the hub; the owner must refresh it (npm run deploy in amh-hive). Nothing deployed.` };
   }
-  const manifest = { ...(base.files || {}) };
+  const manifest = { ...base.files || {} };
   if (!Object.keys(manifest).length) return { error: "Cloudflare returned an empty file list for the live deployment; refusing to patch" };
-
   const files = Array.isArray(args.files) ? args.files.slice() : [];
   const editLog = [];
   const edits = Array.isArray(args.edits) ? args.edits : [];
   if (edits.length) {
-    const byPath = new Map();
-    for (const e of edits) { const ep = pagesPath(e.path); if (!byPath.has(ep)) byPath.set(ep, []); byPath.get(ep).push(e); }
+    const byPath = /* @__PURE__ */ new Map();
+    for (const e of edits) {
+      const ep = pagesPath(e.path);
+      if (!byPath.has(ep)) byPath.set(ep, []);
+      byPath.get(ep).push(e);
+    }
     for (const [ep, list] of byPath) {
       if (!manifest[ep]) throw new Error(`${ep} is not in the live site; send it in files to add it`);
       let text = new TextDecoder().decode(await pagesFetchLiveFile(base.url, ep));
       for (const e of list) {
         const find = String(e.find ?? ""), repl = String(e.replace ?? "");
         if (!find) throw new Error("each edit needs find (exact text from the live file)");
-        let n = 0, k = text.indexOf(find); while (k !== -1) { n++; k = text.indexOf(find, k + find.length); }
+        let n = 0, k = text.indexOf(find);
+        while (k !== -1) {
+          n++;
+          k = text.indexOf(find, k + find.length);
+        }
         const want = e.count != null ? Number(e.count) : 1;
         if (n !== want) throw new Error(`${ep}: find text occurs ${n} time(s), expected ${want}. Use pages_read_file with find to see the exact live text.`);
         text = text.split(find).join(repl);
@@ -2426,7 +2412,6 @@ async function pagesPatch(client, args, env, actor) {
   const deletes = (Array.isArray(args.delete) ? args.delete : []).map(pagesPath);
   if (!files.length && !deletes.length) throw new Error("give edits [{path, find, replace}] (best) or files [{path, content}] with ONLY the changed files");
   if (files.length > PATCH_MAX_FILES) throw new Error(`too many files for a patch (max ${PATCH_MAX_FILES}); use pages_deploy for a full site`);
-
   const stored = await pagesSpecialGet(env, account, project);
   const special = {};
   for (const k of ["_redirects", "_headers", "_routes.json"]) if (stored && typeof stored[k] === "string") special[k] = stored[k];
@@ -2438,7 +2423,11 @@ async function pagesPatch(client, args, env, actor) {
     const bytes = f.content_base64 != null ? b64ToBytes(f.content_base64) : new TextEncoder().encode(String(f.content ?? ""));
     if (bytes.length > PAGES_MAX_FILE) throw new Error(`${path} is over 25 MiB`);
     total += bytes.length;
-    if (path === "/_headers" || path === "/_redirects" || path === "/_routes.json") { special[path.slice(1)] = new TextDecoder().decode(bytes); specialFromArgs = true; continue; }
+    if (path === "/_headers" || path === "/_redirects" || path === "/_routes.json") {
+      special[path.slice(1)] = new TextDecoder().decode(bytes);
+      specialFromArgs = true;
+      continue;
+    }
     if (path.startsWith("/functions/") || path.startsWith("/_worker")) throw new Error("functions/_worker need a build step; patch static files only");
     const ext = (path.match(/\.([a-z0-9]+)$/i) || [])[1] || "";
     const b64 = bytesToB64(bytes);
@@ -2448,29 +2437,35 @@ async function pagesPatch(client, args, env, actor) {
   if (!special._redirects && !special._headers && args.no_redirects !== true) {
     return { error: `the hub has no saved _redirects/_headers for ${project}, and Cloudflare doesn't return them. Fix (once per site): if the site's source is on GitHub, read its _redirects and _headers with repo_read and save them with pages_special_files (or include them in files). If you're not sure, ask the user. If the site has neither file, pass no_redirects=true.` };
   }
-
-  const changed = entries.map((e) => ({ path: e.path, action: manifest[e.path] ? (manifest[e.path] === e.hash ? "same" : "replace") : "add", bytes: e.size }));
+  const changed = entries.map((e) => ({ path: e.path, action: manifest[e.path] ? manifest[e.path] === e.hash ? "same" : "replace" : "add", bytes: e.size }));
   const missingDeletes = deletes.filter((d) => !manifest[d]);
   const plan = {
-    project, account, branch, production, domains_affected: production ? p.domains : [],
-    base_deployment: live.id, live_files: Object.keys(base.files || {}).length,
-    changed, edits: editLog, deleted: deletes.filter((d) => manifest[d]), delete_not_found: missingDeletes,
-    special_files: Object.keys(special), special_source: specialFromArgs ? "sent in this call" : "hub saved copy",
-    rollback_hint: { tool: "pages_rollback", deployment_id: live.id },
+    project,
+    account,
+    branch,
+    production,
+    domains_affected: production ? p.domains : [],
+    base_deployment: live.id,
+    live_files: Object.keys(base.files || {}).length,
+    changed,
+    edits: editLog,
+    deleted: deletes.filter((d) => manifest[d]),
+    delete_not_found: missingDeletes,
+    special_files: Object.keys(special),
+    special_source: specialFromArgs ? "sent in this call" : "hub saved copy",
+    rollback_hint: { tool: "pages_rollback", deployment_id: live.id }
   };
   if (args.apply !== true) return { dry_run: true, ...plan, warning: production ? "PRODUCTION: only the files above change on " + (p.domains || []).join(", ") : "preview branch only", next: "call again with apply=true" };
-
   for (const e of entries) manifest[e.path] = e.hash;
   for (const d of deletes) delete manifest[d];
-
-  const { result: up } = await client.request("GET", `/accounts/${account}/pages/projects/${project}/upload-token`);
-  const jwt = up && up.jwt;
+  const { result: up2 } = await client.request("GET", `/accounts/${account}/pages/projects/${project}/upload-token`);
+  const jwt = up2 && up2.jwt;
   if (!jwt) throw new Error("no upload token from Cloudflare");
   const assets = async (path, body) => {
-    const r = await fetch(`https://api.cloudflare.com/client/v4/pages/assets/${path}`, { method: "POST", headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" }, body: JSON.stringify(body) });
-    const j = await r.json().catch(() => ({}));
-    if (!j.success) throw new Error(`pages assets/${path} failed: ${(j.errors && j.errors[0] && j.errors[0].message) || r.status}`);
-    return j.result;
+    const r2 = await fetch(`https://api.cloudflare.com/client/v4/pages/assets/${path}`, { method: "POST", headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+    const j2 = await r2.json().catch(() => ({}));
+    if (!j2.success) throw new Error(`pages assets/${path} failed: ${j2.errors && j2.errors[0] && j2.errors[0].message || r2.status}`);
+    return j2.result;
   };
   if (entries.length) {
     const unique = [...new Map(entries.map((e) => [e.hash, e])).values()];
@@ -2479,7 +2474,6 @@ async function pagesPatch(client, args, env, actor) {
     if (batch.length) await assets("upload", batch);
     await assets("upsert-hashes", { hashes: unique.map((e) => e.hash) });
   }
-
   const form = new FormData();
   form.append("manifest", JSON.stringify(manifest));
   form.append("branch", branch);
@@ -2490,7 +2484,6 @@ async function pagesPatch(client, args, env, actor) {
   if (worker) {
     form.append("_worker.bundle", new File([b64ToBytes(worker.bundle_b64)], "_worker.bundle"));
     if (worker.routes) form.append("_routes.json", new File([worker.routes], "_routes.json"));
-    // anything else wrangler sent for this project (Functions routing config, wrangler config hash, ...)
     for (const [name, part] of Object.entries(worker.extra || {})) {
       if (part.file) form.append(name, new File([b64ToBytes(part.b64)], name));
       else form.append(name, new TextDecoder().decode(b64ToBytes(part.b64)));
@@ -2498,44 +2491,46 @@ async function pagesPatch(client, args, env, actor) {
   }
   const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/pages/projects/${project}/deployments`, { method: "POST", headers: { authorization: `Bearer ${client._token}` }, body: form });
   const j = await r.json().catch(() => ({}));
-  if (!j.success) throw new Error(`create deployment failed: ${(j.errors && j.errors[0] && j.errors[0].message) || r.status}`);
+  if (!j.success) throw new Error(`create deployment failed: ${j.errors && j.errors[0] && j.errors[0].message || r.status}`);
   if (specialFromArgs) await pagesSpecialPut(env, account, project, special);
-
-  // Server-code sites: prove the new deployment still works (title + worker endpoints) or roll back.
   if (worker && production) {
     const health = await pagesHealth(j.result.url, worker);
     if (!health.ok) {
       let rolled = null;
-      try { await client.request("POST", `/accounts/${account}/pages/projects/${project}/deployments/${live.id}/rollback`); rolled = live.id; } catch (e) { rolled = "ROLLBACK FAILED: " + String(e.message || e).slice(0, 120); }
+      try {
+        await client.request("POST", `/accounts/${account}/pages/projects/${project}/deployments/${live.id}/rollback`);
+        rolled = live.id;
+      } catch (e) {
+        rolled = "ROLLBACK FAILED: " + String(e.message || e).slice(0, 120);
+      }
       return { error: "health check failed after deploy; rolled back automatically", rolled_back_to: rolled, health, deployment: { id: j.result.id, url: j.result.url } };
     }
-    worker.deployments = [...new Set([...(worker.deployments || []), worker.for_deployment, j.result.id])].slice(-50);
+    worker.deployments = [.../* @__PURE__ */ new Set([...worker.deployments || [], worker.for_deployment, j.result.id])].slice(-50);
     worker.for_deployment = j.result.id;
-    worker.updated_by_patch = new Date().toISOString();
+    worker.updated_by_patch = (/* @__PURE__ */ new Date()).toISOString();
     await env.CLOUDFLARE_OPS_OAUTH.put(`pages:worker:${account}:${project}`, JSON.stringify(worker));
     plan.health = health;
   }
-
-  // check each changed file on the new deployment's own URL (bypasses any proxy/cache in front of the domain)
   const checks = [];
   for (const e of entries.slice(0, 10)) {
     try {
       const u = new URL(e.path, j.result.url);
-      let res, ok = false;
-      for (let i = 0; i < 5 && !ok; i++) {
-        if (i) await new Promise((r) => setTimeout(r, 3000));
+      let res, ok2 = false;
+      for (let i = 0; i < 5 && !ok2; i++) {
+        if (i) await new Promise((r2) => setTimeout(r2, 3e3));
         res = await fetch(u.toString(), { redirect: "follow" });
-        ok = res.status === 200 && (await pagesHash(bytesToB64(new Uint8Array(await res.arrayBuffer())), e.ext)) === e.hash;
+        ok2 = res.status === 200 && await pagesHash(bytesToB64(new Uint8Array(await res.arrayBuffer())), e.ext) === e.hash;
       }
-      checks.push({ path: e.path, status: res.status, matches: ok });
-    } catch (err) { checks.push({ path: e.path, error: String(err.message || err).slice(0, 120) }); }
+      checks.push({ path: e.path, status: res.status, matches: ok2 });
+    } catch (err2) {
+      checks.push({ path: e.path, error: String(err2.message || err2).slice(0, 120) });
+    }
   }
   if (env && env.CLOUDFLARE_OPS_OAUTH) {
-    await env.CLOUDFLARE_OPS_OAUTH.put(`patchlog:${project}:${Date.now()}`, JSON.stringify({ account, project, branch, base: live.id, deployment: j.result.id, changed, deleted: plan.deleted, actor: actor || "unknown", at: new Date().toISOString() }), { expirationTtl: 60 * 60 * 24 * 90 });
+    await env.CLOUDFLARE_OPS_OAUTH.put(`patchlog:${project}:${Date.now()}`, JSON.stringify({ account, project, branch, base: live.id, deployment: j.result.id, changed, deleted: plan.deleted, actor: actor || "unknown", at: (/* @__PURE__ */ new Date()).toISOString() }), { expirationTtl: 60 * 60 * 24 * 90 });
   }
   return { applied: true, ...plan, deployment: { id: j.result.id, url: j.result.url, environment: j.result.environment }, checks, note: "Checks hit the deployment URL. The custom domain can take ~30s to show it." };
 }
-
 async function pagesSaveSpecial(client, args, env) {
   const account = pagesAccount(args.account), project = pagesProject(args.project);
   await pagesGetProject(client, account, project);
@@ -2543,54 +2538,61 @@ async function pagesSaveSpecial(client, args, env) {
   for (const k of ["_redirects", "_headers", "_routes.json"]) if (typeof args[k] === "string") special[k] = args[k];
   if (!Object.keys(special).length) {
     const cur = await pagesSpecialGet(env, account, project);
-    return { project, saved: cur ? Object.keys(cur).filter((k) => k !== "saved") : [], saved_at: cur && cur.saved, ...(cur || {}) };
+    return { project, saved: cur ? Object.keys(cur).filter((k) => k !== "saved") : [], saved_at: cur && cur.saved, ...cur || {} };
   }
   await pagesSpecialPut(env, account, project, special);
   return { ok: true, project, saved: Object.keys(special) };
 }
-
 var PAGES_PATCH_TOOL_DEFS = [
-  { name: "pages_read_file", description: "Read the RAW text of one file exactly as the live production deployment serves it (no summarizer, no proxy). Use find to get the exact snippet(s) around a string; else returns content in chunks (offset/length). Read-only.",
-    inputSchema: { type: "object", properties: { account: { type: "string" }, project: { type: "string" }, path: { type: "string", description: "e.g. insights.html" }, find: { type: "string" }, around: { type: "number", description: "chars of context each side (default 300)" }, offset: { type: "number" }, length: { type: "number" } }, required: ["account", "project", "path"] } },
-  { name: "pages_patch", description: "Change ONLY a few files on a live Pages site (no PC, no full file set). Best: edits [{path, find, replace}] — the hub fetches the live file, replaces the exact text (must match once), and deploys. Or files [{path, content}] for whole changed files. The hub copies the live deployment's file list, swaps in the changes (and removes any in delete), keeps _redirects/_headers, and deploys. Every other file stays exactly as live. Dry-run by default; apply=true deploys. branch = production branch goes LIVE, any other = preview. Returns rollback_hint. Sites with server code (artificialmindhive) re-attach the owner-saved worker bundle and get a title + API health check after deploy, with automatic rollback on failure.",
+  {
+    name: "pages_read_file",
+    description: "Read the RAW text of one file exactly as the live production deployment serves it (no summarizer, no proxy). Use find to get the exact snippet(s) around a string; else returns content in chunks (offset/length). Read-only.",
+    inputSchema: { type: "object", properties: { account: { type: "string" }, project: { type: "string" }, path: { type: "string", description: "e.g. insights.html" }, find: { type: "string" }, around: { type: "number", description: "chars of context each side (default 300)" }, offset: { type: "number" }, length: { type: "number" } }, required: ["account", "project", "path"] }
+  },
+  {
+    name: "pages_patch",
+    description: "Change ONLY a few files on a live Pages site (no PC, no full file set). Best: edits [{path, find, replace}] \u2014 the hub fetches the live file, replaces the exact text (must match once), and deploys. Or files [{path, content}] for whole changed files. The hub copies the live deployment's file list, swaps in the changes (and removes any in delete), keeps _redirects/_headers, and deploys. Every other file stays exactly as live. Dry-run by default; apply=true deploys. branch = production branch goes LIVE, any other = preview. Returns rollback_hint. Sites with server code (artificialmindhive) re-attach the owner-saved worker bundle and get a title + API health check after deploy, with automatic rollback on failure.",
     inputSchema: { type: "object", properties: {
-      account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1)" },
-      project: { type: "string" }, branch: { type: "string", description: "default = production branch (LIVE)" },
+      account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" },
+      project: { type: "string" },
+      branch: { type: "string", description: "default = production branch (LIVE)" },
       edits: { type: "array", description: "exact find/replace on live files", items: { type: "object", properties: { path: { type: "string" }, find: { type: "string" }, replace: { type: "string" }, count: { type: "number", description: "expected matches, default 1" } }, required: ["path", "find", "replace"] } },
       files: { type: "array", description: "ONLY the changed/new files", items: { type: "object", properties: { path: { type: "string" }, content: { type: "string" }, content_base64: { type: "string" } }, required: ["path"] } },
       delete: { type: "array", items: { type: "string" }, description: "paths to remove from the site" },
-      commit_message: { type: "string" }, apply: { type: "boolean" }, no_redirects: { type: "boolean" },
-    }, required: ["account", "project"] } },
-  { name: "pages_special_files", description: "Read (no args besides account/project) or save the hub's copy of a project's _redirects/_headers, which pages_patch re-sends on every patch.",
-    inputSchema: { type: "object", properties: { account: { type: "string" }, project: { type: "string" }, _redirects: { type: "string" }, _headers: { type: "string" } }, required: ["account", "project"] } },
+      commit_message: { type: "string" },
+      apply: { type: "boolean" },
+      no_redirects: { type: "boolean" }
+    }, required: ["account", "project"] }
+  },
+  {
+    name: "pages_special_files",
+    description: "Read (no args besides account/project) or save the hub's copy of a project's _redirects/_headers, which pages_patch re-sends on every patch.",
+    inputSchema: { type: "object", properties: { account: { type: "string" }, project: { type: "string" }, _redirects: { type: "string" }, _headers: { type: "string" } }, required: ["account", "project"] }
+  }
 ];
-
-// github-tools.js — Austin's GitHub (pain2hustle/* and pain2hustle1/*) from the hub, no PC. Same tool names/shapes as
-// the PC ops server (repo_list / repo_read / repo_commit_push / repo_open_pr) plus repo_search.
-// Writes are fenced in code, because the token itself is broad:
-//   - only branches grok/<name> or agent/<name>; never the default branch, never force, never delete a branch
-//   - never anything under .github/ (workflows run with repo secrets)
-// Uses the git data API, so one call = one commit, however many files.
-
-var GH_OWNER = "pain2hustle";
-var GH_OWNERS = ["pain2hustle", "pain2hustle1"]; // Austin's two GitHub accounts (the token is a collaborator on pain2hustle1 repos)
+var GH_OWNERS = ["pain2hustle", "pain2hustle1"];
 var GH_BRANCH_RE = /^(grok|agent)\/[A-Za-z0-9._-]{1,60}$/;
-var GH_MAX_FILES = 100, GH_MAX_BYTES = 20 * 1024 * 1024;
-
+var GH_MAX_FILES = 100;
+var GH_MAX_BYTES = 20 * 1024 * 1024;
 async function gh(env, method, path, body, accept) {
   if (!env.GITHUB_TOKEN) throw new Error("no GitHub token: add one at /setup");
   const r = await fetch(`https://api.github.com${path}`, {
     method,
-    headers: { authorization: `Bearer ${env.GITHUB_TOKEN}`, accept: accept || "application/vnd.github+json", "user-agent": "amh-cfops-hub", "x-github-api-version": "2022-11-28", ...(body ? { "content-type": "application/json" } : {}) },
-    body: body ? JSON.stringify(body) : undefined,
+    headers: { authorization: `Bearer ${env.GITHUB_TOKEN}`, accept: accept || "application/vnd.github+json", "user-agent": "amh-cfops-hub", "x-github-api-version": "2022-11-28", ...body ? { "content-type": "application/json" } : {} },
+    body: body ? JSON.stringify(body) : void 0
   });
   if (accept && accept.includes("raw") && r.ok) return await r.arrayBuffer();
   const j = r.status === 204 ? {} : await r.json().catch(() => ({}));
-  if (!r.ok) { const e = new Error(`GitHub ${method} ${path.split("?")[0]}: ${r.status} ${j.message || ""}`.trim()); e.status = r.status; throw e; }
+  if (!r.ok) {
+    const e = new Error(`GitHub ${method} ${path.split("?")[0]}: ${r.status} ${j.message || ""}`.trim());
+    e.status = r.status;
+    throw e;
+  }
   return j;
 }
-// owners/token can be overridden per request (WT user keys use their own GitHub token + login)
-function ghOwners(env) { return (env && env.GH_OWNERS_OVERRIDE) || GH_OWNERS; }
+function ghOwners(env) {
+  return env && env.GH_OWNERS_OVERRIDE || GH_OWNERS;
+}
 function ghRepo(repo, env) {
   const OWNERS = ghOwners(env);
   const s = String(repo || "").trim().replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, "");
@@ -2609,20 +2611,17 @@ function ghWritable(path) {
   return path;
 }
 var ghEnc = (s) => s.split("/").map(encodeURIComponent).join("/");
-
 async function ghRepoList(env, args) {
   const out = [];
-  for (let page = 1; page <= 5; page++) {
-    const r = await gh(env, "GET", `/user/repos?per_page=100&page=${page}&affiliation=owner,collaborator&sort=pushed`);
+  for (let page2 = 1; page2 <= 5; page2++) {
+    const r = await gh(env, "GET", `/user/repos?per_page=100&page=${page2}&affiliation=owner,collaborator&sort=pushed`);
     out.push(...r);
     if (r.length < 100) break;
   }
   const q = String(args.q || "").toLowerCase();
   const OWNERS = ghOwners(env).map((o) => o.toLowerCase());
-  return { owners: ghOwners(env), repos: out.filter((r) => OWNERS.includes(r.owner.login.toLowerCase()) && (!q || (r.name + " " + (r.description || "")).toLowerCase().includes(q)))
-    .map((r) => ({ repo: r.full_name, private: r.private, default_branch: r.default_branch, pushed_at: r.pushed_at, description: r.description, url: r.html_url })) };
+  return { owners: ghOwners(env), repos: out.filter((r) => OWNERS.includes(r.owner.login.toLowerCase()) && (!q || (r.name + " " + (r.description || "")).toLowerCase().includes(q))).map((r) => ({ repo: r.full_name, private: r.private, default_branch: r.default_branch, pushed_at: r.pushed_at, description: r.description, url: r.html_url })) };
 }
-
 async function ghRead(env, args) {
   const repo = ghRepo(args.repo, env), path = ghPath(args.path || "");
   const ref = args.ref ? `?ref=${encodeURIComponent(String(args.ref))}` : "";
@@ -2633,22 +2632,24 @@ async function ghRead(env, args) {
   const out = { repo, path, ref: args.ref || "default", sha: meta.sha, bytes: buf.byteLength };
   const find = args.find != null ? String(args.find) : "";
   if (find) {
-    const around = Math.min(Math.max(Number(args.around) || 300, 0), 4000), hits = [];
+    const around = Math.min(Math.max(Number(args.around) || 300, 0), 4e3), hits = [];
     let i = text.indexOf(find), n = 0;
-    while (i !== -1) { n++; if (hits.length < 10) hits.push({ at: i, snippet: text.slice(Math.max(0, i - around), i + find.length + around) }); i = text.indexOf(find, i + 1); }
+    while (i !== -1) {
+      n++;
+      if (hits.length < 10) hits.push({ at: i, snippet: text.slice(Math.max(0, i - around), i + find.length + around) });
+      i = text.indexOf(find, i + 1);
+    }
     return { ...out, find, occurrences: n, hits };
   }
-  const offset = Math.max(Number(args.offset) || 0, 0), length = Math.min(Math.max(Number(args.length) || 20000, 1), 60000);
+  const offset = Math.max(Number(args.offset) || 0, 0), length = Math.min(Math.max(Number(args.length) || 2e4, 1), 6e4);
   return { ...out, offset, length, more: offset + length < text.length, content: text.slice(offset, offset + length) };
 }
-
 async function ghSearch(env, args) {
   const repo = ghRepo(args.repo, env), q = String(args.query || "").trim();
   if (!q) throw new Error("query required");
   const r = await gh(env, "GET", `/search/code?per_page=20&q=${encodeURIComponent(q + " repo:" + repo)}`);
   return { repo, query: q, total: r.total_count, results: (r.items || []).map((x) => ({ path: x.path, url: x.html_url })) };
 }
-
 async function ghCommitPush(env, args, actor) {
   const repo = ghRepo(args.repo, env), branch = String(args.branch || "").trim();
   if (!GH_BRANCH_RE.test(branch)) throw new Error("branch must be grok/<name> or agent/<name>");
@@ -2660,27 +2661,34 @@ async function ghCommitPush(env, args, actor) {
   if (files.length + edits.length > GH_MAX_FILES) throw new Error(`max ${GH_MAX_FILES} files per commit`);
   const info = await gh(env, "GET", `/repos/${repo}`);
   if (branch === info.default_branch) throw new Error("refused: that is the default branch");
-
   let created = false, headSha;
-  try { headSha = (await gh(env, "GET", `/repos/${repo}/git/ref/heads/${ghEnc(branch)}`)).object.sha; }
-  catch (e) {
+  try {
+    headSha = (await gh(env, "GET", `/repos/${repo}/git/ref/heads/${ghEnc(branch)}`)).object.sha;
+  } catch (e) {
     if (e.status !== 404) throw e;
     headSha = (await gh(env, "GET", `/repos/${repo}/git/ref/heads/${ghEnc(info.default_branch)}`)).object.sha;
     created = true;
   }
   const headCommit = await gh(env, "GET", `/repos/${repo}/git/commits/${headSha}`);
-
   const tree = [], log = [];
   let total = 0;
   const readAt = async (p) => new TextDecoder().decode(await gh(env, "GET", `/repos/${repo}/contents/${ghEnc(p)}?ref=${headSha}`, null, "application/vnd.github.raw"));
-  const byPath = new Map();
-  for (const e of edits) { const p = ghWritable(ghPath(e.path)); if (!byPath.has(p)) byPath.set(p, []); byPath.get(p).push(e); }
+  const byPath = /* @__PURE__ */ new Map();
+  for (const e of edits) {
+    const p = ghWritable(ghPath(e.path));
+    if (!byPath.has(p)) byPath.set(p, []);
+    byPath.get(p).push(e);
+  }
   for (const [p, list] of byPath) {
     let text = await readAt(p);
     for (const e of list) {
       const find = String(e.find ?? ""), repl = String(e.replace ?? "");
       if (!find) throw new Error("each edit needs find");
-      let n = 0, k = text.indexOf(find); while (k !== -1) { n++; k = text.indexOf(find, k + find.length); }
+      let n = 0, k = text.indexOf(find);
+      while (k !== -1) {
+        n++;
+        k = text.indexOf(find, k + find.length);
+      }
       const want = e.count != null ? Number(e.count) : 1;
       if (n !== want) throw new Error(`${p}: find occurs ${n} time(s), expected ${want}. Use repo_read with find to see the exact text.`);
       text = text.split(find).join(repl);
@@ -2690,7 +2698,11 @@ async function ghCommitPush(env, args, actor) {
   for (const f of files) {
     const p = ghWritable(ghPath(f.path));
     if (!p) throw new Error("empty path");
-    if (f.delete === true) { tree.push({ path: p, mode: "100644", type: "blob", sha: null }); log.push({ path: p, action: "delete" }); continue; }
+    if (f.delete === true) {
+      tree.push({ path: p, mode: "100644", type: "blob", sha: null });
+      log.push({ path: p, action: "delete" });
+      continue;
+    }
     const b64 = f.encoding === "base64" || f.content_base64 != null;
     const content = String(f.content_base64 ?? f.content ?? "");
     total += content.length;
@@ -2700,23 +2712,23 @@ async function ghCommitPush(env, args, actor) {
     log.push({ path: p, action: "write", bytes: content.length });
   }
   const newTree = await gh(env, "POST", `/repos/${repo}/git/trees`, { base_tree: headCommit.tree.sha, tree });
-  const author = { name: String(args.author || "Bucktooth (Grok)").slice(0, 80), email: "agents@artificialmindhive.com", date: new Date().toISOString() };
-  const commit = await gh(env, "POST", `/repos/${repo}/git/commits`, { message: `${message}\n\nvia cfops hub (${actor || "agent"})`, tree: newTree.sha, parents: [headSha], author });
+  const author = { name: String(args.author || "AMH agent").slice(0, 80), email: "agents@artificialmindhive.com", date: (/* @__PURE__ */ new Date()).toISOString() };
+  const commit = await gh(env, "POST", `/repos/${repo}/git/commits`, { message: `${message}
+
+via cfops hub (${actor || "agent"})`, tree: newTree.sha, parents: [headSha], author });
   if (created) await gh(env, "POST", `/repos/${repo}/git/refs`, { ref: `refs/heads/${branch}`, sha: commit.sha });
   else await gh(env, "PATCH", `/repos/${repo}/git/refs/heads/${ghEnc(branch)}`, { sha: commit.sha, force: false });
   return { ok: true, repo, branch, created_branch: created, commit: commit.sha.slice(0, 7), files: log, url: `https://github.com/${repo}/tree/${branch}`, compare: `https://github.com/${repo}/compare/${info.default_branch}...${branch}` };
 }
-
 async function ghOpenPr(env, args) {
   const repo = ghRepo(args.repo, env), branch = String(args.branch || "").trim();
   if (!GH_BRANCH_RE.test(branch)) throw new Error("branch must be grok/<name> or agent/<name>");
   const info = await gh(env, "GET", `/repos/${repo}`);
   const open = await gh(env, "GET", `/repos/${repo}/pulls?state=open&head=${repo.split("/")[0]}:${encodeURIComponent(branch)}`);
   if (open.length) return { ok: true, existing: true, number: open[0].number, url: open[0].html_url };
-  const pr = await gh(env, "POST", `/repos/${repo}/pulls`, { title: String(args.title || branch).slice(0, 200), head: branch, base: info.default_branch, body: String(args.body || "Opened by an agent through the Walrus Tusk MCP hub. Review and merge.").slice(0, 20000) });
+  const pr = await gh(env, "POST", `/repos/${repo}/pulls`, { title: String(args.title || branch).slice(0, 200), head: branch, base: info.default_branch, body: String(args.body || "Opened by an agent through the Walrus Tusk MCP hub. Review and merge.").slice(0, 2e4) });
   return { ok: true, number: pr.number, url: pr.html_url };
 }
-
 async function ghMergePr(env, args) {
   const repo = ghRepo(args.repo, env);
   let num = Number(args.number) || 0;
@@ -2734,26 +2746,45 @@ async function ghMergePr(env, args) {
   const m = await gh(env, "PUT", `/repos/${repo}/pulls/${num}/merge`, { merge_method: "merge", commit_title: `Merge #${num}: ${pr.title}`.slice(0, 200) });
   return { ok: true, repo, number: num, merged: m.merged, sha: (m.sha || "").slice(0, 7), into: pr.base.ref, files: files.map((x) => x.filename).slice(0, 50) };
 }
-
 var GITHUB_TOOL_DEFS = [
-  { name: "repo_list", description: "List Austin's GitHub repos (pain2hustle/* and pain2hustle1/*): default branch, last push, private flag. Optional q filters by name/description. No PC needed.",
-    inputSchema: { type: "object", properties: { q: { type: "string" } } } },
-  { name: "repo_read", description: "Read a file (raw text) or list a folder from a pain2hustle repo at a branch/ref. Use find (+around) to get exact snippets, or offset/length for big files. No PC needed.",
-    inputSchema: { type: "object", properties: { repo: { type: "string", description: "pain2hustle/<name>, pain2hustle1/<name>, or <name> (= pain2hustle)" }, path: { type: "string" }, ref: { type: "string" }, find: { type: "string" }, around: { type: "number" }, offset: { type: "number" }, length: { type: "number" } }, required: ["repo"] } },
-  { name: "repo_search", description: "Search code inside one pain2hustle repo (GitHub code search). Returns matching file paths.",
-    inputSchema: { type: "object", properties: { repo: { type: "string" }, query: { type: "string" } }, required: ["repo", "query"] } },
-  { name: "repo_commit_push", description: "Commit to a grok/<name> (or agent/<name>) branch on GitHub in ONE commit, no PC. Branch is created from the default branch if new. files [{path, content, encoding?:'base64', delete?:true}] and/or edits [{path, find, replace}] applied to the branch's current file. Never touches the default branch, never force-pushes, never writes .github/.",
+  {
+    name: "repo_list",
+    description: "List Austin's GitHub repos (pain2hustle/* and pain2hustle1/*): default branch, last push, private flag. Optional q filters by name/description. No PC needed.",
+    inputSchema: { type: "object", properties: { q: { type: "string" } } }
+  },
+  {
+    name: "repo_read",
+    description: "Read a file (raw text) or list a folder from a pain2hustle repo at a branch/ref. Use find (+around) to get exact snippets, or offset/length for big files. No PC needed.",
+    inputSchema: { type: "object", properties: { repo: { type: "string", description: "pain2hustle/<name>, pain2hustle1/<name>, or <name> (= pain2hustle)" }, path: { type: "string" }, ref: { type: "string" }, find: { type: "string" }, around: { type: "number" }, offset: { type: "number" }, length: { type: "number" } }, required: ["repo"] }
+  },
+  {
+    name: "repo_search",
+    description: "Search code inside one pain2hustle repo (GitHub code search). Returns matching file paths.",
+    inputSchema: { type: "object", properties: { repo: { type: "string" }, query: { type: "string" } }, required: ["repo", "query"] }
+  },
+  {
+    name: "repo_commit_push",
+    description: "Commit to a grok/<name> (or agent/<name>) branch on GitHub in ONE commit, no PC. Branch is created from the default branch if new. files [{path, content, encoding?:'base64', delete?:true}] and/or edits [{path, find, replace}] applied to the branch's current file. Never touches the default branch, never force-pushes, never writes .github/.",
     inputSchema: { type: "object", properties: {
-      repo: { type: "string" }, branch: { type: "string", description: "grok/<short-name>" }, message: { type: "string" },
+      repo: { type: "string" },
+      branch: { type: "string", description: "grok/<short-name>" },
+      message: { type: "string" },
       files: { type: "array", items: { type: "object", properties: { path: { type: "string" }, content: { type: "string" }, encoding: { type: "string", enum: ["utf8", "base64"] }, delete: { type: "boolean" } }, required: ["path"] } },
       edits: { type: "array", items: { type: "object", properties: { path: { type: "string" }, find: { type: "string" }, replace: { type: "string" }, count: { type: "number" } }, required: ["path", "find", "replace"] } },
-      author: { type: "string" },
-    }, required: ["repo", "branch", "message"] } },
-  { name: "repo_open_pr", description: "Open (or find) a pull request from a grok/<name> branch into the default branch so Austin can review and merge.",
-    inputSchema: { type: "object", properties: { repo: { type: "string" }, branch: { type: "string" }, title: { type: "string" }, body: { type: "string" } }, required: ["repo", "branch", "title"] } },
+      author: { type: "string" }
+    }, required: ["repo", "branch", "message"] }
+  },
+  {
+    name: "repo_open_pr",
+    description: "Open (or find) a pull request from a grok/<name> branch into the default branch so Austin can review and merge.",
+    inputSchema: { type: "object", properties: { repo: { type: "string" }, branch: { type: "string" }, title: { type: "string" }, body: { type: "string" } }, required: ["repo", "branch", "title"] }
+  }
 ];
-GITHUB_TOOL_DEFS.push({ name: "repo_merge_pr", description: "Merge an open grok/* or agent/* pull request into the default branch (normal merge commit, history kept, no force). Refused if the PR touches .github/.",
-  inputSchema: { type: "object", properties: { repo: { type: "string" }, number: { type: "number" }, branch: { type: "string", description: "or give the PR's branch" } }, required: ["repo"] } });
+GITHUB_TOOL_DEFS.push({
+  name: "repo_merge_pr",
+  description: "Merge an open grok/* or agent/* pull request into the default branch (normal merge commit, history kept, no force). Refused if the PR touches .github/.",
+  inputSchema: { type: "object", properties: { repo: { type: "string" }, number: { type: "number" }, branch: { type: "string", description: "or give the PR's branch" } }, required: ["repo"] }
+});
 var GITHUB_TOOLS = new Set(GITHUB_TOOL_DEFS.map((t) => t.name));
 async function runGithubTool(name, args, env, actor) {
   try {
@@ -2763,2885 +2794,2796 @@ async function runGithubTool(name, args, env, actor) {
     if (name === "repo_commit_push") return await ghCommitPush(env, args, actor);
     if (name === "repo_open_pr") return await ghOpenPr(env, args);
     if (name === "repo_merge_pr") return await ghMergePr(env, args);
-  } catch (e) { return { error: String((e && e.message) || e).slice(0, 600) }; }
+  } catch (e) {
+    return { error: String(e && e.message || e).slice(0, 600) };
+  }
   return { error: "unknown repo tool" };
 }
-
-// sealed-box.js — libsodium crypto_box_seal, needed to set GitHub Actions secrets from the hub.
-// Vendored, unmodified: tweetnacl 1.0.3 (nacl-fast.js, public domain / Unlicense) and blakejs 1.2.1
-// (util.js + blake2b.js, CC0). Generated by scripts/build-sealed-box.cjs — do not edit by hand.
-var __wtNacl = (function () { var module = { exports: {} }; var exports = module.exports; var require = undefined;
-(function(nacl) {
-'use strict';
-
-// Ported in 2014 by Dmitry Chestnykh and Devi Mandiri.
-// Public domain.
-//
-// Implementation derived from TweetNaCl version 20140427.
-// See for details: http://tweetnacl.cr.yp.to/
-
-var gf = function(init) {
-  var i, r = new Float64Array(16);
-  if (init) for (i = 0; i < init.length; i++) r[i] = init[i];
-  return r;
-};
-
-//  Pluggable, initialized in high-level API below.
-var randombytes = function(/* x, n */) { throw new Error('no PRNG'); };
-
-var _0 = new Uint8Array(16);
-var _9 = new Uint8Array(32); _9[0] = 9;
-
-var gf0 = gf(),
-    gf1 = gf([1]),
-    _121665 = gf([0xdb41, 1]),
-    D = gf([0x78a3, 0x1359, 0x4dca, 0x75eb, 0xd8ab, 0x4141, 0x0a4d, 0x0070, 0xe898, 0x7779, 0x4079, 0x8cc7, 0xfe73, 0x2b6f, 0x6cee, 0x5203]),
-    D2 = gf([0xf159, 0x26b2, 0x9b94, 0xebd6, 0xb156, 0x8283, 0x149a, 0x00e0, 0xd130, 0xeef3, 0x80f2, 0x198e, 0xfce7, 0x56df, 0xd9dc, 0x2406]),
-    X = gf([0xd51a, 0x8f25, 0x2d60, 0xc956, 0xa7b2, 0x9525, 0xc760, 0x692c, 0xdc5c, 0xfdd6, 0xe231, 0xc0a4, 0x53fe, 0xcd6e, 0x36d3, 0x2169]),
-    Y = gf([0x6658, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666, 0x6666]),
-    I = gf([0xa0b0, 0x4a0e, 0x1b27, 0xc4ee, 0xe478, 0xad2f, 0x1806, 0x2f43, 0xd7a7, 0x3dfb, 0x0099, 0x2b4d, 0xdf0b, 0x4fc1, 0x2480, 0x2b83]);
-
-function ts64(x, i, h, l) {
-  x[i]   = (h >> 24) & 0xff;
-  x[i+1] = (h >> 16) & 0xff;
-  x[i+2] = (h >>  8) & 0xff;
-  x[i+3] = h & 0xff;
-  x[i+4] = (l >> 24)  & 0xff;
-  x[i+5] = (l >> 16)  & 0xff;
-  x[i+6] = (l >>  8)  & 0xff;
-  x[i+7] = l & 0xff;
-}
-
-function vn(x, xi, y, yi, n) {
-  var i,d = 0;
-  for (i = 0; i < n; i++) d |= x[xi+i]^y[yi+i];
-  return (1 & ((d - 1) >>> 8)) - 1;
-}
-
-function crypto_verify_16(x, xi, y, yi) {
-  return vn(x,xi,y,yi,16);
-}
-
-function crypto_verify_32(x, xi, y, yi) {
-  return vn(x,xi,y,yi,32);
-}
-
-function core_salsa20(o, p, k, c) {
-  var j0  = c[ 0] & 0xff | (c[ 1] & 0xff)<<8 | (c[ 2] & 0xff)<<16 | (c[ 3] & 0xff)<<24,
-      j1  = k[ 0] & 0xff | (k[ 1] & 0xff)<<8 | (k[ 2] & 0xff)<<16 | (k[ 3] & 0xff)<<24,
-      j2  = k[ 4] & 0xff | (k[ 5] & 0xff)<<8 | (k[ 6] & 0xff)<<16 | (k[ 7] & 0xff)<<24,
-      j3  = k[ 8] & 0xff | (k[ 9] & 0xff)<<8 | (k[10] & 0xff)<<16 | (k[11] & 0xff)<<24,
-      j4  = k[12] & 0xff | (k[13] & 0xff)<<8 | (k[14] & 0xff)<<16 | (k[15] & 0xff)<<24,
-      j5  = c[ 4] & 0xff | (c[ 5] & 0xff)<<8 | (c[ 6] & 0xff)<<16 | (c[ 7] & 0xff)<<24,
-      j6  = p[ 0] & 0xff | (p[ 1] & 0xff)<<8 | (p[ 2] & 0xff)<<16 | (p[ 3] & 0xff)<<24,
-      j7  = p[ 4] & 0xff | (p[ 5] & 0xff)<<8 | (p[ 6] & 0xff)<<16 | (p[ 7] & 0xff)<<24,
-      j8  = p[ 8] & 0xff | (p[ 9] & 0xff)<<8 | (p[10] & 0xff)<<16 | (p[11] & 0xff)<<24,
-      j9  = p[12] & 0xff | (p[13] & 0xff)<<8 | (p[14] & 0xff)<<16 | (p[15] & 0xff)<<24,
-      j10 = c[ 8] & 0xff | (c[ 9] & 0xff)<<8 | (c[10] & 0xff)<<16 | (c[11] & 0xff)<<24,
-      j11 = k[16] & 0xff | (k[17] & 0xff)<<8 | (k[18] & 0xff)<<16 | (k[19] & 0xff)<<24,
-      j12 = k[20] & 0xff | (k[21] & 0xff)<<8 | (k[22] & 0xff)<<16 | (k[23] & 0xff)<<24,
-      j13 = k[24] & 0xff | (k[25] & 0xff)<<8 | (k[26] & 0xff)<<16 | (k[27] & 0xff)<<24,
-      j14 = k[28] & 0xff | (k[29] & 0xff)<<8 | (k[30] & 0xff)<<16 | (k[31] & 0xff)<<24,
-      j15 = c[12] & 0xff | (c[13] & 0xff)<<8 | (c[14] & 0xff)<<16 | (c[15] & 0xff)<<24;
-
-  var x0 = j0, x1 = j1, x2 = j2, x3 = j3, x4 = j4, x5 = j5, x6 = j6, x7 = j7,
-      x8 = j8, x9 = j9, x10 = j10, x11 = j11, x12 = j12, x13 = j13, x14 = j14,
-      x15 = j15, u;
-
-  for (var i = 0; i < 20; i += 2) {
-    u = x0 + x12 | 0;
-    x4 ^= u<<7 | u>>>(32-7);
-    u = x4 + x0 | 0;
-    x8 ^= u<<9 | u>>>(32-9);
-    u = x8 + x4 | 0;
-    x12 ^= u<<13 | u>>>(32-13);
-    u = x12 + x8 | 0;
-    x0 ^= u<<18 | u>>>(32-18);
-
-    u = x5 + x1 | 0;
-    x9 ^= u<<7 | u>>>(32-7);
-    u = x9 + x5 | 0;
-    x13 ^= u<<9 | u>>>(32-9);
-    u = x13 + x9 | 0;
-    x1 ^= u<<13 | u>>>(32-13);
-    u = x1 + x13 | 0;
-    x5 ^= u<<18 | u>>>(32-18);
-
-    u = x10 + x6 | 0;
-    x14 ^= u<<7 | u>>>(32-7);
-    u = x14 + x10 | 0;
-    x2 ^= u<<9 | u>>>(32-9);
-    u = x2 + x14 | 0;
-    x6 ^= u<<13 | u>>>(32-13);
-    u = x6 + x2 | 0;
-    x10 ^= u<<18 | u>>>(32-18);
-
-    u = x15 + x11 | 0;
-    x3 ^= u<<7 | u>>>(32-7);
-    u = x3 + x15 | 0;
-    x7 ^= u<<9 | u>>>(32-9);
-    u = x7 + x3 | 0;
-    x11 ^= u<<13 | u>>>(32-13);
-    u = x11 + x7 | 0;
-    x15 ^= u<<18 | u>>>(32-18);
-
-    u = x0 + x3 | 0;
-    x1 ^= u<<7 | u>>>(32-7);
-    u = x1 + x0 | 0;
-    x2 ^= u<<9 | u>>>(32-9);
-    u = x2 + x1 | 0;
-    x3 ^= u<<13 | u>>>(32-13);
-    u = x3 + x2 | 0;
-    x0 ^= u<<18 | u>>>(32-18);
-
-    u = x5 + x4 | 0;
-    x6 ^= u<<7 | u>>>(32-7);
-    u = x6 + x5 | 0;
-    x7 ^= u<<9 | u>>>(32-9);
-    u = x7 + x6 | 0;
-    x4 ^= u<<13 | u>>>(32-13);
-    u = x4 + x7 | 0;
-    x5 ^= u<<18 | u>>>(32-18);
-
-    u = x10 + x9 | 0;
-    x11 ^= u<<7 | u>>>(32-7);
-    u = x11 + x10 | 0;
-    x8 ^= u<<9 | u>>>(32-9);
-    u = x8 + x11 | 0;
-    x9 ^= u<<13 | u>>>(32-13);
-    u = x9 + x8 | 0;
-    x10 ^= u<<18 | u>>>(32-18);
-
-    u = x15 + x14 | 0;
-    x12 ^= u<<7 | u>>>(32-7);
-    u = x12 + x15 | 0;
-    x13 ^= u<<9 | u>>>(32-9);
-    u = x13 + x12 | 0;
-    x14 ^= u<<13 | u>>>(32-13);
-    u = x14 + x13 | 0;
-    x15 ^= u<<18 | u>>>(32-18);
-  }
-   x0 =  x0 +  j0 | 0;
-   x1 =  x1 +  j1 | 0;
-   x2 =  x2 +  j2 | 0;
-   x3 =  x3 +  j3 | 0;
-   x4 =  x4 +  j4 | 0;
-   x5 =  x5 +  j5 | 0;
-   x6 =  x6 +  j6 | 0;
-   x7 =  x7 +  j7 | 0;
-   x8 =  x8 +  j8 | 0;
-   x9 =  x9 +  j9 | 0;
-  x10 = x10 + j10 | 0;
-  x11 = x11 + j11 | 0;
-  x12 = x12 + j12 | 0;
-  x13 = x13 + j13 | 0;
-  x14 = x14 + j14 | 0;
-  x15 = x15 + j15 | 0;
-
-  o[ 0] = x0 >>>  0 & 0xff;
-  o[ 1] = x0 >>>  8 & 0xff;
-  o[ 2] = x0 >>> 16 & 0xff;
-  o[ 3] = x0 >>> 24 & 0xff;
-
-  o[ 4] = x1 >>>  0 & 0xff;
-  o[ 5] = x1 >>>  8 & 0xff;
-  o[ 6] = x1 >>> 16 & 0xff;
-  o[ 7] = x1 >>> 24 & 0xff;
-
-  o[ 8] = x2 >>>  0 & 0xff;
-  o[ 9] = x2 >>>  8 & 0xff;
-  o[10] = x2 >>> 16 & 0xff;
-  o[11] = x2 >>> 24 & 0xff;
-
-  o[12] = x3 >>>  0 & 0xff;
-  o[13] = x3 >>>  8 & 0xff;
-  o[14] = x3 >>> 16 & 0xff;
-  o[15] = x3 >>> 24 & 0xff;
-
-  o[16] = x4 >>>  0 & 0xff;
-  o[17] = x4 >>>  8 & 0xff;
-  o[18] = x4 >>> 16 & 0xff;
-  o[19] = x4 >>> 24 & 0xff;
-
-  o[20] = x5 >>>  0 & 0xff;
-  o[21] = x5 >>>  8 & 0xff;
-  o[22] = x5 >>> 16 & 0xff;
-  o[23] = x5 >>> 24 & 0xff;
-
-  o[24] = x6 >>>  0 & 0xff;
-  o[25] = x6 >>>  8 & 0xff;
-  o[26] = x6 >>> 16 & 0xff;
-  o[27] = x6 >>> 24 & 0xff;
-
-  o[28] = x7 >>>  0 & 0xff;
-  o[29] = x7 >>>  8 & 0xff;
-  o[30] = x7 >>> 16 & 0xff;
-  o[31] = x7 >>> 24 & 0xff;
-
-  o[32] = x8 >>>  0 & 0xff;
-  o[33] = x8 >>>  8 & 0xff;
-  o[34] = x8 >>> 16 & 0xff;
-  o[35] = x8 >>> 24 & 0xff;
-
-  o[36] = x9 >>>  0 & 0xff;
-  o[37] = x9 >>>  8 & 0xff;
-  o[38] = x9 >>> 16 & 0xff;
-  o[39] = x9 >>> 24 & 0xff;
-
-  o[40] = x10 >>>  0 & 0xff;
-  o[41] = x10 >>>  8 & 0xff;
-  o[42] = x10 >>> 16 & 0xff;
-  o[43] = x10 >>> 24 & 0xff;
-
-  o[44] = x11 >>>  0 & 0xff;
-  o[45] = x11 >>>  8 & 0xff;
-  o[46] = x11 >>> 16 & 0xff;
-  o[47] = x11 >>> 24 & 0xff;
-
-  o[48] = x12 >>>  0 & 0xff;
-  o[49] = x12 >>>  8 & 0xff;
-  o[50] = x12 >>> 16 & 0xff;
-  o[51] = x12 >>> 24 & 0xff;
-
-  o[52] = x13 >>>  0 & 0xff;
-  o[53] = x13 >>>  8 & 0xff;
-  o[54] = x13 >>> 16 & 0xff;
-  o[55] = x13 >>> 24 & 0xff;
-
-  o[56] = x14 >>>  0 & 0xff;
-  o[57] = x14 >>>  8 & 0xff;
-  o[58] = x14 >>> 16 & 0xff;
-  o[59] = x14 >>> 24 & 0xff;
-
-  o[60] = x15 >>>  0 & 0xff;
-  o[61] = x15 >>>  8 & 0xff;
-  o[62] = x15 >>> 16 & 0xff;
-  o[63] = x15 >>> 24 & 0xff;
-}
-
-function core_hsalsa20(o,p,k,c) {
-  var j0  = c[ 0] & 0xff | (c[ 1] & 0xff)<<8 | (c[ 2] & 0xff)<<16 | (c[ 3] & 0xff)<<24,
-      j1  = k[ 0] & 0xff | (k[ 1] & 0xff)<<8 | (k[ 2] & 0xff)<<16 | (k[ 3] & 0xff)<<24,
-      j2  = k[ 4] & 0xff | (k[ 5] & 0xff)<<8 | (k[ 6] & 0xff)<<16 | (k[ 7] & 0xff)<<24,
-      j3  = k[ 8] & 0xff | (k[ 9] & 0xff)<<8 | (k[10] & 0xff)<<16 | (k[11] & 0xff)<<24,
-      j4  = k[12] & 0xff | (k[13] & 0xff)<<8 | (k[14] & 0xff)<<16 | (k[15] & 0xff)<<24,
-      j5  = c[ 4] & 0xff | (c[ 5] & 0xff)<<8 | (c[ 6] & 0xff)<<16 | (c[ 7] & 0xff)<<24,
-      j6  = p[ 0] & 0xff | (p[ 1] & 0xff)<<8 | (p[ 2] & 0xff)<<16 | (p[ 3] & 0xff)<<24,
-      j7  = p[ 4] & 0xff | (p[ 5] & 0xff)<<8 | (p[ 6] & 0xff)<<16 | (p[ 7] & 0xff)<<24,
-      j8  = p[ 8] & 0xff | (p[ 9] & 0xff)<<8 | (p[10] & 0xff)<<16 | (p[11] & 0xff)<<24,
-      j9  = p[12] & 0xff | (p[13] & 0xff)<<8 | (p[14] & 0xff)<<16 | (p[15] & 0xff)<<24,
-      j10 = c[ 8] & 0xff | (c[ 9] & 0xff)<<8 | (c[10] & 0xff)<<16 | (c[11] & 0xff)<<24,
-      j11 = k[16] & 0xff | (k[17] & 0xff)<<8 | (k[18] & 0xff)<<16 | (k[19] & 0xff)<<24,
-      j12 = k[20] & 0xff | (k[21] & 0xff)<<8 | (k[22] & 0xff)<<16 | (k[23] & 0xff)<<24,
-      j13 = k[24] & 0xff | (k[25] & 0xff)<<8 | (k[26] & 0xff)<<16 | (k[27] & 0xff)<<24,
-      j14 = k[28] & 0xff | (k[29] & 0xff)<<8 | (k[30] & 0xff)<<16 | (k[31] & 0xff)<<24,
-      j15 = c[12] & 0xff | (c[13] & 0xff)<<8 | (c[14] & 0xff)<<16 | (c[15] & 0xff)<<24;
-
-  var x0 = j0, x1 = j1, x2 = j2, x3 = j3, x4 = j4, x5 = j5, x6 = j6, x7 = j7,
-      x8 = j8, x9 = j9, x10 = j10, x11 = j11, x12 = j12, x13 = j13, x14 = j14,
-      x15 = j15, u;
-
-  for (var i = 0; i < 20; i += 2) {
-    u = x0 + x12 | 0;
-    x4 ^= u<<7 | u>>>(32-7);
-    u = x4 + x0 | 0;
-    x8 ^= u<<9 | u>>>(32-9);
-    u = x8 + x4 | 0;
-    x12 ^= u<<13 | u>>>(32-13);
-    u = x12 + x8 | 0;
-    x0 ^= u<<18 | u>>>(32-18);
-
-    u = x5 + x1 | 0;
-    x9 ^= u<<7 | u>>>(32-7);
-    u = x9 + x5 | 0;
-    x13 ^= u<<9 | u>>>(32-9);
-    u = x13 + x9 | 0;
-    x1 ^= u<<13 | u>>>(32-13);
-    u = x1 + x13 | 0;
-    x5 ^= u<<18 | u>>>(32-18);
-
-    u = x10 + x6 | 0;
-    x14 ^= u<<7 | u>>>(32-7);
-    u = x14 + x10 | 0;
-    x2 ^= u<<9 | u>>>(32-9);
-    u = x2 + x14 | 0;
-    x6 ^= u<<13 | u>>>(32-13);
-    u = x6 + x2 | 0;
-    x10 ^= u<<18 | u>>>(32-18);
-
-    u = x15 + x11 | 0;
-    x3 ^= u<<7 | u>>>(32-7);
-    u = x3 + x15 | 0;
-    x7 ^= u<<9 | u>>>(32-9);
-    u = x7 + x3 | 0;
-    x11 ^= u<<13 | u>>>(32-13);
-    u = x11 + x7 | 0;
-    x15 ^= u<<18 | u>>>(32-18);
-
-    u = x0 + x3 | 0;
-    x1 ^= u<<7 | u>>>(32-7);
-    u = x1 + x0 | 0;
-    x2 ^= u<<9 | u>>>(32-9);
-    u = x2 + x1 | 0;
-    x3 ^= u<<13 | u>>>(32-13);
-    u = x3 + x2 | 0;
-    x0 ^= u<<18 | u>>>(32-18);
-
-    u = x5 + x4 | 0;
-    x6 ^= u<<7 | u>>>(32-7);
-    u = x6 + x5 | 0;
-    x7 ^= u<<9 | u>>>(32-9);
-    u = x7 + x6 | 0;
-    x4 ^= u<<13 | u>>>(32-13);
-    u = x4 + x7 | 0;
-    x5 ^= u<<18 | u>>>(32-18);
-
-    u = x10 + x9 | 0;
-    x11 ^= u<<7 | u>>>(32-7);
-    u = x11 + x10 | 0;
-    x8 ^= u<<9 | u>>>(32-9);
-    u = x8 + x11 | 0;
-    x9 ^= u<<13 | u>>>(32-13);
-    u = x9 + x8 | 0;
-    x10 ^= u<<18 | u>>>(32-18);
-
-    u = x15 + x14 | 0;
-    x12 ^= u<<7 | u>>>(32-7);
-    u = x12 + x15 | 0;
-    x13 ^= u<<9 | u>>>(32-9);
-    u = x13 + x12 | 0;
-    x14 ^= u<<13 | u>>>(32-13);
-    u = x14 + x13 | 0;
-    x15 ^= u<<18 | u>>>(32-18);
-  }
-
-  o[ 0] = x0 >>>  0 & 0xff;
-  o[ 1] = x0 >>>  8 & 0xff;
-  o[ 2] = x0 >>> 16 & 0xff;
-  o[ 3] = x0 >>> 24 & 0xff;
-
-  o[ 4] = x5 >>>  0 & 0xff;
-  o[ 5] = x5 >>>  8 & 0xff;
-  o[ 6] = x5 >>> 16 & 0xff;
-  o[ 7] = x5 >>> 24 & 0xff;
-
-  o[ 8] = x10 >>>  0 & 0xff;
-  o[ 9] = x10 >>>  8 & 0xff;
-  o[10] = x10 >>> 16 & 0xff;
-  o[11] = x10 >>> 24 & 0xff;
-
-  o[12] = x15 >>>  0 & 0xff;
-  o[13] = x15 >>>  8 & 0xff;
-  o[14] = x15 >>> 16 & 0xff;
-  o[15] = x15 >>> 24 & 0xff;
-
-  o[16] = x6 >>>  0 & 0xff;
-  o[17] = x6 >>>  8 & 0xff;
-  o[18] = x6 >>> 16 & 0xff;
-  o[19] = x6 >>> 24 & 0xff;
-
-  o[20] = x7 >>>  0 & 0xff;
-  o[21] = x7 >>>  8 & 0xff;
-  o[22] = x7 >>> 16 & 0xff;
-  o[23] = x7 >>> 24 & 0xff;
-
-  o[24] = x8 >>>  0 & 0xff;
-  o[25] = x8 >>>  8 & 0xff;
-  o[26] = x8 >>> 16 & 0xff;
-  o[27] = x8 >>> 24 & 0xff;
-
-  o[28] = x9 >>>  0 & 0xff;
-  o[29] = x9 >>>  8 & 0xff;
-  o[30] = x9 >>> 16 & 0xff;
-  o[31] = x9 >>> 24 & 0xff;
-}
-
-function crypto_core_salsa20(out,inp,k,c) {
-  core_salsa20(out,inp,k,c);
-}
-
-function crypto_core_hsalsa20(out,inp,k,c) {
-  core_hsalsa20(out,inp,k,c);
-}
-
-var sigma = new Uint8Array([101, 120, 112, 97, 110, 100, 32, 51, 50, 45, 98, 121, 116, 101, 32, 107]);
-            // "expand 32-byte k"
-
-function crypto_stream_salsa20_xor(c,cpos,m,mpos,b,n,k) {
-  var z = new Uint8Array(16), x = new Uint8Array(64);
-  var u, i;
-  for (i = 0; i < 16; i++) z[i] = 0;
-  for (i = 0; i < 8; i++) z[i] = n[i];
-  while (b >= 64) {
-    crypto_core_salsa20(x,z,k,sigma);
-    for (i = 0; i < 64; i++) c[cpos+i] = m[mpos+i] ^ x[i];
-    u = 1;
-    for (i = 8; i < 16; i++) {
-      u = u + (z[i] & 0xff) | 0;
-      z[i] = u & 0xff;
-      u >>>= 8;
+var __wtNacl = (function() {
+  var module = { exports: {} };
+  var exports = module.exports;
+  var require2 = void 0;
+  (function(nacl) {
+    "use strict";
+    var gf = function(init) {
+      var i, r = new Float64Array(16);
+      if (init) for (i = 0; i < init.length; i++) r[i] = init[i];
+      return r;
+    };
+    var randombytes = function() {
+      throw new Error("no PRNG");
+    };
+    var _0 = new Uint8Array(16);
+    var _9 = new Uint8Array(32);
+    _9[0] = 9;
+    var gf0 = gf(), gf1 = gf([1]), _121665 = gf([56129, 1]), D = gf([30883, 4953, 19914, 30187, 55467, 16705, 2637, 112, 59544, 30585, 16505, 36039, 65139, 11119, 27886, 20995]), D2 = gf([61785, 9906, 39828, 60374, 45398, 33411, 5274, 224, 53552, 61171, 33010, 6542, 64743, 22239, 55772, 9222]), X = gf([54554, 36645, 11616, 51542, 42930, 38181, 51040, 26924, 56412, 64982, 57905, 49316, 21502, 52590, 14035, 8553]), Y = gf([26200, 26214, 26214, 26214, 26214, 26214, 26214, 26214, 26214, 26214, 26214, 26214, 26214, 26214, 26214, 26214]), I = gf([41136, 18958, 6951, 50414, 58488, 44335, 6150, 12099, 55207, 15867, 153, 11085, 57099, 20417, 9344, 11139]);
+    function ts64(x, i, h, l) {
+      x[i] = h >> 24 & 255;
+      x[i + 1] = h >> 16 & 255;
+      x[i + 2] = h >> 8 & 255;
+      x[i + 3] = h & 255;
+      x[i + 4] = l >> 24 & 255;
+      x[i + 5] = l >> 16 & 255;
+      x[i + 6] = l >> 8 & 255;
+      x[i + 7] = l & 255;
     }
-    b -= 64;
-    cpos += 64;
-    mpos += 64;
-  }
-  if (b > 0) {
-    crypto_core_salsa20(x,z,k,sigma);
-    for (i = 0; i < b; i++) c[cpos+i] = m[mpos+i] ^ x[i];
-  }
-  return 0;
-}
-
-function crypto_stream_salsa20(c,cpos,b,n,k) {
-  var z = new Uint8Array(16), x = new Uint8Array(64);
-  var u, i;
-  for (i = 0; i < 16; i++) z[i] = 0;
-  for (i = 0; i < 8; i++) z[i] = n[i];
-  while (b >= 64) {
-    crypto_core_salsa20(x,z,k,sigma);
-    for (i = 0; i < 64; i++) c[cpos+i] = x[i];
-    u = 1;
-    for (i = 8; i < 16; i++) {
-      u = u + (z[i] & 0xff) | 0;
-      z[i] = u & 0xff;
-      u >>>= 8;
+    function vn(x, xi, y, yi, n) {
+      var i, d = 0;
+      for (i = 0; i < n; i++) d |= x[xi + i] ^ y[yi + i];
+      return (1 & d - 1 >>> 8) - 1;
     }
-    b -= 64;
-    cpos += 64;
-  }
-  if (b > 0) {
-    crypto_core_salsa20(x,z,k,sigma);
-    for (i = 0; i < b; i++) c[cpos+i] = x[i];
-  }
-  return 0;
-}
-
-function crypto_stream(c,cpos,d,n,k) {
-  var s = new Uint8Array(32);
-  crypto_core_hsalsa20(s,n,k,sigma);
-  var sn = new Uint8Array(8);
-  for (var i = 0; i < 8; i++) sn[i] = n[i+16];
-  return crypto_stream_salsa20(c,cpos,d,sn,s);
-}
-
-function crypto_stream_xor(c,cpos,m,mpos,d,n,k) {
-  var s = new Uint8Array(32);
-  crypto_core_hsalsa20(s,n,k,sigma);
-  var sn = new Uint8Array(8);
-  for (var i = 0; i < 8; i++) sn[i] = n[i+16];
-  return crypto_stream_salsa20_xor(c,cpos,m,mpos,d,sn,s);
-}
-
-/*
-* Port of Andrew Moon's Poly1305-donna-16. Public domain.
-* https://github.com/floodyberry/poly1305-donna
-*/
-
-var poly1305 = function(key) {
-  this.buffer = new Uint8Array(16);
-  this.r = new Uint16Array(10);
-  this.h = new Uint16Array(10);
-  this.pad = new Uint16Array(8);
-  this.leftover = 0;
-  this.fin = 0;
-
-  var t0, t1, t2, t3, t4, t5, t6, t7;
-
-  t0 = key[ 0] & 0xff | (key[ 1] & 0xff) << 8; this.r[0] = ( t0                     ) & 0x1fff;
-  t1 = key[ 2] & 0xff | (key[ 3] & 0xff) << 8; this.r[1] = ((t0 >>> 13) | (t1 <<  3)) & 0x1fff;
-  t2 = key[ 4] & 0xff | (key[ 5] & 0xff) << 8; this.r[2] = ((t1 >>> 10) | (t2 <<  6)) & 0x1f03;
-  t3 = key[ 6] & 0xff | (key[ 7] & 0xff) << 8; this.r[3] = ((t2 >>>  7) | (t3 <<  9)) & 0x1fff;
-  t4 = key[ 8] & 0xff | (key[ 9] & 0xff) << 8; this.r[4] = ((t3 >>>  4) | (t4 << 12)) & 0x00ff;
-  this.r[5] = ((t4 >>>  1)) & 0x1ffe;
-  t5 = key[10] & 0xff | (key[11] & 0xff) << 8; this.r[6] = ((t4 >>> 14) | (t5 <<  2)) & 0x1fff;
-  t6 = key[12] & 0xff | (key[13] & 0xff) << 8; this.r[7] = ((t5 >>> 11) | (t6 <<  5)) & 0x1f81;
-  t7 = key[14] & 0xff | (key[15] & 0xff) << 8; this.r[8] = ((t6 >>>  8) | (t7 <<  8)) & 0x1fff;
-  this.r[9] = ((t7 >>>  5)) & 0x007f;
-
-  this.pad[0] = key[16] & 0xff | (key[17] & 0xff) << 8;
-  this.pad[1] = key[18] & 0xff | (key[19] & 0xff) << 8;
-  this.pad[2] = key[20] & 0xff | (key[21] & 0xff) << 8;
-  this.pad[3] = key[22] & 0xff | (key[23] & 0xff) << 8;
-  this.pad[4] = key[24] & 0xff | (key[25] & 0xff) << 8;
-  this.pad[5] = key[26] & 0xff | (key[27] & 0xff) << 8;
-  this.pad[6] = key[28] & 0xff | (key[29] & 0xff) << 8;
-  this.pad[7] = key[30] & 0xff | (key[31] & 0xff) << 8;
-};
-
-poly1305.prototype.blocks = function(m, mpos, bytes) {
-  var hibit = this.fin ? 0 : (1 << 11);
-  var t0, t1, t2, t3, t4, t5, t6, t7, c;
-  var d0, d1, d2, d3, d4, d5, d6, d7, d8, d9;
-
-  var h0 = this.h[0],
-      h1 = this.h[1],
-      h2 = this.h[2],
-      h3 = this.h[3],
-      h4 = this.h[4],
-      h5 = this.h[5],
-      h6 = this.h[6],
-      h7 = this.h[7],
-      h8 = this.h[8],
-      h9 = this.h[9];
-
-  var r0 = this.r[0],
-      r1 = this.r[1],
-      r2 = this.r[2],
-      r3 = this.r[3],
-      r4 = this.r[4],
-      r5 = this.r[5],
-      r6 = this.r[6],
-      r7 = this.r[7],
-      r8 = this.r[8],
-      r9 = this.r[9];
-
-  while (bytes >= 16) {
-    t0 = m[mpos+ 0] & 0xff | (m[mpos+ 1] & 0xff) << 8; h0 += ( t0                     ) & 0x1fff;
-    t1 = m[mpos+ 2] & 0xff | (m[mpos+ 3] & 0xff) << 8; h1 += ((t0 >>> 13) | (t1 <<  3)) & 0x1fff;
-    t2 = m[mpos+ 4] & 0xff | (m[mpos+ 5] & 0xff) << 8; h2 += ((t1 >>> 10) | (t2 <<  6)) & 0x1fff;
-    t3 = m[mpos+ 6] & 0xff | (m[mpos+ 7] & 0xff) << 8; h3 += ((t2 >>>  7) | (t3 <<  9)) & 0x1fff;
-    t4 = m[mpos+ 8] & 0xff | (m[mpos+ 9] & 0xff) << 8; h4 += ((t3 >>>  4) | (t4 << 12)) & 0x1fff;
-    h5 += ((t4 >>>  1)) & 0x1fff;
-    t5 = m[mpos+10] & 0xff | (m[mpos+11] & 0xff) << 8; h6 += ((t4 >>> 14) | (t5 <<  2)) & 0x1fff;
-    t6 = m[mpos+12] & 0xff | (m[mpos+13] & 0xff) << 8; h7 += ((t5 >>> 11) | (t6 <<  5)) & 0x1fff;
-    t7 = m[mpos+14] & 0xff | (m[mpos+15] & 0xff) << 8; h8 += ((t6 >>>  8) | (t7 <<  8)) & 0x1fff;
-    h9 += ((t7 >>> 5)) | hibit;
-
-    c = 0;
-
-    d0 = c;
-    d0 += h0 * r0;
-    d0 += h1 * (5 * r9);
-    d0 += h2 * (5 * r8);
-    d0 += h3 * (5 * r7);
-    d0 += h4 * (5 * r6);
-    c = (d0 >>> 13); d0 &= 0x1fff;
-    d0 += h5 * (5 * r5);
-    d0 += h6 * (5 * r4);
-    d0 += h7 * (5 * r3);
-    d0 += h8 * (5 * r2);
-    d0 += h9 * (5 * r1);
-    c += (d0 >>> 13); d0 &= 0x1fff;
-
-    d1 = c;
-    d1 += h0 * r1;
-    d1 += h1 * r0;
-    d1 += h2 * (5 * r9);
-    d1 += h3 * (5 * r8);
-    d1 += h4 * (5 * r7);
-    c = (d1 >>> 13); d1 &= 0x1fff;
-    d1 += h5 * (5 * r6);
-    d1 += h6 * (5 * r5);
-    d1 += h7 * (5 * r4);
-    d1 += h8 * (5 * r3);
-    d1 += h9 * (5 * r2);
-    c += (d1 >>> 13); d1 &= 0x1fff;
-
-    d2 = c;
-    d2 += h0 * r2;
-    d2 += h1 * r1;
-    d2 += h2 * r0;
-    d2 += h3 * (5 * r9);
-    d2 += h4 * (5 * r8);
-    c = (d2 >>> 13); d2 &= 0x1fff;
-    d2 += h5 * (5 * r7);
-    d2 += h6 * (5 * r6);
-    d2 += h7 * (5 * r5);
-    d2 += h8 * (5 * r4);
-    d2 += h9 * (5 * r3);
-    c += (d2 >>> 13); d2 &= 0x1fff;
-
-    d3 = c;
-    d3 += h0 * r3;
-    d3 += h1 * r2;
-    d3 += h2 * r1;
-    d3 += h3 * r0;
-    d3 += h4 * (5 * r9);
-    c = (d3 >>> 13); d3 &= 0x1fff;
-    d3 += h5 * (5 * r8);
-    d3 += h6 * (5 * r7);
-    d3 += h7 * (5 * r6);
-    d3 += h8 * (5 * r5);
-    d3 += h9 * (5 * r4);
-    c += (d3 >>> 13); d3 &= 0x1fff;
-
-    d4 = c;
-    d4 += h0 * r4;
-    d4 += h1 * r3;
-    d4 += h2 * r2;
-    d4 += h3 * r1;
-    d4 += h4 * r0;
-    c = (d4 >>> 13); d4 &= 0x1fff;
-    d4 += h5 * (5 * r9);
-    d4 += h6 * (5 * r8);
-    d4 += h7 * (5 * r7);
-    d4 += h8 * (5 * r6);
-    d4 += h9 * (5 * r5);
-    c += (d4 >>> 13); d4 &= 0x1fff;
-
-    d5 = c;
-    d5 += h0 * r5;
-    d5 += h1 * r4;
-    d5 += h2 * r3;
-    d5 += h3 * r2;
-    d5 += h4 * r1;
-    c = (d5 >>> 13); d5 &= 0x1fff;
-    d5 += h5 * r0;
-    d5 += h6 * (5 * r9);
-    d5 += h7 * (5 * r8);
-    d5 += h8 * (5 * r7);
-    d5 += h9 * (5 * r6);
-    c += (d5 >>> 13); d5 &= 0x1fff;
-
-    d6 = c;
-    d6 += h0 * r6;
-    d6 += h1 * r5;
-    d6 += h2 * r4;
-    d6 += h3 * r3;
-    d6 += h4 * r2;
-    c = (d6 >>> 13); d6 &= 0x1fff;
-    d6 += h5 * r1;
-    d6 += h6 * r0;
-    d6 += h7 * (5 * r9);
-    d6 += h8 * (5 * r8);
-    d6 += h9 * (5 * r7);
-    c += (d6 >>> 13); d6 &= 0x1fff;
-
-    d7 = c;
-    d7 += h0 * r7;
-    d7 += h1 * r6;
-    d7 += h2 * r5;
-    d7 += h3 * r4;
-    d7 += h4 * r3;
-    c = (d7 >>> 13); d7 &= 0x1fff;
-    d7 += h5 * r2;
-    d7 += h6 * r1;
-    d7 += h7 * r0;
-    d7 += h8 * (5 * r9);
-    d7 += h9 * (5 * r8);
-    c += (d7 >>> 13); d7 &= 0x1fff;
-
-    d8 = c;
-    d8 += h0 * r8;
-    d8 += h1 * r7;
-    d8 += h2 * r6;
-    d8 += h3 * r5;
-    d8 += h4 * r4;
-    c = (d8 >>> 13); d8 &= 0x1fff;
-    d8 += h5 * r3;
-    d8 += h6 * r2;
-    d8 += h7 * r1;
-    d8 += h8 * r0;
-    d8 += h9 * (5 * r9);
-    c += (d8 >>> 13); d8 &= 0x1fff;
-
-    d9 = c;
-    d9 += h0 * r9;
-    d9 += h1 * r8;
-    d9 += h2 * r7;
-    d9 += h3 * r6;
-    d9 += h4 * r5;
-    c = (d9 >>> 13); d9 &= 0x1fff;
-    d9 += h5 * r4;
-    d9 += h6 * r3;
-    d9 += h7 * r2;
-    d9 += h8 * r1;
-    d9 += h9 * r0;
-    c += (d9 >>> 13); d9 &= 0x1fff;
-
-    c = (((c << 2) + c)) | 0;
-    c = (c + d0) | 0;
-    d0 = c & 0x1fff;
-    c = (c >>> 13);
-    d1 += c;
-
-    h0 = d0;
-    h1 = d1;
-    h2 = d2;
-    h3 = d3;
-    h4 = d4;
-    h5 = d5;
-    h6 = d6;
-    h7 = d7;
-    h8 = d8;
-    h9 = d9;
-
-    mpos += 16;
-    bytes -= 16;
-  }
-  this.h[0] = h0;
-  this.h[1] = h1;
-  this.h[2] = h2;
-  this.h[3] = h3;
-  this.h[4] = h4;
-  this.h[5] = h5;
-  this.h[6] = h6;
-  this.h[7] = h7;
-  this.h[8] = h8;
-  this.h[9] = h9;
-};
-
-poly1305.prototype.finish = function(mac, macpos) {
-  var g = new Uint16Array(10);
-  var c, mask, f, i;
-
-  if (this.leftover) {
-    i = this.leftover;
-    this.buffer[i++] = 1;
-    for (; i < 16; i++) this.buffer[i] = 0;
-    this.fin = 1;
-    this.blocks(this.buffer, 0, 16);
-  }
-
-  c = this.h[1] >>> 13;
-  this.h[1] &= 0x1fff;
-  for (i = 2; i < 10; i++) {
-    this.h[i] += c;
-    c = this.h[i] >>> 13;
-    this.h[i] &= 0x1fff;
-  }
-  this.h[0] += (c * 5);
-  c = this.h[0] >>> 13;
-  this.h[0] &= 0x1fff;
-  this.h[1] += c;
-  c = this.h[1] >>> 13;
-  this.h[1] &= 0x1fff;
-  this.h[2] += c;
-
-  g[0] = this.h[0] + 5;
-  c = g[0] >>> 13;
-  g[0] &= 0x1fff;
-  for (i = 1; i < 10; i++) {
-    g[i] = this.h[i] + c;
-    c = g[i] >>> 13;
-    g[i] &= 0x1fff;
-  }
-  g[9] -= (1 << 13);
-
-  mask = (c ^ 1) - 1;
-  for (i = 0; i < 10; i++) g[i] &= mask;
-  mask = ~mask;
-  for (i = 0; i < 10; i++) this.h[i] = (this.h[i] & mask) | g[i];
-
-  this.h[0] = ((this.h[0]       ) | (this.h[1] << 13)                    ) & 0xffff;
-  this.h[1] = ((this.h[1] >>>  3) | (this.h[2] << 10)                    ) & 0xffff;
-  this.h[2] = ((this.h[2] >>>  6) | (this.h[3] <<  7)                    ) & 0xffff;
-  this.h[3] = ((this.h[3] >>>  9) | (this.h[4] <<  4)                    ) & 0xffff;
-  this.h[4] = ((this.h[4] >>> 12) | (this.h[5] <<  1) | (this.h[6] << 14)) & 0xffff;
-  this.h[5] = ((this.h[6] >>>  2) | (this.h[7] << 11)                    ) & 0xffff;
-  this.h[6] = ((this.h[7] >>>  5) | (this.h[8] <<  8)                    ) & 0xffff;
-  this.h[7] = ((this.h[8] >>>  8) | (this.h[9] <<  5)                    ) & 0xffff;
-
-  f = this.h[0] + this.pad[0];
-  this.h[0] = f & 0xffff;
-  for (i = 1; i < 8; i++) {
-    f = (((this.h[i] + this.pad[i]) | 0) + (f >>> 16)) | 0;
-    this.h[i] = f & 0xffff;
-  }
-
-  mac[macpos+ 0] = (this.h[0] >>> 0) & 0xff;
-  mac[macpos+ 1] = (this.h[0] >>> 8) & 0xff;
-  mac[macpos+ 2] = (this.h[1] >>> 0) & 0xff;
-  mac[macpos+ 3] = (this.h[1] >>> 8) & 0xff;
-  mac[macpos+ 4] = (this.h[2] >>> 0) & 0xff;
-  mac[macpos+ 5] = (this.h[2] >>> 8) & 0xff;
-  mac[macpos+ 6] = (this.h[3] >>> 0) & 0xff;
-  mac[macpos+ 7] = (this.h[3] >>> 8) & 0xff;
-  mac[macpos+ 8] = (this.h[4] >>> 0) & 0xff;
-  mac[macpos+ 9] = (this.h[4] >>> 8) & 0xff;
-  mac[macpos+10] = (this.h[5] >>> 0) & 0xff;
-  mac[macpos+11] = (this.h[5] >>> 8) & 0xff;
-  mac[macpos+12] = (this.h[6] >>> 0) & 0xff;
-  mac[macpos+13] = (this.h[6] >>> 8) & 0xff;
-  mac[macpos+14] = (this.h[7] >>> 0) & 0xff;
-  mac[macpos+15] = (this.h[7] >>> 8) & 0xff;
-};
-
-poly1305.prototype.update = function(m, mpos, bytes) {
-  var i, want;
-
-  if (this.leftover) {
-    want = (16 - this.leftover);
-    if (want > bytes)
-      want = bytes;
-    for (i = 0; i < want; i++)
-      this.buffer[this.leftover + i] = m[mpos+i];
-    bytes -= want;
-    mpos += want;
-    this.leftover += want;
-    if (this.leftover < 16)
-      return;
-    this.blocks(this.buffer, 0, 16);
-    this.leftover = 0;
-  }
-
-  if (bytes >= 16) {
-    want = bytes - (bytes % 16);
-    this.blocks(m, mpos, want);
-    mpos += want;
-    bytes -= want;
-  }
-
-  if (bytes) {
-    for (i = 0; i < bytes; i++)
-      this.buffer[this.leftover + i] = m[mpos+i];
-    this.leftover += bytes;
-  }
-};
-
-function crypto_onetimeauth(out, outpos, m, mpos, n, k) {
-  var s = new poly1305(k);
-  s.update(m, mpos, n);
-  s.finish(out, outpos);
-  return 0;
-}
-
-function crypto_onetimeauth_verify(h, hpos, m, mpos, n, k) {
-  var x = new Uint8Array(16);
-  crypto_onetimeauth(x,0,m,mpos,n,k);
-  return crypto_verify_16(h,hpos,x,0);
-}
-
-function crypto_secretbox(c,m,d,n,k) {
-  var i;
-  if (d < 32) return -1;
-  crypto_stream_xor(c,0,m,0,d,n,k);
-  crypto_onetimeauth(c, 16, c, 32, d - 32, c);
-  for (i = 0; i < 16; i++) c[i] = 0;
-  return 0;
-}
-
-function crypto_secretbox_open(m,c,d,n,k) {
-  var i;
-  var x = new Uint8Array(32);
-  if (d < 32) return -1;
-  crypto_stream(x,0,32,n,k);
-  if (crypto_onetimeauth_verify(c, 16,c, 32,d - 32,x) !== 0) return -1;
-  crypto_stream_xor(m,0,c,0,d,n,k);
-  for (i = 0; i < 32; i++) m[i] = 0;
-  return 0;
-}
-
-function set25519(r, a) {
-  var i;
-  for (i = 0; i < 16; i++) r[i] = a[i]|0;
-}
-
-function car25519(o) {
-  var i, v, c = 1;
-  for (i = 0; i < 16; i++) {
-    v = o[i] + c + 65535;
-    c = Math.floor(v / 65536);
-    o[i] = v - c * 65536;
-  }
-  o[0] += c-1 + 37 * (c-1);
-}
-
-function sel25519(p, q, b) {
-  var t, c = ~(b-1);
-  for (var i = 0; i < 16; i++) {
-    t = c & (p[i] ^ q[i]);
-    p[i] ^= t;
-    q[i] ^= t;
-  }
-}
-
-function pack25519(o, n) {
-  var i, j, b;
-  var m = gf(), t = gf();
-  for (i = 0; i < 16; i++) t[i] = n[i];
-  car25519(t);
-  car25519(t);
-  car25519(t);
-  for (j = 0; j < 2; j++) {
-    m[0] = t[0] - 0xffed;
-    for (i = 1; i < 15; i++) {
-      m[i] = t[i] - 0xffff - ((m[i-1]>>16) & 1);
-      m[i-1] &= 0xffff;
+    function crypto_verify_16(x, xi, y, yi) {
+      return vn(x, xi, y, yi, 16);
     }
-    m[15] = t[15] - 0x7fff - ((m[14]>>16) & 1);
-    b = (m[15]>>16) & 1;
-    m[14] &= 0xffff;
-    sel25519(t, m, 1-b);
-  }
-  for (i = 0; i < 16; i++) {
-    o[2*i] = t[i] & 0xff;
-    o[2*i+1] = t[i]>>8;
-  }
-}
-
-function neq25519(a, b) {
-  var c = new Uint8Array(32), d = new Uint8Array(32);
-  pack25519(c, a);
-  pack25519(d, b);
-  return crypto_verify_32(c, 0, d, 0);
-}
-
-function par25519(a) {
-  var d = new Uint8Array(32);
-  pack25519(d, a);
-  return d[0] & 1;
-}
-
-function unpack25519(o, n) {
-  var i;
-  for (i = 0; i < 16; i++) o[i] = n[2*i] + (n[2*i+1] << 8);
-  o[15] &= 0x7fff;
-}
-
-function A(o, a, b) {
-  for (var i = 0; i < 16; i++) o[i] = a[i] + b[i];
-}
-
-function Z(o, a, b) {
-  for (var i = 0; i < 16; i++) o[i] = a[i] - b[i];
-}
-
-function M(o, a, b) {
-  var v, c,
-     t0 = 0,  t1 = 0,  t2 = 0,  t3 = 0,  t4 = 0,  t5 = 0,  t6 = 0,  t7 = 0,
-     t8 = 0,  t9 = 0, t10 = 0, t11 = 0, t12 = 0, t13 = 0, t14 = 0, t15 = 0,
-    t16 = 0, t17 = 0, t18 = 0, t19 = 0, t20 = 0, t21 = 0, t22 = 0, t23 = 0,
-    t24 = 0, t25 = 0, t26 = 0, t27 = 0, t28 = 0, t29 = 0, t30 = 0,
-    b0 = b[0],
-    b1 = b[1],
-    b2 = b[2],
-    b3 = b[3],
-    b4 = b[4],
-    b5 = b[5],
-    b6 = b[6],
-    b7 = b[7],
-    b8 = b[8],
-    b9 = b[9],
-    b10 = b[10],
-    b11 = b[11],
-    b12 = b[12],
-    b13 = b[13],
-    b14 = b[14],
-    b15 = b[15];
-
-  v = a[0];
-  t0 += v * b0;
-  t1 += v * b1;
-  t2 += v * b2;
-  t3 += v * b3;
-  t4 += v * b4;
-  t5 += v * b5;
-  t6 += v * b6;
-  t7 += v * b7;
-  t8 += v * b8;
-  t9 += v * b9;
-  t10 += v * b10;
-  t11 += v * b11;
-  t12 += v * b12;
-  t13 += v * b13;
-  t14 += v * b14;
-  t15 += v * b15;
-  v = a[1];
-  t1 += v * b0;
-  t2 += v * b1;
-  t3 += v * b2;
-  t4 += v * b3;
-  t5 += v * b4;
-  t6 += v * b5;
-  t7 += v * b6;
-  t8 += v * b7;
-  t9 += v * b8;
-  t10 += v * b9;
-  t11 += v * b10;
-  t12 += v * b11;
-  t13 += v * b12;
-  t14 += v * b13;
-  t15 += v * b14;
-  t16 += v * b15;
-  v = a[2];
-  t2 += v * b0;
-  t3 += v * b1;
-  t4 += v * b2;
-  t5 += v * b3;
-  t6 += v * b4;
-  t7 += v * b5;
-  t8 += v * b6;
-  t9 += v * b7;
-  t10 += v * b8;
-  t11 += v * b9;
-  t12 += v * b10;
-  t13 += v * b11;
-  t14 += v * b12;
-  t15 += v * b13;
-  t16 += v * b14;
-  t17 += v * b15;
-  v = a[3];
-  t3 += v * b0;
-  t4 += v * b1;
-  t5 += v * b2;
-  t6 += v * b3;
-  t7 += v * b4;
-  t8 += v * b5;
-  t9 += v * b6;
-  t10 += v * b7;
-  t11 += v * b8;
-  t12 += v * b9;
-  t13 += v * b10;
-  t14 += v * b11;
-  t15 += v * b12;
-  t16 += v * b13;
-  t17 += v * b14;
-  t18 += v * b15;
-  v = a[4];
-  t4 += v * b0;
-  t5 += v * b1;
-  t6 += v * b2;
-  t7 += v * b3;
-  t8 += v * b4;
-  t9 += v * b5;
-  t10 += v * b6;
-  t11 += v * b7;
-  t12 += v * b8;
-  t13 += v * b9;
-  t14 += v * b10;
-  t15 += v * b11;
-  t16 += v * b12;
-  t17 += v * b13;
-  t18 += v * b14;
-  t19 += v * b15;
-  v = a[5];
-  t5 += v * b0;
-  t6 += v * b1;
-  t7 += v * b2;
-  t8 += v * b3;
-  t9 += v * b4;
-  t10 += v * b5;
-  t11 += v * b6;
-  t12 += v * b7;
-  t13 += v * b8;
-  t14 += v * b9;
-  t15 += v * b10;
-  t16 += v * b11;
-  t17 += v * b12;
-  t18 += v * b13;
-  t19 += v * b14;
-  t20 += v * b15;
-  v = a[6];
-  t6 += v * b0;
-  t7 += v * b1;
-  t8 += v * b2;
-  t9 += v * b3;
-  t10 += v * b4;
-  t11 += v * b5;
-  t12 += v * b6;
-  t13 += v * b7;
-  t14 += v * b8;
-  t15 += v * b9;
-  t16 += v * b10;
-  t17 += v * b11;
-  t18 += v * b12;
-  t19 += v * b13;
-  t20 += v * b14;
-  t21 += v * b15;
-  v = a[7];
-  t7 += v * b0;
-  t8 += v * b1;
-  t9 += v * b2;
-  t10 += v * b3;
-  t11 += v * b4;
-  t12 += v * b5;
-  t13 += v * b6;
-  t14 += v * b7;
-  t15 += v * b8;
-  t16 += v * b9;
-  t17 += v * b10;
-  t18 += v * b11;
-  t19 += v * b12;
-  t20 += v * b13;
-  t21 += v * b14;
-  t22 += v * b15;
-  v = a[8];
-  t8 += v * b0;
-  t9 += v * b1;
-  t10 += v * b2;
-  t11 += v * b3;
-  t12 += v * b4;
-  t13 += v * b5;
-  t14 += v * b6;
-  t15 += v * b7;
-  t16 += v * b8;
-  t17 += v * b9;
-  t18 += v * b10;
-  t19 += v * b11;
-  t20 += v * b12;
-  t21 += v * b13;
-  t22 += v * b14;
-  t23 += v * b15;
-  v = a[9];
-  t9 += v * b0;
-  t10 += v * b1;
-  t11 += v * b2;
-  t12 += v * b3;
-  t13 += v * b4;
-  t14 += v * b5;
-  t15 += v * b6;
-  t16 += v * b7;
-  t17 += v * b8;
-  t18 += v * b9;
-  t19 += v * b10;
-  t20 += v * b11;
-  t21 += v * b12;
-  t22 += v * b13;
-  t23 += v * b14;
-  t24 += v * b15;
-  v = a[10];
-  t10 += v * b0;
-  t11 += v * b1;
-  t12 += v * b2;
-  t13 += v * b3;
-  t14 += v * b4;
-  t15 += v * b5;
-  t16 += v * b6;
-  t17 += v * b7;
-  t18 += v * b8;
-  t19 += v * b9;
-  t20 += v * b10;
-  t21 += v * b11;
-  t22 += v * b12;
-  t23 += v * b13;
-  t24 += v * b14;
-  t25 += v * b15;
-  v = a[11];
-  t11 += v * b0;
-  t12 += v * b1;
-  t13 += v * b2;
-  t14 += v * b3;
-  t15 += v * b4;
-  t16 += v * b5;
-  t17 += v * b6;
-  t18 += v * b7;
-  t19 += v * b8;
-  t20 += v * b9;
-  t21 += v * b10;
-  t22 += v * b11;
-  t23 += v * b12;
-  t24 += v * b13;
-  t25 += v * b14;
-  t26 += v * b15;
-  v = a[12];
-  t12 += v * b0;
-  t13 += v * b1;
-  t14 += v * b2;
-  t15 += v * b3;
-  t16 += v * b4;
-  t17 += v * b5;
-  t18 += v * b6;
-  t19 += v * b7;
-  t20 += v * b8;
-  t21 += v * b9;
-  t22 += v * b10;
-  t23 += v * b11;
-  t24 += v * b12;
-  t25 += v * b13;
-  t26 += v * b14;
-  t27 += v * b15;
-  v = a[13];
-  t13 += v * b0;
-  t14 += v * b1;
-  t15 += v * b2;
-  t16 += v * b3;
-  t17 += v * b4;
-  t18 += v * b5;
-  t19 += v * b6;
-  t20 += v * b7;
-  t21 += v * b8;
-  t22 += v * b9;
-  t23 += v * b10;
-  t24 += v * b11;
-  t25 += v * b12;
-  t26 += v * b13;
-  t27 += v * b14;
-  t28 += v * b15;
-  v = a[14];
-  t14 += v * b0;
-  t15 += v * b1;
-  t16 += v * b2;
-  t17 += v * b3;
-  t18 += v * b4;
-  t19 += v * b5;
-  t20 += v * b6;
-  t21 += v * b7;
-  t22 += v * b8;
-  t23 += v * b9;
-  t24 += v * b10;
-  t25 += v * b11;
-  t26 += v * b12;
-  t27 += v * b13;
-  t28 += v * b14;
-  t29 += v * b15;
-  v = a[15];
-  t15 += v * b0;
-  t16 += v * b1;
-  t17 += v * b2;
-  t18 += v * b3;
-  t19 += v * b4;
-  t20 += v * b5;
-  t21 += v * b6;
-  t22 += v * b7;
-  t23 += v * b8;
-  t24 += v * b9;
-  t25 += v * b10;
-  t26 += v * b11;
-  t27 += v * b12;
-  t28 += v * b13;
-  t29 += v * b14;
-  t30 += v * b15;
-
-  t0  += 38 * t16;
-  t1  += 38 * t17;
-  t2  += 38 * t18;
-  t3  += 38 * t19;
-  t4  += 38 * t20;
-  t5  += 38 * t21;
-  t6  += 38 * t22;
-  t7  += 38 * t23;
-  t8  += 38 * t24;
-  t9  += 38 * t25;
-  t10 += 38 * t26;
-  t11 += 38 * t27;
-  t12 += 38 * t28;
-  t13 += 38 * t29;
-  t14 += 38 * t30;
-  // t15 left as is
-
-  // first car
-  c = 1;
-  v =  t0 + c + 65535; c = Math.floor(v / 65536);  t0 = v - c * 65536;
-  v =  t1 + c + 65535; c = Math.floor(v / 65536);  t1 = v - c * 65536;
-  v =  t2 + c + 65535; c = Math.floor(v / 65536);  t2 = v - c * 65536;
-  v =  t3 + c + 65535; c = Math.floor(v / 65536);  t3 = v - c * 65536;
-  v =  t4 + c + 65535; c = Math.floor(v / 65536);  t4 = v - c * 65536;
-  v =  t5 + c + 65535; c = Math.floor(v / 65536);  t5 = v - c * 65536;
-  v =  t6 + c + 65535; c = Math.floor(v / 65536);  t6 = v - c * 65536;
-  v =  t7 + c + 65535; c = Math.floor(v / 65536);  t7 = v - c * 65536;
-  v =  t8 + c + 65535; c = Math.floor(v / 65536);  t8 = v - c * 65536;
-  v =  t9 + c + 65535; c = Math.floor(v / 65536);  t9 = v - c * 65536;
-  v = t10 + c + 65535; c = Math.floor(v / 65536); t10 = v - c * 65536;
-  v = t11 + c + 65535; c = Math.floor(v / 65536); t11 = v - c * 65536;
-  v = t12 + c + 65535; c = Math.floor(v / 65536); t12 = v - c * 65536;
-  v = t13 + c + 65535; c = Math.floor(v / 65536); t13 = v - c * 65536;
-  v = t14 + c + 65535; c = Math.floor(v / 65536); t14 = v - c * 65536;
-  v = t15 + c + 65535; c = Math.floor(v / 65536); t15 = v - c * 65536;
-  t0 += c-1 + 37 * (c-1);
-
-  // second car
-  c = 1;
-  v =  t0 + c + 65535; c = Math.floor(v / 65536);  t0 = v - c * 65536;
-  v =  t1 + c + 65535; c = Math.floor(v / 65536);  t1 = v - c * 65536;
-  v =  t2 + c + 65535; c = Math.floor(v / 65536);  t2 = v - c * 65536;
-  v =  t3 + c + 65535; c = Math.floor(v / 65536);  t3 = v - c * 65536;
-  v =  t4 + c + 65535; c = Math.floor(v / 65536);  t4 = v - c * 65536;
-  v =  t5 + c + 65535; c = Math.floor(v / 65536);  t5 = v - c * 65536;
-  v =  t6 + c + 65535; c = Math.floor(v / 65536);  t6 = v - c * 65536;
-  v =  t7 + c + 65535; c = Math.floor(v / 65536);  t7 = v - c * 65536;
-  v =  t8 + c + 65535; c = Math.floor(v / 65536);  t8 = v - c * 65536;
-  v =  t9 + c + 65535; c = Math.floor(v / 65536);  t9 = v - c * 65536;
-  v = t10 + c + 65535; c = Math.floor(v / 65536); t10 = v - c * 65536;
-  v = t11 + c + 65535; c = Math.floor(v / 65536); t11 = v - c * 65536;
-  v = t12 + c + 65535; c = Math.floor(v / 65536); t12 = v - c * 65536;
-  v = t13 + c + 65535; c = Math.floor(v / 65536); t13 = v - c * 65536;
-  v = t14 + c + 65535; c = Math.floor(v / 65536); t14 = v - c * 65536;
-  v = t15 + c + 65535; c = Math.floor(v / 65536); t15 = v - c * 65536;
-  t0 += c-1 + 37 * (c-1);
-
-  o[ 0] = t0;
-  o[ 1] = t1;
-  o[ 2] = t2;
-  o[ 3] = t3;
-  o[ 4] = t4;
-  o[ 5] = t5;
-  o[ 6] = t6;
-  o[ 7] = t7;
-  o[ 8] = t8;
-  o[ 9] = t9;
-  o[10] = t10;
-  o[11] = t11;
-  o[12] = t12;
-  o[13] = t13;
-  o[14] = t14;
-  o[15] = t15;
-}
-
-function S(o, a) {
-  M(o, a, a);
-}
-
-function inv25519(o, i) {
-  var c = gf();
-  var a;
-  for (a = 0; a < 16; a++) c[a] = i[a];
-  for (a = 253; a >= 0; a--) {
-    S(c, c);
-    if(a !== 2 && a !== 4) M(c, c, i);
-  }
-  for (a = 0; a < 16; a++) o[a] = c[a];
-}
-
-function pow2523(o, i) {
-  var c = gf();
-  var a;
-  for (a = 0; a < 16; a++) c[a] = i[a];
-  for (a = 250; a >= 0; a--) {
-      S(c, c);
-      if(a !== 1) M(c, c, i);
-  }
-  for (a = 0; a < 16; a++) o[a] = c[a];
-}
-
-function crypto_scalarmult(q, n, p) {
-  var z = new Uint8Array(32);
-  var x = new Float64Array(80), r, i;
-  var a = gf(), b = gf(), c = gf(),
-      d = gf(), e = gf(), f = gf();
-  for (i = 0; i < 31; i++) z[i] = n[i];
-  z[31]=(n[31]&127)|64;
-  z[0]&=248;
-  unpack25519(x,p);
-  for (i = 0; i < 16; i++) {
-    b[i]=x[i];
-    d[i]=a[i]=c[i]=0;
-  }
-  a[0]=d[0]=1;
-  for (i=254; i>=0; --i) {
-    r=(z[i>>>3]>>>(i&7))&1;
-    sel25519(a,b,r);
-    sel25519(c,d,r);
-    A(e,a,c);
-    Z(a,a,c);
-    A(c,b,d);
-    Z(b,b,d);
-    S(d,e);
-    S(f,a);
-    M(a,c,a);
-    M(c,b,e);
-    A(e,a,c);
-    Z(a,a,c);
-    S(b,a);
-    Z(c,d,f);
-    M(a,c,_121665);
-    A(a,a,d);
-    M(c,c,a);
-    M(a,d,f);
-    M(d,b,x);
-    S(b,e);
-    sel25519(a,b,r);
-    sel25519(c,d,r);
-  }
-  for (i = 0; i < 16; i++) {
-    x[i+16]=a[i];
-    x[i+32]=c[i];
-    x[i+48]=b[i];
-    x[i+64]=d[i];
-  }
-  var x32 = x.subarray(32);
-  var x16 = x.subarray(16);
-  inv25519(x32,x32);
-  M(x16,x16,x32);
-  pack25519(q,x16);
-  return 0;
-}
-
-function crypto_scalarmult_base(q, n) {
-  return crypto_scalarmult(q, n, _9);
-}
-
-function crypto_box_keypair(y, x) {
-  randombytes(x, 32);
-  return crypto_scalarmult_base(y, x);
-}
-
-function crypto_box_beforenm(k, y, x) {
-  var s = new Uint8Array(32);
-  crypto_scalarmult(s, x, y);
-  return crypto_core_hsalsa20(k, _0, s, sigma);
-}
-
-var crypto_box_afternm = crypto_secretbox;
-var crypto_box_open_afternm = crypto_secretbox_open;
-
-function crypto_box(c, m, d, n, y, x) {
-  var k = new Uint8Array(32);
-  crypto_box_beforenm(k, y, x);
-  return crypto_box_afternm(c, m, d, n, k);
-}
-
-function crypto_box_open(m, c, d, n, y, x) {
-  var k = new Uint8Array(32);
-  crypto_box_beforenm(k, y, x);
-  return crypto_box_open_afternm(m, c, d, n, k);
-}
-
-var K = [
-  0x428a2f98, 0xd728ae22, 0x71374491, 0x23ef65cd,
-  0xb5c0fbcf, 0xec4d3b2f, 0xe9b5dba5, 0x8189dbbc,
-  0x3956c25b, 0xf348b538, 0x59f111f1, 0xb605d019,
-  0x923f82a4, 0xaf194f9b, 0xab1c5ed5, 0xda6d8118,
-  0xd807aa98, 0xa3030242, 0x12835b01, 0x45706fbe,
-  0x243185be, 0x4ee4b28c, 0x550c7dc3, 0xd5ffb4e2,
-  0x72be5d74, 0xf27b896f, 0x80deb1fe, 0x3b1696b1,
-  0x9bdc06a7, 0x25c71235, 0xc19bf174, 0xcf692694,
-  0xe49b69c1, 0x9ef14ad2, 0xefbe4786, 0x384f25e3,
-  0x0fc19dc6, 0x8b8cd5b5, 0x240ca1cc, 0x77ac9c65,
-  0x2de92c6f, 0x592b0275, 0x4a7484aa, 0x6ea6e483,
-  0x5cb0a9dc, 0xbd41fbd4, 0x76f988da, 0x831153b5,
-  0x983e5152, 0xee66dfab, 0xa831c66d, 0x2db43210,
-  0xb00327c8, 0x98fb213f, 0xbf597fc7, 0xbeef0ee4,
-  0xc6e00bf3, 0x3da88fc2, 0xd5a79147, 0x930aa725,
-  0x06ca6351, 0xe003826f, 0x14292967, 0x0a0e6e70,
-  0x27b70a85, 0x46d22ffc, 0x2e1b2138, 0x5c26c926,
-  0x4d2c6dfc, 0x5ac42aed, 0x53380d13, 0x9d95b3df,
-  0x650a7354, 0x8baf63de, 0x766a0abb, 0x3c77b2a8,
-  0x81c2c92e, 0x47edaee6, 0x92722c85, 0x1482353b,
-  0xa2bfe8a1, 0x4cf10364, 0xa81a664b, 0xbc423001,
-  0xc24b8b70, 0xd0f89791, 0xc76c51a3, 0x0654be30,
-  0xd192e819, 0xd6ef5218, 0xd6990624, 0x5565a910,
-  0xf40e3585, 0x5771202a, 0x106aa070, 0x32bbd1b8,
-  0x19a4c116, 0xb8d2d0c8, 0x1e376c08, 0x5141ab53,
-  0x2748774c, 0xdf8eeb99, 0x34b0bcb5, 0xe19b48a8,
-  0x391c0cb3, 0xc5c95a63, 0x4ed8aa4a, 0xe3418acb,
-  0x5b9cca4f, 0x7763e373, 0x682e6ff3, 0xd6b2b8a3,
-  0x748f82ee, 0x5defb2fc, 0x78a5636f, 0x43172f60,
-  0x84c87814, 0xa1f0ab72, 0x8cc70208, 0x1a6439ec,
-  0x90befffa, 0x23631e28, 0xa4506ceb, 0xde82bde9,
-  0xbef9a3f7, 0xb2c67915, 0xc67178f2, 0xe372532b,
-  0xca273ece, 0xea26619c, 0xd186b8c7, 0x21c0c207,
-  0xeada7dd6, 0xcde0eb1e, 0xf57d4f7f, 0xee6ed178,
-  0x06f067aa, 0x72176fba, 0x0a637dc5, 0xa2c898a6,
-  0x113f9804, 0xbef90dae, 0x1b710b35, 0x131c471b,
-  0x28db77f5, 0x23047d84, 0x32caab7b, 0x40c72493,
-  0x3c9ebe0a, 0x15c9bebc, 0x431d67c4, 0x9c100d4c,
-  0x4cc5d4be, 0xcb3e42b6, 0x597f299c, 0xfc657e2a,
-  0x5fcb6fab, 0x3ad6faec, 0x6c44198c, 0x4a475817
-];
-
-function crypto_hashblocks_hl(hh, hl, m, n) {
-  var wh = new Int32Array(16), wl = new Int32Array(16),
-      bh0, bh1, bh2, bh3, bh4, bh5, bh6, bh7,
-      bl0, bl1, bl2, bl3, bl4, bl5, bl6, bl7,
-      th, tl, i, j, h, l, a, b, c, d;
-
-  var ah0 = hh[0],
-      ah1 = hh[1],
-      ah2 = hh[2],
-      ah3 = hh[3],
-      ah4 = hh[4],
-      ah5 = hh[5],
-      ah6 = hh[6],
-      ah7 = hh[7],
-
-      al0 = hl[0],
-      al1 = hl[1],
-      al2 = hl[2],
-      al3 = hl[3],
-      al4 = hl[4],
-      al5 = hl[5],
-      al6 = hl[6],
-      al7 = hl[7];
-
-  var pos = 0;
-  while (n >= 128) {
-    for (i = 0; i < 16; i++) {
-      j = 8 * i + pos;
-      wh[i] = (m[j+0] << 24) | (m[j+1] << 16) | (m[j+2] << 8) | m[j+3];
-      wl[i] = (m[j+4] << 24) | (m[j+5] << 16) | (m[j+6] << 8) | m[j+7];
+    function crypto_verify_32(x, xi, y, yi) {
+      return vn(x, xi, y, yi, 32);
     }
-    for (i = 0; i < 80; i++) {
-      bh0 = ah0;
-      bh1 = ah1;
-      bh2 = ah2;
-      bh3 = ah3;
-      bh4 = ah4;
-      bh5 = ah5;
-      bh6 = ah6;
-      bh7 = ah7;
-
-      bl0 = al0;
-      bl1 = al1;
-      bl2 = al2;
-      bl3 = al3;
-      bl4 = al4;
-      bl5 = al5;
-      bl6 = al6;
-      bl7 = al7;
-
-      // add
-      h = ah7;
-      l = al7;
-
-      a = l & 0xffff; b = l >>> 16;
-      c = h & 0xffff; d = h >>> 16;
-
-      // Sigma1
-      h = ((ah4 >>> 14) | (al4 << (32-14))) ^ ((ah4 >>> 18) | (al4 << (32-18))) ^ ((al4 >>> (41-32)) | (ah4 << (32-(41-32))));
-      l = ((al4 >>> 14) | (ah4 << (32-14))) ^ ((al4 >>> 18) | (ah4 << (32-18))) ^ ((ah4 >>> (41-32)) | (al4 << (32-(41-32))));
-
-      a += l & 0xffff; b += l >>> 16;
-      c += h & 0xffff; d += h >>> 16;
-
-      // Ch
-      h = (ah4 & ah5) ^ (~ah4 & ah6);
-      l = (al4 & al5) ^ (~al4 & al6);
-
-      a += l & 0xffff; b += l >>> 16;
-      c += h & 0xffff; d += h >>> 16;
-
-      // K
-      h = K[i*2];
-      l = K[i*2+1];
-
-      a += l & 0xffff; b += l >>> 16;
-      c += h & 0xffff; d += h >>> 16;
-
-      // w
-      h = wh[i%16];
-      l = wl[i%16];
-
-      a += l & 0xffff; b += l >>> 16;
-      c += h & 0xffff; d += h >>> 16;
-
-      b += a >>> 16;
-      c += b >>> 16;
-      d += c >>> 16;
-
-      th = c & 0xffff | d << 16;
-      tl = a & 0xffff | b << 16;
-
-      // add
-      h = th;
-      l = tl;
-
-      a = l & 0xffff; b = l >>> 16;
-      c = h & 0xffff; d = h >>> 16;
-
-      // Sigma0
-      h = ((ah0 >>> 28) | (al0 << (32-28))) ^ ((al0 >>> (34-32)) | (ah0 << (32-(34-32)))) ^ ((al0 >>> (39-32)) | (ah0 << (32-(39-32))));
-      l = ((al0 >>> 28) | (ah0 << (32-28))) ^ ((ah0 >>> (34-32)) | (al0 << (32-(34-32)))) ^ ((ah0 >>> (39-32)) | (al0 << (32-(39-32))));
-
-      a += l & 0xffff; b += l >>> 16;
-      c += h & 0xffff; d += h >>> 16;
-
-      // Maj
-      h = (ah0 & ah1) ^ (ah0 & ah2) ^ (ah1 & ah2);
-      l = (al0 & al1) ^ (al0 & al2) ^ (al1 & al2);
-
-      a += l & 0xffff; b += l >>> 16;
-      c += h & 0xffff; d += h >>> 16;
-
-      b += a >>> 16;
-      c += b >>> 16;
-      d += c >>> 16;
-
-      bh7 = (c & 0xffff) | (d << 16);
-      bl7 = (a & 0xffff) | (b << 16);
-
-      // add
-      h = bh3;
-      l = bl3;
-
-      a = l & 0xffff; b = l >>> 16;
-      c = h & 0xffff; d = h >>> 16;
-
-      h = th;
-      l = tl;
-
-      a += l & 0xffff; b += l >>> 16;
-      c += h & 0xffff; d += h >>> 16;
-
-      b += a >>> 16;
-      c += b >>> 16;
-      d += c >>> 16;
-
-      bh3 = (c & 0xffff) | (d << 16);
-      bl3 = (a & 0xffff) | (b << 16);
-
-      ah1 = bh0;
-      ah2 = bh1;
-      ah3 = bh2;
-      ah4 = bh3;
-      ah5 = bh4;
-      ah6 = bh5;
-      ah7 = bh6;
-      ah0 = bh7;
-
-      al1 = bl0;
-      al2 = bl1;
-      al3 = bl2;
-      al4 = bl3;
-      al5 = bl4;
-      al6 = bl5;
-      al7 = bl6;
-      al0 = bl7;
-
-      if (i%16 === 15) {
-        for (j = 0; j < 16; j++) {
-          // add
-          h = wh[j];
-          l = wl[j];
-
-          a = l & 0xffff; b = l >>> 16;
-          c = h & 0xffff; d = h >>> 16;
-
-          h = wh[(j+9)%16];
-          l = wl[(j+9)%16];
-
-          a += l & 0xffff; b += l >>> 16;
-          c += h & 0xffff; d += h >>> 16;
-
-          // sigma0
-          th = wh[(j+1)%16];
-          tl = wl[(j+1)%16];
-          h = ((th >>> 1) | (tl << (32-1))) ^ ((th >>> 8) | (tl << (32-8))) ^ (th >>> 7);
-          l = ((tl >>> 1) | (th << (32-1))) ^ ((tl >>> 8) | (th << (32-8))) ^ ((tl >>> 7) | (th << (32-7)));
-
-          a += l & 0xffff; b += l >>> 16;
-          c += h & 0xffff; d += h >>> 16;
-
-          // sigma1
-          th = wh[(j+14)%16];
-          tl = wl[(j+14)%16];
-          h = ((th >>> 19) | (tl << (32-19))) ^ ((tl >>> (61-32)) | (th << (32-(61-32)))) ^ (th >>> 6);
-          l = ((tl >>> 19) | (th << (32-19))) ^ ((th >>> (61-32)) | (tl << (32-(61-32)))) ^ ((tl >>> 6) | (th << (32-6)));
-
-          a += l & 0xffff; b += l >>> 16;
-          c += h & 0xffff; d += h >>> 16;
-
+    function core_salsa20(o, p, k, c) {
+      var j0 = c[0] & 255 | (c[1] & 255) << 8 | (c[2] & 255) << 16 | (c[3] & 255) << 24, j1 = k[0] & 255 | (k[1] & 255) << 8 | (k[2] & 255) << 16 | (k[3] & 255) << 24, j2 = k[4] & 255 | (k[5] & 255) << 8 | (k[6] & 255) << 16 | (k[7] & 255) << 24, j3 = k[8] & 255 | (k[9] & 255) << 8 | (k[10] & 255) << 16 | (k[11] & 255) << 24, j4 = k[12] & 255 | (k[13] & 255) << 8 | (k[14] & 255) << 16 | (k[15] & 255) << 24, j5 = c[4] & 255 | (c[5] & 255) << 8 | (c[6] & 255) << 16 | (c[7] & 255) << 24, j6 = p[0] & 255 | (p[1] & 255) << 8 | (p[2] & 255) << 16 | (p[3] & 255) << 24, j7 = p[4] & 255 | (p[5] & 255) << 8 | (p[6] & 255) << 16 | (p[7] & 255) << 24, j8 = p[8] & 255 | (p[9] & 255) << 8 | (p[10] & 255) << 16 | (p[11] & 255) << 24, j9 = p[12] & 255 | (p[13] & 255) << 8 | (p[14] & 255) << 16 | (p[15] & 255) << 24, j10 = c[8] & 255 | (c[9] & 255) << 8 | (c[10] & 255) << 16 | (c[11] & 255) << 24, j11 = k[16] & 255 | (k[17] & 255) << 8 | (k[18] & 255) << 16 | (k[19] & 255) << 24, j12 = k[20] & 255 | (k[21] & 255) << 8 | (k[22] & 255) << 16 | (k[23] & 255) << 24, j13 = k[24] & 255 | (k[25] & 255) << 8 | (k[26] & 255) << 16 | (k[27] & 255) << 24, j14 = k[28] & 255 | (k[29] & 255) << 8 | (k[30] & 255) << 16 | (k[31] & 255) << 24, j15 = c[12] & 255 | (c[13] & 255) << 8 | (c[14] & 255) << 16 | (c[15] & 255) << 24;
+      var x0 = j0, x1 = j1, x2 = j2, x3 = j3, x4 = j4, x5 = j5, x6 = j6, x7 = j7, x8 = j8, x9 = j9, x10 = j10, x11 = j11, x12 = j12, x13 = j13, x14 = j14, x15 = j15, u;
+      for (var i = 0; i < 20; i += 2) {
+        u = x0 + x12 | 0;
+        x4 ^= u << 7 | u >>> 32 - 7;
+        u = x4 + x0 | 0;
+        x8 ^= u << 9 | u >>> 32 - 9;
+        u = x8 + x4 | 0;
+        x12 ^= u << 13 | u >>> 32 - 13;
+        u = x12 + x8 | 0;
+        x0 ^= u << 18 | u >>> 32 - 18;
+        u = x5 + x1 | 0;
+        x9 ^= u << 7 | u >>> 32 - 7;
+        u = x9 + x5 | 0;
+        x13 ^= u << 9 | u >>> 32 - 9;
+        u = x13 + x9 | 0;
+        x1 ^= u << 13 | u >>> 32 - 13;
+        u = x1 + x13 | 0;
+        x5 ^= u << 18 | u >>> 32 - 18;
+        u = x10 + x6 | 0;
+        x14 ^= u << 7 | u >>> 32 - 7;
+        u = x14 + x10 | 0;
+        x2 ^= u << 9 | u >>> 32 - 9;
+        u = x2 + x14 | 0;
+        x6 ^= u << 13 | u >>> 32 - 13;
+        u = x6 + x2 | 0;
+        x10 ^= u << 18 | u >>> 32 - 18;
+        u = x15 + x11 | 0;
+        x3 ^= u << 7 | u >>> 32 - 7;
+        u = x3 + x15 | 0;
+        x7 ^= u << 9 | u >>> 32 - 9;
+        u = x7 + x3 | 0;
+        x11 ^= u << 13 | u >>> 32 - 13;
+        u = x11 + x7 | 0;
+        x15 ^= u << 18 | u >>> 32 - 18;
+        u = x0 + x3 | 0;
+        x1 ^= u << 7 | u >>> 32 - 7;
+        u = x1 + x0 | 0;
+        x2 ^= u << 9 | u >>> 32 - 9;
+        u = x2 + x1 | 0;
+        x3 ^= u << 13 | u >>> 32 - 13;
+        u = x3 + x2 | 0;
+        x0 ^= u << 18 | u >>> 32 - 18;
+        u = x5 + x4 | 0;
+        x6 ^= u << 7 | u >>> 32 - 7;
+        u = x6 + x5 | 0;
+        x7 ^= u << 9 | u >>> 32 - 9;
+        u = x7 + x6 | 0;
+        x4 ^= u << 13 | u >>> 32 - 13;
+        u = x4 + x7 | 0;
+        x5 ^= u << 18 | u >>> 32 - 18;
+        u = x10 + x9 | 0;
+        x11 ^= u << 7 | u >>> 32 - 7;
+        u = x11 + x10 | 0;
+        x8 ^= u << 9 | u >>> 32 - 9;
+        u = x8 + x11 | 0;
+        x9 ^= u << 13 | u >>> 32 - 13;
+        u = x9 + x8 | 0;
+        x10 ^= u << 18 | u >>> 32 - 18;
+        u = x15 + x14 | 0;
+        x12 ^= u << 7 | u >>> 32 - 7;
+        u = x12 + x15 | 0;
+        x13 ^= u << 9 | u >>> 32 - 9;
+        u = x13 + x12 | 0;
+        x14 ^= u << 13 | u >>> 32 - 13;
+        u = x14 + x13 | 0;
+        x15 ^= u << 18 | u >>> 32 - 18;
+      }
+      x0 = x0 + j0 | 0;
+      x1 = x1 + j1 | 0;
+      x2 = x2 + j2 | 0;
+      x3 = x3 + j3 | 0;
+      x4 = x4 + j4 | 0;
+      x5 = x5 + j5 | 0;
+      x6 = x6 + j6 | 0;
+      x7 = x7 + j7 | 0;
+      x8 = x8 + j8 | 0;
+      x9 = x9 + j9 | 0;
+      x10 = x10 + j10 | 0;
+      x11 = x11 + j11 | 0;
+      x12 = x12 + j12 | 0;
+      x13 = x13 + j13 | 0;
+      x14 = x14 + j14 | 0;
+      x15 = x15 + j15 | 0;
+      o[0] = x0 >>> 0 & 255;
+      o[1] = x0 >>> 8 & 255;
+      o[2] = x0 >>> 16 & 255;
+      o[3] = x0 >>> 24 & 255;
+      o[4] = x1 >>> 0 & 255;
+      o[5] = x1 >>> 8 & 255;
+      o[6] = x1 >>> 16 & 255;
+      o[7] = x1 >>> 24 & 255;
+      o[8] = x2 >>> 0 & 255;
+      o[9] = x2 >>> 8 & 255;
+      o[10] = x2 >>> 16 & 255;
+      o[11] = x2 >>> 24 & 255;
+      o[12] = x3 >>> 0 & 255;
+      o[13] = x3 >>> 8 & 255;
+      o[14] = x3 >>> 16 & 255;
+      o[15] = x3 >>> 24 & 255;
+      o[16] = x4 >>> 0 & 255;
+      o[17] = x4 >>> 8 & 255;
+      o[18] = x4 >>> 16 & 255;
+      o[19] = x4 >>> 24 & 255;
+      o[20] = x5 >>> 0 & 255;
+      o[21] = x5 >>> 8 & 255;
+      o[22] = x5 >>> 16 & 255;
+      o[23] = x5 >>> 24 & 255;
+      o[24] = x6 >>> 0 & 255;
+      o[25] = x6 >>> 8 & 255;
+      o[26] = x6 >>> 16 & 255;
+      o[27] = x6 >>> 24 & 255;
+      o[28] = x7 >>> 0 & 255;
+      o[29] = x7 >>> 8 & 255;
+      o[30] = x7 >>> 16 & 255;
+      o[31] = x7 >>> 24 & 255;
+      o[32] = x8 >>> 0 & 255;
+      o[33] = x8 >>> 8 & 255;
+      o[34] = x8 >>> 16 & 255;
+      o[35] = x8 >>> 24 & 255;
+      o[36] = x9 >>> 0 & 255;
+      o[37] = x9 >>> 8 & 255;
+      o[38] = x9 >>> 16 & 255;
+      o[39] = x9 >>> 24 & 255;
+      o[40] = x10 >>> 0 & 255;
+      o[41] = x10 >>> 8 & 255;
+      o[42] = x10 >>> 16 & 255;
+      o[43] = x10 >>> 24 & 255;
+      o[44] = x11 >>> 0 & 255;
+      o[45] = x11 >>> 8 & 255;
+      o[46] = x11 >>> 16 & 255;
+      o[47] = x11 >>> 24 & 255;
+      o[48] = x12 >>> 0 & 255;
+      o[49] = x12 >>> 8 & 255;
+      o[50] = x12 >>> 16 & 255;
+      o[51] = x12 >>> 24 & 255;
+      o[52] = x13 >>> 0 & 255;
+      o[53] = x13 >>> 8 & 255;
+      o[54] = x13 >>> 16 & 255;
+      o[55] = x13 >>> 24 & 255;
+      o[56] = x14 >>> 0 & 255;
+      o[57] = x14 >>> 8 & 255;
+      o[58] = x14 >>> 16 & 255;
+      o[59] = x14 >>> 24 & 255;
+      o[60] = x15 >>> 0 & 255;
+      o[61] = x15 >>> 8 & 255;
+      o[62] = x15 >>> 16 & 255;
+      o[63] = x15 >>> 24 & 255;
+    }
+    function core_hsalsa20(o, p, k, c) {
+      var j0 = c[0] & 255 | (c[1] & 255) << 8 | (c[2] & 255) << 16 | (c[3] & 255) << 24, j1 = k[0] & 255 | (k[1] & 255) << 8 | (k[2] & 255) << 16 | (k[3] & 255) << 24, j2 = k[4] & 255 | (k[5] & 255) << 8 | (k[6] & 255) << 16 | (k[7] & 255) << 24, j3 = k[8] & 255 | (k[9] & 255) << 8 | (k[10] & 255) << 16 | (k[11] & 255) << 24, j4 = k[12] & 255 | (k[13] & 255) << 8 | (k[14] & 255) << 16 | (k[15] & 255) << 24, j5 = c[4] & 255 | (c[5] & 255) << 8 | (c[6] & 255) << 16 | (c[7] & 255) << 24, j6 = p[0] & 255 | (p[1] & 255) << 8 | (p[2] & 255) << 16 | (p[3] & 255) << 24, j7 = p[4] & 255 | (p[5] & 255) << 8 | (p[6] & 255) << 16 | (p[7] & 255) << 24, j8 = p[8] & 255 | (p[9] & 255) << 8 | (p[10] & 255) << 16 | (p[11] & 255) << 24, j9 = p[12] & 255 | (p[13] & 255) << 8 | (p[14] & 255) << 16 | (p[15] & 255) << 24, j10 = c[8] & 255 | (c[9] & 255) << 8 | (c[10] & 255) << 16 | (c[11] & 255) << 24, j11 = k[16] & 255 | (k[17] & 255) << 8 | (k[18] & 255) << 16 | (k[19] & 255) << 24, j12 = k[20] & 255 | (k[21] & 255) << 8 | (k[22] & 255) << 16 | (k[23] & 255) << 24, j13 = k[24] & 255 | (k[25] & 255) << 8 | (k[26] & 255) << 16 | (k[27] & 255) << 24, j14 = k[28] & 255 | (k[29] & 255) << 8 | (k[30] & 255) << 16 | (k[31] & 255) << 24, j15 = c[12] & 255 | (c[13] & 255) << 8 | (c[14] & 255) << 16 | (c[15] & 255) << 24;
+      var x0 = j0, x1 = j1, x2 = j2, x3 = j3, x4 = j4, x5 = j5, x6 = j6, x7 = j7, x8 = j8, x9 = j9, x10 = j10, x11 = j11, x12 = j12, x13 = j13, x14 = j14, x15 = j15, u;
+      for (var i = 0; i < 20; i += 2) {
+        u = x0 + x12 | 0;
+        x4 ^= u << 7 | u >>> 32 - 7;
+        u = x4 + x0 | 0;
+        x8 ^= u << 9 | u >>> 32 - 9;
+        u = x8 + x4 | 0;
+        x12 ^= u << 13 | u >>> 32 - 13;
+        u = x12 + x8 | 0;
+        x0 ^= u << 18 | u >>> 32 - 18;
+        u = x5 + x1 | 0;
+        x9 ^= u << 7 | u >>> 32 - 7;
+        u = x9 + x5 | 0;
+        x13 ^= u << 9 | u >>> 32 - 9;
+        u = x13 + x9 | 0;
+        x1 ^= u << 13 | u >>> 32 - 13;
+        u = x1 + x13 | 0;
+        x5 ^= u << 18 | u >>> 32 - 18;
+        u = x10 + x6 | 0;
+        x14 ^= u << 7 | u >>> 32 - 7;
+        u = x14 + x10 | 0;
+        x2 ^= u << 9 | u >>> 32 - 9;
+        u = x2 + x14 | 0;
+        x6 ^= u << 13 | u >>> 32 - 13;
+        u = x6 + x2 | 0;
+        x10 ^= u << 18 | u >>> 32 - 18;
+        u = x15 + x11 | 0;
+        x3 ^= u << 7 | u >>> 32 - 7;
+        u = x3 + x15 | 0;
+        x7 ^= u << 9 | u >>> 32 - 9;
+        u = x7 + x3 | 0;
+        x11 ^= u << 13 | u >>> 32 - 13;
+        u = x11 + x7 | 0;
+        x15 ^= u << 18 | u >>> 32 - 18;
+        u = x0 + x3 | 0;
+        x1 ^= u << 7 | u >>> 32 - 7;
+        u = x1 + x0 | 0;
+        x2 ^= u << 9 | u >>> 32 - 9;
+        u = x2 + x1 | 0;
+        x3 ^= u << 13 | u >>> 32 - 13;
+        u = x3 + x2 | 0;
+        x0 ^= u << 18 | u >>> 32 - 18;
+        u = x5 + x4 | 0;
+        x6 ^= u << 7 | u >>> 32 - 7;
+        u = x6 + x5 | 0;
+        x7 ^= u << 9 | u >>> 32 - 9;
+        u = x7 + x6 | 0;
+        x4 ^= u << 13 | u >>> 32 - 13;
+        u = x4 + x7 | 0;
+        x5 ^= u << 18 | u >>> 32 - 18;
+        u = x10 + x9 | 0;
+        x11 ^= u << 7 | u >>> 32 - 7;
+        u = x11 + x10 | 0;
+        x8 ^= u << 9 | u >>> 32 - 9;
+        u = x8 + x11 | 0;
+        x9 ^= u << 13 | u >>> 32 - 13;
+        u = x9 + x8 | 0;
+        x10 ^= u << 18 | u >>> 32 - 18;
+        u = x15 + x14 | 0;
+        x12 ^= u << 7 | u >>> 32 - 7;
+        u = x12 + x15 | 0;
+        x13 ^= u << 9 | u >>> 32 - 9;
+        u = x13 + x12 | 0;
+        x14 ^= u << 13 | u >>> 32 - 13;
+        u = x14 + x13 | 0;
+        x15 ^= u << 18 | u >>> 32 - 18;
+      }
+      o[0] = x0 >>> 0 & 255;
+      o[1] = x0 >>> 8 & 255;
+      o[2] = x0 >>> 16 & 255;
+      o[3] = x0 >>> 24 & 255;
+      o[4] = x5 >>> 0 & 255;
+      o[5] = x5 >>> 8 & 255;
+      o[6] = x5 >>> 16 & 255;
+      o[7] = x5 >>> 24 & 255;
+      o[8] = x10 >>> 0 & 255;
+      o[9] = x10 >>> 8 & 255;
+      o[10] = x10 >>> 16 & 255;
+      o[11] = x10 >>> 24 & 255;
+      o[12] = x15 >>> 0 & 255;
+      o[13] = x15 >>> 8 & 255;
+      o[14] = x15 >>> 16 & 255;
+      o[15] = x15 >>> 24 & 255;
+      o[16] = x6 >>> 0 & 255;
+      o[17] = x6 >>> 8 & 255;
+      o[18] = x6 >>> 16 & 255;
+      o[19] = x6 >>> 24 & 255;
+      o[20] = x7 >>> 0 & 255;
+      o[21] = x7 >>> 8 & 255;
+      o[22] = x7 >>> 16 & 255;
+      o[23] = x7 >>> 24 & 255;
+      o[24] = x8 >>> 0 & 255;
+      o[25] = x8 >>> 8 & 255;
+      o[26] = x8 >>> 16 & 255;
+      o[27] = x8 >>> 24 & 255;
+      o[28] = x9 >>> 0 & 255;
+      o[29] = x9 >>> 8 & 255;
+      o[30] = x9 >>> 16 & 255;
+      o[31] = x9 >>> 24 & 255;
+    }
+    function crypto_core_salsa20(out, inp, k, c) {
+      core_salsa20(out, inp, k, c);
+    }
+    function crypto_core_hsalsa20(out, inp, k, c) {
+      core_hsalsa20(out, inp, k, c);
+    }
+    var sigma = new Uint8Array([101, 120, 112, 97, 110, 100, 32, 51, 50, 45, 98, 121, 116, 101, 32, 107]);
+    function crypto_stream_salsa20_xor(c, cpos, m, mpos, b, n, k) {
+      var z = new Uint8Array(16), x = new Uint8Array(64);
+      var u, i;
+      for (i = 0; i < 16; i++) z[i] = 0;
+      for (i = 0; i < 8; i++) z[i] = n[i];
+      while (b >= 64) {
+        crypto_core_salsa20(x, z, k, sigma);
+        for (i = 0; i < 64; i++) c[cpos + i] = m[mpos + i] ^ x[i];
+        u = 1;
+        for (i = 8; i < 16; i++) {
+          u = u + (z[i] & 255) | 0;
+          z[i] = u & 255;
+          u >>>= 8;
+        }
+        b -= 64;
+        cpos += 64;
+        mpos += 64;
+      }
+      if (b > 0) {
+        crypto_core_salsa20(x, z, k, sigma);
+        for (i = 0; i < b; i++) c[cpos + i] = m[mpos + i] ^ x[i];
+      }
+      return 0;
+    }
+    function crypto_stream_salsa20(c, cpos, b, n, k) {
+      var z = new Uint8Array(16), x = new Uint8Array(64);
+      var u, i;
+      for (i = 0; i < 16; i++) z[i] = 0;
+      for (i = 0; i < 8; i++) z[i] = n[i];
+      while (b >= 64) {
+        crypto_core_salsa20(x, z, k, sigma);
+        for (i = 0; i < 64; i++) c[cpos + i] = x[i];
+        u = 1;
+        for (i = 8; i < 16; i++) {
+          u = u + (z[i] & 255) | 0;
+          z[i] = u & 255;
+          u >>>= 8;
+        }
+        b -= 64;
+        cpos += 64;
+      }
+      if (b > 0) {
+        crypto_core_salsa20(x, z, k, sigma);
+        for (i = 0; i < b; i++) c[cpos + i] = x[i];
+      }
+      return 0;
+    }
+    function crypto_stream(c, cpos, d, n, k) {
+      var s = new Uint8Array(32);
+      crypto_core_hsalsa20(s, n, k, sigma);
+      var sn = new Uint8Array(8);
+      for (var i = 0; i < 8; i++) sn[i] = n[i + 16];
+      return crypto_stream_salsa20(c, cpos, d, sn, s);
+    }
+    function crypto_stream_xor(c, cpos, m, mpos, d, n, k) {
+      var s = new Uint8Array(32);
+      crypto_core_hsalsa20(s, n, k, sigma);
+      var sn = new Uint8Array(8);
+      for (var i = 0; i < 8; i++) sn[i] = n[i + 16];
+      return crypto_stream_salsa20_xor(c, cpos, m, mpos, d, sn, s);
+    }
+    var poly1305 = function(key2) {
+      this.buffer = new Uint8Array(16);
+      this.r = new Uint16Array(10);
+      this.h = new Uint16Array(10);
+      this.pad = new Uint16Array(8);
+      this.leftover = 0;
+      this.fin = 0;
+      var t0, t1, t2, t3, t4, t5, t6, t7;
+      t0 = key2[0] & 255 | (key2[1] & 255) << 8;
+      this.r[0] = t0 & 8191;
+      t1 = key2[2] & 255 | (key2[3] & 255) << 8;
+      this.r[1] = (t0 >>> 13 | t1 << 3) & 8191;
+      t2 = key2[4] & 255 | (key2[5] & 255) << 8;
+      this.r[2] = (t1 >>> 10 | t2 << 6) & 7939;
+      t3 = key2[6] & 255 | (key2[7] & 255) << 8;
+      this.r[3] = (t2 >>> 7 | t3 << 9) & 8191;
+      t4 = key2[8] & 255 | (key2[9] & 255) << 8;
+      this.r[4] = (t3 >>> 4 | t4 << 12) & 255;
+      this.r[5] = t4 >>> 1 & 8190;
+      t5 = key2[10] & 255 | (key2[11] & 255) << 8;
+      this.r[6] = (t4 >>> 14 | t5 << 2) & 8191;
+      t6 = key2[12] & 255 | (key2[13] & 255) << 8;
+      this.r[7] = (t5 >>> 11 | t6 << 5) & 8065;
+      t7 = key2[14] & 255 | (key2[15] & 255) << 8;
+      this.r[8] = (t6 >>> 8 | t7 << 8) & 8191;
+      this.r[9] = t7 >>> 5 & 127;
+      this.pad[0] = key2[16] & 255 | (key2[17] & 255) << 8;
+      this.pad[1] = key2[18] & 255 | (key2[19] & 255) << 8;
+      this.pad[2] = key2[20] & 255 | (key2[21] & 255) << 8;
+      this.pad[3] = key2[22] & 255 | (key2[23] & 255) << 8;
+      this.pad[4] = key2[24] & 255 | (key2[25] & 255) << 8;
+      this.pad[5] = key2[26] & 255 | (key2[27] & 255) << 8;
+      this.pad[6] = key2[28] & 255 | (key2[29] & 255) << 8;
+      this.pad[7] = key2[30] & 255 | (key2[31] & 255) << 8;
+    };
+    poly1305.prototype.blocks = function(m, mpos, bytes) {
+      var hibit = this.fin ? 0 : 1 << 11;
+      var t0, t1, t2, t3, t4, t5, t6, t7, c;
+      var d0, d1, d2, d3, d4, d5, d6, d7, d8, d9;
+      var h0 = this.h[0], h1 = this.h[1], h2 = this.h[2], h3 = this.h[3], h4 = this.h[4], h5 = this.h[5], h6 = this.h[6], h7 = this.h[7], h8 = this.h[8], h9 = this.h[9];
+      var r0 = this.r[0], r1 = this.r[1], r2 = this.r[2], r3 = this.r[3], r4 = this.r[4], r5 = this.r[5], r6 = this.r[6], r7 = this.r[7], r8 = this.r[8], r9 = this.r[9];
+      while (bytes >= 16) {
+        t0 = m[mpos + 0] & 255 | (m[mpos + 1] & 255) << 8;
+        h0 += t0 & 8191;
+        t1 = m[mpos + 2] & 255 | (m[mpos + 3] & 255) << 8;
+        h1 += (t0 >>> 13 | t1 << 3) & 8191;
+        t2 = m[mpos + 4] & 255 | (m[mpos + 5] & 255) << 8;
+        h2 += (t1 >>> 10 | t2 << 6) & 8191;
+        t3 = m[mpos + 6] & 255 | (m[mpos + 7] & 255) << 8;
+        h3 += (t2 >>> 7 | t3 << 9) & 8191;
+        t4 = m[mpos + 8] & 255 | (m[mpos + 9] & 255) << 8;
+        h4 += (t3 >>> 4 | t4 << 12) & 8191;
+        h5 += t4 >>> 1 & 8191;
+        t5 = m[mpos + 10] & 255 | (m[mpos + 11] & 255) << 8;
+        h6 += (t4 >>> 14 | t5 << 2) & 8191;
+        t6 = m[mpos + 12] & 255 | (m[mpos + 13] & 255) << 8;
+        h7 += (t5 >>> 11 | t6 << 5) & 8191;
+        t7 = m[mpos + 14] & 255 | (m[mpos + 15] & 255) << 8;
+        h8 += (t6 >>> 8 | t7 << 8) & 8191;
+        h9 += t7 >>> 5 | hibit;
+        c = 0;
+        d0 = c;
+        d0 += h0 * r0;
+        d0 += h1 * (5 * r9);
+        d0 += h2 * (5 * r8);
+        d0 += h3 * (5 * r7);
+        d0 += h4 * (5 * r6);
+        c = d0 >>> 13;
+        d0 &= 8191;
+        d0 += h5 * (5 * r5);
+        d0 += h6 * (5 * r4);
+        d0 += h7 * (5 * r3);
+        d0 += h8 * (5 * r2);
+        d0 += h9 * (5 * r1);
+        c += d0 >>> 13;
+        d0 &= 8191;
+        d1 = c;
+        d1 += h0 * r1;
+        d1 += h1 * r0;
+        d1 += h2 * (5 * r9);
+        d1 += h3 * (5 * r8);
+        d1 += h4 * (5 * r7);
+        c = d1 >>> 13;
+        d1 &= 8191;
+        d1 += h5 * (5 * r6);
+        d1 += h6 * (5 * r5);
+        d1 += h7 * (5 * r4);
+        d1 += h8 * (5 * r3);
+        d1 += h9 * (5 * r2);
+        c += d1 >>> 13;
+        d1 &= 8191;
+        d2 = c;
+        d2 += h0 * r2;
+        d2 += h1 * r1;
+        d2 += h2 * r0;
+        d2 += h3 * (5 * r9);
+        d2 += h4 * (5 * r8);
+        c = d2 >>> 13;
+        d2 &= 8191;
+        d2 += h5 * (5 * r7);
+        d2 += h6 * (5 * r6);
+        d2 += h7 * (5 * r5);
+        d2 += h8 * (5 * r4);
+        d2 += h9 * (5 * r3);
+        c += d2 >>> 13;
+        d2 &= 8191;
+        d3 = c;
+        d3 += h0 * r3;
+        d3 += h1 * r2;
+        d3 += h2 * r1;
+        d3 += h3 * r0;
+        d3 += h4 * (5 * r9);
+        c = d3 >>> 13;
+        d3 &= 8191;
+        d3 += h5 * (5 * r8);
+        d3 += h6 * (5 * r7);
+        d3 += h7 * (5 * r6);
+        d3 += h8 * (5 * r5);
+        d3 += h9 * (5 * r4);
+        c += d3 >>> 13;
+        d3 &= 8191;
+        d4 = c;
+        d4 += h0 * r4;
+        d4 += h1 * r3;
+        d4 += h2 * r2;
+        d4 += h3 * r1;
+        d4 += h4 * r0;
+        c = d4 >>> 13;
+        d4 &= 8191;
+        d4 += h5 * (5 * r9);
+        d4 += h6 * (5 * r8);
+        d4 += h7 * (5 * r7);
+        d4 += h8 * (5 * r6);
+        d4 += h9 * (5 * r5);
+        c += d4 >>> 13;
+        d4 &= 8191;
+        d5 = c;
+        d5 += h0 * r5;
+        d5 += h1 * r4;
+        d5 += h2 * r3;
+        d5 += h3 * r2;
+        d5 += h4 * r1;
+        c = d5 >>> 13;
+        d5 &= 8191;
+        d5 += h5 * r0;
+        d5 += h6 * (5 * r9);
+        d5 += h7 * (5 * r8);
+        d5 += h8 * (5 * r7);
+        d5 += h9 * (5 * r6);
+        c += d5 >>> 13;
+        d5 &= 8191;
+        d6 = c;
+        d6 += h0 * r6;
+        d6 += h1 * r5;
+        d6 += h2 * r4;
+        d6 += h3 * r3;
+        d6 += h4 * r2;
+        c = d6 >>> 13;
+        d6 &= 8191;
+        d6 += h5 * r1;
+        d6 += h6 * r0;
+        d6 += h7 * (5 * r9);
+        d6 += h8 * (5 * r8);
+        d6 += h9 * (5 * r7);
+        c += d6 >>> 13;
+        d6 &= 8191;
+        d7 = c;
+        d7 += h0 * r7;
+        d7 += h1 * r6;
+        d7 += h2 * r5;
+        d7 += h3 * r4;
+        d7 += h4 * r3;
+        c = d7 >>> 13;
+        d7 &= 8191;
+        d7 += h5 * r2;
+        d7 += h6 * r1;
+        d7 += h7 * r0;
+        d7 += h8 * (5 * r9);
+        d7 += h9 * (5 * r8);
+        c += d7 >>> 13;
+        d7 &= 8191;
+        d8 = c;
+        d8 += h0 * r8;
+        d8 += h1 * r7;
+        d8 += h2 * r6;
+        d8 += h3 * r5;
+        d8 += h4 * r4;
+        c = d8 >>> 13;
+        d8 &= 8191;
+        d8 += h5 * r3;
+        d8 += h6 * r2;
+        d8 += h7 * r1;
+        d8 += h8 * r0;
+        d8 += h9 * (5 * r9);
+        c += d8 >>> 13;
+        d8 &= 8191;
+        d9 = c;
+        d9 += h0 * r9;
+        d9 += h1 * r8;
+        d9 += h2 * r7;
+        d9 += h3 * r6;
+        d9 += h4 * r5;
+        c = d9 >>> 13;
+        d9 &= 8191;
+        d9 += h5 * r4;
+        d9 += h6 * r3;
+        d9 += h7 * r2;
+        d9 += h8 * r1;
+        d9 += h9 * r0;
+        c += d9 >>> 13;
+        d9 &= 8191;
+        c = (c << 2) + c | 0;
+        c = c + d0 | 0;
+        d0 = c & 8191;
+        c = c >>> 13;
+        d1 += c;
+        h0 = d0;
+        h1 = d1;
+        h2 = d2;
+        h3 = d3;
+        h4 = d4;
+        h5 = d5;
+        h6 = d6;
+        h7 = d7;
+        h8 = d8;
+        h9 = d9;
+        mpos += 16;
+        bytes -= 16;
+      }
+      this.h[0] = h0;
+      this.h[1] = h1;
+      this.h[2] = h2;
+      this.h[3] = h3;
+      this.h[4] = h4;
+      this.h[5] = h5;
+      this.h[6] = h6;
+      this.h[7] = h7;
+      this.h[8] = h8;
+      this.h[9] = h9;
+    };
+    poly1305.prototype.finish = function(mac, macpos) {
+      var g = new Uint16Array(10);
+      var c, mask, f, i;
+      if (this.leftover) {
+        i = this.leftover;
+        this.buffer[i++] = 1;
+        for (; i < 16; i++) this.buffer[i] = 0;
+        this.fin = 1;
+        this.blocks(this.buffer, 0, 16);
+      }
+      c = this.h[1] >>> 13;
+      this.h[1] &= 8191;
+      for (i = 2; i < 10; i++) {
+        this.h[i] += c;
+        c = this.h[i] >>> 13;
+        this.h[i] &= 8191;
+      }
+      this.h[0] += c * 5;
+      c = this.h[0] >>> 13;
+      this.h[0] &= 8191;
+      this.h[1] += c;
+      c = this.h[1] >>> 13;
+      this.h[1] &= 8191;
+      this.h[2] += c;
+      g[0] = this.h[0] + 5;
+      c = g[0] >>> 13;
+      g[0] &= 8191;
+      for (i = 1; i < 10; i++) {
+        g[i] = this.h[i] + c;
+        c = g[i] >>> 13;
+        g[i] &= 8191;
+      }
+      g[9] -= 1 << 13;
+      mask = (c ^ 1) - 1;
+      for (i = 0; i < 10; i++) g[i] &= mask;
+      mask = ~mask;
+      for (i = 0; i < 10; i++) this.h[i] = this.h[i] & mask | g[i];
+      this.h[0] = (this.h[0] | this.h[1] << 13) & 65535;
+      this.h[1] = (this.h[1] >>> 3 | this.h[2] << 10) & 65535;
+      this.h[2] = (this.h[2] >>> 6 | this.h[3] << 7) & 65535;
+      this.h[3] = (this.h[3] >>> 9 | this.h[4] << 4) & 65535;
+      this.h[4] = (this.h[4] >>> 12 | this.h[5] << 1 | this.h[6] << 14) & 65535;
+      this.h[5] = (this.h[6] >>> 2 | this.h[7] << 11) & 65535;
+      this.h[6] = (this.h[7] >>> 5 | this.h[8] << 8) & 65535;
+      this.h[7] = (this.h[8] >>> 8 | this.h[9] << 5) & 65535;
+      f = this.h[0] + this.pad[0];
+      this.h[0] = f & 65535;
+      for (i = 1; i < 8; i++) {
+        f = (this.h[i] + this.pad[i] | 0) + (f >>> 16) | 0;
+        this.h[i] = f & 65535;
+      }
+      mac[macpos + 0] = this.h[0] >>> 0 & 255;
+      mac[macpos + 1] = this.h[0] >>> 8 & 255;
+      mac[macpos + 2] = this.h[1] >>> 0 & 255;
+      mac[macpos + 3] = this.h[1] >>> 8 & 255;
+      mac[macpos + 4] = this.h[2] >>> 0 & 255;
+      mac[macpos + 5] = this.h[2] >>> 8 & 255;
+      mac[macpos + 6] = this.h[3] >>> 0 & 255;
+      mac[macpos + 7] = this.h[3] >>> 8 & 255;
+      mac[macpos + 8] = this.h[4] >>> 0 & 255;
+      mac[macpos + 9] = this.h[4] >>> 8 & 255;
+      mac[macpos + 10] = this.h[5] >>> 0 & 255;
+      mac[macpos + 11] = this.h[5] >>> 8 & 255;
+      mac[macpos + 12] = this.h[6] >>> 0 & 255;
+      mac[macpos + 13] = this.h[6] >>> 8 & 255;
+      mac[macpos + 14] = this.h[7] >>> 0 & 255;
+      mac[macpos + 15] = this.h[7] >>> 8 & 255;
+    };
+    poly1305.prototype.update = function(m, mpos, bytes) {
+      var i, want;
+      if (this.leftover) {
+        want = 16 - this.leftover;
+        if (want > bytes)
+          want = bytes;
+        for (i = 0; i < want; i++)
+          this.buffer[this.leftover + i] = m[mpos + i];
+        bytes -= want;
+        mpos += want;
+        this.leftover += want;
+        if (this.leftover < 16)
+          return;
+        this.blocks(this.buffer, 0, 16);
+        this.leftover = 0;
+      }
+      if (bytes >= 16) {
+        want = bytes - bytes % 16;
+        this.blocks(m, mpos, want);
+        mpos += want;
+        bytes -= want;
+      }
+      if (bytes) {
+        for (i = 0; i < bytes; i++)
+          this.buffer[this.leftover + i] = m[mpos + i];
+        this.leftover += bytes;
+      }
+    };
+    function crypto_onetimeauth(out, outpos, m, mpos, n, k) {
+      var s = new poly1305(k);
+      s.update(m, mpos, n);
+      s.finish(out, outpos);
+      return 0;
+    }
+    function crypto_onetimeauth_verify(h, hpos, m, mpos, n, k) {
+      var x = new Uint8Array(16);
+      crypto_onetimeauth(x, 0, m, mpos, n, k);
+      return crypto_verify_16(h, hpos, x, 0);
+    }
+    function crypto_secretbox(c, m, d, n, k) {
+      var i;
+      if (d < 32) return -1;
+      crypto_stream_xor(c, 0, m, 0, d, n, k);
+      crypto_onetimeauth(c, 16, c, 32, d - 32, c);
+      for (i = 0; i < 16; i++) c[i] = 0;
+      return 0;
+    }
+    function crypto_secretbox_open(m, c, d, n, k) {
+      var i;
+      var x = new Uint8Array(32);
+      if (d < 32) return -1;
+      crypto_stream(x, 0, 32, n, k);
+      if (crypto_onetimeauth_verify(c, 16, c, 32, d - 32, x) !== 0) return -1;
+      crypto_stream_xor(m, 0, c, 0, d, n, k);
+      for (i = 0; i < 32; i++) m[i] = 0;
+      return 0;
+    }
+    function set25519(r, a) {
+      var i;
+      for (i = 0; i < 16; i++) r[i] = a[i] | 0;
+    }
+    function car25519(o) {
+      var i, v, c = 1;
+      for (i = 0; i < 16; i++) {
+        v = o[i] + c + 65535;
+        c = Math.floor(v / 65536);
+        o[i] = v - c * 65536;
+      }
+      o[0] += c - 1 + 37 * (c - 1);
+    }
+    function sel25519(p, q, b) {
+      var t, c = ~(b - 1);
+      for (var i = 0; i < 16; i++) {
+        t = c & (p[i] ^ q[i]);
+        p[i] ^= t;
+        q[i] ^= t;
+      }
+    }
+    function pack25519(o, n) {
+      var i, j, b;
+      var m = gf(), t = gf();
+      for (i = 0; i < 16; i++) t[i] = n[i];
+      car25519(t);
+      car25519(t);
+      car25519(t);
+      for (j = 0; j < 2; j++) {
+        m[0] = t[0] - 65517;
+        for (i = 1; i < 15; i++) {
+          m[i] = t[i] - 65535 - (m[i - 1] >> 16 & 1);
+          m[i - 1] &= 65535;
+        }
+        m[15] = t[15] - 32767 - (m[14] >> 16 & 1);
+        b = m[15] >> 16 & 1;
+        m[14] &= 65535;
+        sel25519(t, m, 1 - b);
+      }
+      for (i = 0; i < 16; i++) {
+        o[2 * i] = t[i] & 255;
+        o[2 * i + 1] = t[i] >> 8;
+      }
+    }
+    function neq25519(a, b) {
+      var c = new Uint8Array(32), d = new Uint8Array(32);
+      pack25519(c, a);
+      pack25519(d, b);
+      return crypto_verify_32(c, 0, d, 0);
+    }
+    function par25519(a) {
+      var d = new Uint8Array(32);
+      pack25519(d, a);
+      return d[0] & 1;
+    }
+    function unpack25519(o, n) {
+      var i;
+      for (i = 0; i < 16; i++) o[i] = n[2 * i] + (n[2 * i + 1] << 8);
+      o[15] &= 32767;
+    }
+    function A(o, a, b) {
+      for (var i = 0; i < 16; i++) o[i] = a[i] + b[i];
+    }
+    function Z(o, a, b) {
+      for (var i = 0; i < 16; i++) o[i] = a[i] - b[i];
+    }
+    function M(o, a, b) {
+      var v, c, t0 = 0, t1 = 0, t2 = 0, t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, t10 = 0, t11 = 0, t12 = 0, t13 = 0, t14 = 0, t15 = 0, t16 = 0, t17 = 0, t18 = 0, t19 = 0, t20 = 0, t21 = 0, t22 = 0, t23 = 0, t24 = 0, t25 = 0, t26 = 0, t27 = 0, t28 = 0, t29 = 0, t30 = 0, b0 = b[0], b1 = b[1], b2 = b[2], b3 = b[3], b4 = b[4], b5 = b[5], b6 = b[6], b7 = b[7], b8 = b[8], b9 = b[9], b10 = b[10], b11 = b[11], b12 = b[12], b13 = b[13], b14 = b[14], b15 = b[15];
+      v = a[0];
+      t0 += v * b0;
+      t1 += v * b1;
+      t2 += v * b2;
+      t3 += v * b3;
+      t4 += v * b4;
+      t5 += v * b5;
+      t6 += v * b6;
+      t7 += v * b7;
+      t8 += v * b8;
+      t9 += v * b9;
+      t10 += v * b10;
+      t11 += v * b11;
+      t12 += v * b12;
+      t13 += v * b13;
+      t14 += v * b14;
+      t15 += v * b15;
+      v = a[1];
+      t1 += v * b0;
+      t2 += v * b1;
+      t3 += v * b2;
+      t4 += v * b3;
+      t5 += v * b4;
+      t6 += v * b5;
+      t7 += v * b6;
+      t8 += v * b7;
+      t9 += v * b8;
+      t10 += v * b9;
+      t11 += v * b10;
+      t12 += v * b11;
+      t13 += v * b12;
+      t14 += v * b13;
+      t15 += v * b14;
+      t16 += v * b15;
+      v = a[2];
+      t2 += v * b0;
+      t3 += v * b1;
+      t4 += v * b2;
+      t5 += v * b3;
+      t6 += v * b4;
+      t7 += v * b5;
+      t8 += v * b6;
+      t9 += v * b7;
+      t10 += v * b8;
+      t11 += v * b9;
+      t12 += v * b10;
+      t13 += v * b11;
+      t14 += v * b12;
+      t15 += v * b13;
+      t16 += v * b14;
+      t17 += v * b15;
+      v = a[3];
+      t3 += v * b0;
+      t4 += v * b1;
+      t5 += v * b2;
+      t6 += v * b3;
+      t7 += v * b4;
+      t8 += v * b5;
+      t9 += v * b6;
+      t10 += v * b7;
+      t11 += v * b8;
+      t12 += v * b9;
+      t13 += v * b10;
+      t14 += v * b11;
+      t15 += v * b12;
+      t16 += v * b13;
+      t17 += v * b14;
+      t18 += v * b15;
+      v = a[4];
+      t4 += v * b0;
+      t5 += v * b1;
+      t6 += v * b2;
+      t7 += v * b3;
+      t8 += v * b4;
+      t9 += v * b5;
+      t10 += v * b6;
+      t11 += v * b7;
+      t12 += v * b8;
+      t13 += v * b9;
+      t14 += v * b10;
+      t15 += v * b11;
+      t16 += v * b12;
+      t17 += v * b13;
+      t18 += v * b14;
+      t19 += v * b15;
+      v = a[5];
+      t5 += v * b0;
+      t6 += v * b1;
+      t7 += v * b2;
+      t8 += v * b3;
+      t9 += v * b4;
+      t10 += v * b5;
+      t11 += v * b6;
+      t12 += v * b7;
+      t13 += v * b8;
+      t14 += v * b9;
+      t15 += v * b10;
+      t16 += v * b11;
+      t17 += v * b12;
+      t18 += v * b13;
+      t19 += v * b14;
+      t20 += v * b15;
+      v = a[6];
+      t6 += v * b0;
+      t7 += v * b1;
+      t8 += v * b2;
+      t9 += v * b3;
+      t10 += v * b4;
+      t11 += v * b5;
+      t12 += v * b6;
+      t13 += v * b7;
+      t14 += v * b8;
+      t15 += v * b9;
+      t16 += v * b10;
+      t17 += v * b11;
+      t18 += v * b12;
+      t19 += v * b13;
+      t20 += v * b14;
+      t21 += v * b15;
+      v = a[7];
+      t7 += v * b0;
+      t8 += v * b1;
+      t9 += v * b2;
+      t10 += v * b3;
+      t11 += v * b4;
+      t12 += v * b5;
+      t13 += v * b6;
+      t14 += v * b7;
+      t15 += v * b8;
+      t16 += v * b9;
+      t17 += v * b10;
+      t18 += v * b11;
+      t19 += v * b12;
+      t20 += v * b13;
+      t21 += v * b14;
+      t22 += v * b15;
+      v = a[8];
+      t8 += v * b0;
+      t9 += v * b1;
+      t10 += v * b2;
+      t11 += v * b3;
+      t12 += v * b4;
+      t13 += v * b5;
+      t14 += v * b6;
+      t15 += v * b7;
+      t16 += v * b8;
+      t17 += v * b9;
+      t18 += v * b10;
+      t19 += v * b11;
+      t20 += v * b12;
+      t21 += v * b13;
+      t22 += v * b14;
+      t23 += v * b15;
+      v = a[9];
+      t9 += v * b0;
+      t10 += v * b1;
+      t11 += v * b2;
+      t12 += v * b3;
+      t13 += v * b4;
+      t14 += v * b5;
+      t15 += v * b6;
+      t16 += v * b7;
+      t17 += v * b8;
+      t18 += v * b9;
+      t19 += v * b10;
+      t20 += v * b11;
+      t21 += v * b12;
+      t22 += v * b13;
+      t23 += v * b14;
+      t24 += v * b15;
+      v = a[10];
+      t10 += v * b0;
+      t11 += v * b1;
+      t12 += v * b2;
+      t13 += v * b3;
+      t14 += v * b4;
+      t15 += v * b5;
+      t16 += v * b6;
+      t17 += v * b7;
+      t18 += v * b8;
+      t19 += v * b9;
+      t20 += v * b10;
+      t21 += v * b11;
+      t22 += v * b12;
+      t23 += v * b13;
+      t24 += v * b14;
+      t25 += v * b15;
+      v = a[11];
+      t11 += v * b0;
+      t12 += v * b1;
+      t13 += v * b2;
+      t14 += v * b3;
+      t15 += v * b4;
+      t16 += v * b5;
+      t17 += v * b6;
+      t18 += v * b7;
+      t19 += v * b8;
+      t20 += v * b9;
+      t21 += v * b10;
+      t22 += v * b11;
+      t23 += v * b12;
+      t24 += v * b13;
+      t25 += v * b14;
+      t26 += v * b15;
+      v = a[12];
+      t12 += v * b0;
+      t13 += v * b1;
+      t14 += v * b2;
+      t15 += v * b3;
+      t16 += v * b4;
+      t17 += v * b5;
+      t18 += v * b6;
+      t19 += v * b7;
+      t20 += v * b8;
+      t21 += v * b9;
+      t22 += v * b10;
+      t23 += v * b11;
+      t24 += v * b12;
+      t25 += v * b13;
+      t26 += v * b14;
+      t27 += v * b15;
+      v = a[13];
+      t13 += v * b0;
+      t14 += v * b1;
+      t15 += v * b2;
+      t16 += v * b3;
+      t17 += v * b4;
+      t18 += v * b5;
+      t19 += v * b6;
+      t20 += v * b7;
+      t21 += v * b8;
+      t22 += v * b9;
+      t23 += v * b10;
+      t24 += v * b11;
+      t25 += v * b12;
+      t26 += v * b13;
+      t27 += v * b14;
+      t28 += v * b15;
+      v = a[14];
+      t14 += v * b0;
+      t15 += v * b1;
+      t16 += v * b2;
+      t17 += v * b3;
+      t18 += v * b4;
+      t19 += v * b5;
+      t20 += v * b6;
+      t21 += v * b7;
+      t22 += v * b8;
+      t23 += v * b9;
+      t24 += v * b10;
+      t25 += v * b11;
+      t26 += v * b12;
+      t27 += v * b13;
+      t28 += v * b14;
+      t29 += v * b15;
+      v = a[15];
+      t15 += v * b0;
+      t16 += v * b1;
+      t17 += v * b2;
+      t18 += v * b3;
+      t19 += v * b4;
+      t20 += v * b5;
+      t21 += v * b6;
+      t22 += v * b7;
+      t23 += v * b8;
+      t24 += v * b9;
+      t25 += v * b10;
+      t26 += v * b11;
+      t27 += v * b12;
+      t28 += v * b13;
+      t29 += v * b14;
+      t30 += v * b15;
+      t0 += 38 * t16;
+      t1 += 38 * t17;
+      t2 += 38 * t18;
+      t3 += 38 * t19;
+      t4 += 38 * t20;
+      t5 += 38 * t21;
+      t6 += 38 * t22;
+      t7 += 38 * t23;
+      t8 += 38 * t24;
+      t9 += 38 * t25;
+      t10 += 38 * t26;
+      t11 += 38 * t27;
+      t12 += 38 * t28;
+      t13 += 38 * t29;
+      t14 += 38 * t30;
+      c = 1;
+      v = t0 + c + 65535;
+      c = Math.floor(v / 65536);
+      t0 = v - c * 65536;
+      v = t1 + c + 65535;
+      c = Math.floor(v / 65536);
+      t1 = v - c * 65536;
+      v = t2 + c + 65535;
+      c = Math.floor(v / 65536);
+      t2 = v - c * 65536;
+      v = t3 + c + 65535;
+      c = Math.floor(v / 65536);
+      t3 = v - c * 65536;
+      v = t4 + c + 65535;
+      c = Math.floor(v / 65536);
+      t4 = v - c * 65536;
+      v = t5 + c + 65535;
+      c = Math.floor(v / 65536);
+      t5 = v - c * 65536;
+      v = t6 + c + 65535;
+      c = Math.floor(v / 65536);
+      t6 = v - c * 65536;
+      v = t7 + c + 65535;
+      c = Math.floor(v / 65536);
+      t7 = v - c * 65536;
+      v = t8 + c + 65535;
+      c = Math.floor(v / 65536);
+      t8 = v - c * 65536;
+      v = t9 + c + 65535;
+      c = Math.floor(v / 65536);
+      t9 = v - c * 65536;
+      v = t10 + c + 65535;
+      c = Math.floor(v / 65536);
+      t10 = v - c * 65536;
+      v = t11 + c + 65535;
+      c = Math.floor(v / 65536);
+      t11 = v - c * 65536;
+      v = t12 + c + 65535;
+      c = Math.floor(v / 65536);
+      t12 = v - c * 65536;
+      v = t13 + c + 65535;
+      c = Math.floor(v / 65536);
+      t13 = v - c * 65536;
+      v = t14 + c + 65535;
+      c = Math.floor(v / 65536);
+      t14 = v - c * 65536;
+      v = t15 + c + 65535;
+      c = Math.floor(v / 65536);
+      t15 = v - c * 65536;
+      t0 += c - 1 + 37 * (c - 1);
+      c = 1;
+      v = t0 + c + 65535;
+      c = Math.floor(v / 65536);
+      t0 = v - c * 65536;
+      v = t1 + c + 65535;
+      c = Math.floor(v / 65536);
+      t1 = v - c * 65536;
+      v = t2 + c + 65535;
+      c = Math.floor(v / 65536);
+      t2 = v - c * 65536;
+      v = t3 + c + 65535;
+      c = Math.floor(v / 65536);
+      t3 = v - c * 65536;
+      v = t4 + c + 65535;
+      c = Math.floor(v / 65536);
+      t4 = v - c * 65536;
+      v = t5 + c + 65535;
+      c = Math.floor(v / 65536);
+      t5 = v - c * 65536;
+      v = t6 + c + 65535;
+      c = Math.floor(v / 65536);
+      t6 = v - c * 65536;
+      v = t7 + c + 65535;
+      c = Math.floor(v / 65536);
+      t7 = v - c * 65536;
+      v = t8 + c + 65535;
+      c = Math.floor(v / 65536);
+      t8 = v - c * 65536;
+      v = t9 + c + 65535;
+      c = Math.floor(v / 65536);
+      t9 = v - c * 65536;
+      v = t10 + c + 65535;
+      c = Math.floor(v / 65536);
+      t10 = v - c * 65536;
+      v = t11 + c + 65535;
+      c = Math.floor(v / 65536);
+      t11 = v - c * 65536;
+      v = t12 + c + 65535;
+      c = Math.floor(v / 65536);
+      t12 = v - c * 65536;
+      v = t13 + c + 65535;
+      c = Math.floor(v / 65536);
+      t13 = v - c * 65536;
+      v = t14 + c + 65535;
+      c = Math.floor(v / 65536);
+      t14 = v - c * 65536;
+      v = t15 + c + 65535;
+      c = Math.floor(v / 65536);
+      t15 = v - c * 65536;
+      t0 += c - 1 + 37 * (c - 1);
+      o[0] = t0;
+      o[1] = t1;
+      o[2] = t2;
+      o[3] = t3;
+      o[4] = t4;
+      o[5] = t5;
+      o[6] = t6;
+      o[7] = t7;
+      o[8] = t8;
+      o[9] = t9;
+      o[10] = t10;
+      o[11] = t11;
+      o[12] = t12;
+      o[13] = t13;
+      o[14] = t14;
+      o[15] = t15;
+    }
+    function S(o, a) {
+      M(o, a, a);
+    }
+    function inv25519(o, i) {
+      var c = gf();
+      var a;
+      for (a = 0; a < 16; a++) c[a] = i[a];
+      for (a = 253; a >= 0; a--) {
+        S(c, c);
+        if (a !== 2 && a !== 4) M(c, c, i);
+      }
+      for (a = 0; a < 16; a++) o[a] = c[a];
+    }
+    function pow2523(o, i) {
+      var c = gf();
+      var a;
+      for (a = 0; a < 16; a++) c[a] = i[a];
+      for (a = 250; a >= 0; a--) {
+        S(c, c);
+        if (a !== 1) M(c, c, i);
+      }
+      for (a = 0; a < 16; a++) o[a] = c[a];
+    }
+    function crypto_scalarmult(q, n, p) {
+      var z = new Uint8Array(32);
+      var x = new Float64Array(80), r, i;
+      var a = gf(), b = gf(), c = gf(), d = gf(), e = gf(), f = gf();
+      for (i = 0; i < 31; i++) z[i] = n[i];
+      z[31] = n[31] & 127 | 64;
+      z[0] &= 248;
+      unpack25519(x, p);
+      for (i = 0; i < 16; i++) {
+        b[i] = x[i];
+        d[i] = a[i] = c[i] = 0;
+      }
+      a[0] = d[0] = 1;
+      for (i = 254; i >= 0; --i) {
+        r = z[i >>> 3] >>> (i & 7) & 1;
+        sel25519(a, b, r);
+        sel25519(c, d, r);
+        A(e, a, c);
+        Z(a, a, c);
+        A(c, b, d);
+        Z(b, b, d);
+        S(d, e);
+        S(f, a);
+        M(a, c, a);
+        M(c, b, e);
+        A(e, a, c);
+        Z(a, a, c);
+        S(b, a);
+        Z(c, d, f);
+        M(a, c, _121665);
+        A(a, a, d);
+        M(c, c, a);
+        M(a, d, f);
+        M(d, b, x);
+        S(b, e);
+        sel25519(a, b, r);
+        sel25519(c, d, r);
+      }
+      for (i = 0; i < 16; i++) {
+        x[i + 16] = a[i];
+        x[i + 32] = c[i];
+        x[i + 48] = b[i];
+        x[i + 64] = d[i];
+      }
+      var x32 = x.subarray(32);
+      var x16 = x.subarray(16);
+      inv25519(x32, x32);
+      M(x16, x16, x32);
+      pack25519(q, x16);
+      return 0;
+    }
+    function crypto_scalarmult_base(q, n) {
+      return crypto_scalarmult(q, n, _9);
+    }
+    function crypto_box_keypair(y, x) {
+      randombytes(x, 32);
+      return crypto_scalarmult_base(y, x);
+    }
+    function crypto_box_beforenm(k, y, x) {
+      var s = new Uint8Array(32);
+      crypto_scalarmult(s, x, y);
+      return crypto_core_hsalsa20(k, _0, s, sigma);
+    }
+    var crypto_box_afternm = crypto_secretbox;
+    var crypto_box_open_afternm = crypto_secretbox_open;
+    function crypto_box(c, m, d, n, y, x) {
+      var k = new Uint8Array(32);
+      crypto_box_beforenm(k, y, x);
+      return crypto_box_afternm(c, m, d, n, k);
+    }
+    function crypto_box_open(m, c, d, n, y, x) {
+      var k = new Uint8Array(32);
+      crypto_box_beforenm(k, y, x);
+      return crypto_box_open_afternm(m, c, d, n, k);
+    }
+    var K = [
+      1116352408,
+      3609767458,
+      1899447441,
+      602891725,
+      3049323471,
+      3964484399,
+      3921009573,
+      2173295548,
+      961987163,
+      4081628472,
+      1508970993,
+      3053834265,
+      2453635748,
+      2937671579,
+      2870763221,
+      3664609560,
+      3624381080,
+      2734883394,
+      310598401,
+      1164996542,
+      607225278,
+      1323610764,
+      1426881987,
+      3590304994,
+      1925078388,
+      4068182383,
+      2162078206,
+      991336113,
+      2614888103,
+      633803317,
+      3248222580,
+      3479774868,
+      3835390401,
+      2666613458,
+      4022224774,
+      944711139,
+      264347078,
+      2341262773,
+      604807628,
+      2007800933,
+      770255983,
+      1495990901,
+      1249150122,
+      1856431235,
+      1555081692,
+      3175218132,
+      1996064986,
+      2198950837,
+      2554220882,
+      3999719339,
+      2821834349,
+      766784016,
+      2952996808,
+      2566594879,
+      3210313671,
+      3203337956,
+      3336571891,
+      1034457026,
+      3584528711,
+      2466948901,
+      113926993,
+      3758326383,
+      338241895,
+      168717936,
+      666307205,
+      1188179964,
+      773529912,
+      1546045734,
+      1294757372,
+      1522805485,
+      1396182291,
+      2643833823,
+      1695183700,
+      2343527390,
+      1986661051,
+      1014477480,
+      2177026350,
+      1206759142,
+      2456956037,
+      344077627,
+      2730485921,
+      1290863460,
+      2820302411,
+      3158454273,
+      3259730800,
+      3505952657,
+      3345764771,
+      106217008,
+      3516065817,
+      3606008344,
+      3600352804,
+      1432725776,
+      4094571909,
+      1467031594,
+      275423344,
+      851169720,
+      430227734,
+      3100823752,
+      506948616,
+      1363258195,
+      659060556,
+      3750685593,
+      883997877,
+      3785050280,
+      958139571,
+      3318307427,
+      1322822218,
+      3812723403,
+      1537002063,
+      2003034995,
+      1747873779,
+      3602036899,
+      1955562222,
+      1575990012,
+      2024104815,
+      1125592928,
+      2227730452,
+      2716904306,
+      2361852424,
+      442776044,
+      2428436474,
+      593698344,
+      2756734187,
+      3733110249,
+      3204031479,
+      2999351573,
+      3329325298,
+      3815920427,
+      3391569614,
+      3928383900,
+      3515267271,
+      566280711,
+      3940187606,
+      3454069534,
+      4118630271,
+      4000239992,
+      116418474,
+      1914138554,
+      174292421,
+      2731055270,
+      289380356,
+      3203993006,
+      460393269,
+      320620315,
+      685471733,
+      587496836,
+      852142971,
+      1086792851,
+      1017036298,
+      365543100,
+      1126000580,
+      2618297676,
+      1288033470,
+      3409855158,
+      1501505948,
+      4234509866,
+      1607167915,
+      987167468,
+      1816402316,
+      1246189591
+    ];
+    function crypto_hashblocks_hl(hh, hl, m, n) {
+      var wh = new Int32Array(16), wl = new Int32Array(16), bh0, bh1, bh2, bh3, bh4, bh5, bh6, bh7, bl0, bl1, bl2, bl3, bl4, bl5, bl6, bl7, th, tl, i, j, h, l, a, b, c, d;
+      var ah0 = hh[0], ah1 = hh[1], ah2 = hh[2], ah3 = hh[3], ah4 = hh[4], ah5 = hh[5], ah6 = hh[6], ah7 = hh[7], al0 = hl[0], al1 = hl[1], al2 = hl[2], al3 = hl[3], al4 = hl[4], al5 = hl[5], al6 = hl[6], al7 = hl[7];
+      var pos = 0;
+      while (n >= 128) {
+        for (i = 0; i < 16; i++) {
+          j = 8 * i + pos;
+          wh[i] = m[j + 0] << 24 | m[j + 1] << 16 | m[j + 2] << 8 | m[j + 3];
+          wl[i] = m[j + 4] << 24 | m[j + 5] << 16 | m[j + 6] << 8 | m[j + 7];
+        }
+        for (i = 0; i < 80; i++) {
+          bh0 = ah0;
+          bh1 = ah1;
+          bh2 = ah2;
+          bh3 = ah3;
+          bh4 = ah4;
+          bh5 = ah5;
+          bh6 = ah6;
+          bh7 = ah7;
+          bl0 = al0;
+          bl1 = al1;
+          bl2 = al2;
+          bl3 = al3;
+          bl4 = al4;
+          bl5 = al5;
+          bl6 = al6;
+          bl7 = al7;
+          h = ah7;
+          l = al7;
+          a = l & 65535;
+          b = l >>> 16;
+          c = h & 65535;
+          d = h >>> 16;
+          h = (ah4 >>> 14 | al4 << 32 - 14) ^ (ah4 >>> 18 | al4 << 32 - 18) ^ (al4 >>> 41 - 32 | ah4 << 32 - (41 - 32));
+          l = (al4 >>> 14 | ah4 << 32 - 14) ^ (al4 >>> 18 | ah4 << 32 - 18) ^ (ah4 >>> 41 - 32 | al4 << 32 - (41 - 32));
+          a += l & 65535;
+          b += l >>> 16;
+          c += h & 65535;
+          d += h >>> 16;
+          h = ah4 & ah5 ^ ~ah4 & ah6;
+          l = al4 & al5 ^ ~al4 & al6;
+          a += l & 65535;
+          b += l >>> 16;
+          c += h & 65535;
+          d += h >>> 16;
+          h = K[i * 2];
+          l = K[i * 2 + 1];
+          a += l & 65535;
+          b += l >>> 16;
+          c += h & 65535;
+          d += h >>> 16;
+          h = wh[i % 16];
+          l = wl[i % 16];
+          a += l & 65535;
+          b += l >>> 16;
+          c += h & 65535;
+          d += h >>> 16;
           b += a >>> 16;
           c += b >>> 16;
           d += c >>> 16;
-
-          wh[j] = (c & 0xffff) | (d << 16);
-          wl[j] = (a & 0xffff) | (b << 16);
+          th = c & 65535 | d << 16;
+          tl = a & 65535 | b << 16;
+          h = th;
+          l = tl;
+          a = l & 65535;
+          b = l >>> 16;
+          c = h & 65535;
+          d = h >>> 16;
+          h = (ah0 >>> 28 | al0 << 32 - 28) ^ (al0 >>> 34 - 32 | ah0 << 32 - (34 - 32)) ^ (al0 >>> 39 - 32 | ah0 << 32 - (39 - 32));
+          l = (al0 >>> 28 | ah0 << 32 - 28) ^ (ah0 >>> 34 - 32 | al0 << 32 - (34 - 32)) ^ (ah0 >>> 39 - 32 | al0 << 32 - (39 - 32));
+          a += l & 65535;
+          b += l >>> 16;
+          c += h & 65535;
+          d += h >>> 16;
+          h = ah0 & ah1 ^ ah0 & ah2 ^ ah1 & ah2;
+          l = al0 & al1 ^ al0 & al2 ^ al1 & al2;
+          a += l & 65535;
+          b += l >>> 16;
+          c += h & 65535;
+          d += h >>> 16;
+          b += a >>> 16;
+          c += b >>> 16;
+          d += c >>> 16;
+          bh7 = c & 65535 | d << 16;
+          bl7 = a & 65535 | b << 16;
+          h = bh3;
+          l = bl3;
+          a = l & 65535;
+          b = l >>> 16;
+          c = h & 65535;
+          d = h >>> 16;
+          h = th;
+          l = tl;
+          a += l & 65535;
+          b += l >>> 16;
+          c += h & 65535;
+          d += h >>> 16;
+          b += a >>> 16;
+          c += b >>> 16;
+          d += c >>> 16;
+          bh3 = c & 65535 | d << 16;
+          bl3 = a & 65535 | b << 16;
+          ah1 = bh0;
+          ah2 = bh1;
+          ah3 = bh2;
+          ah4 = bh3;
+          ah5 = bh4;
+          ah6 = bh5;
+          ah7 = bh6;
+          ah0 = bh7;
+          al1 = bl0;
+          al2 = bl1;
+          al3 = bl2;
+          al4 = bl3;
+          al5 = bl4;
+          al6 = bl5;
+          al7 = bl6;
+          al0 = bl7;
+          if (i % 16 === 15) {
+            for (j = 0; j < 16; j++) {
+              h = wh[j];
+              l = wl[j];
+              a = l & 65535;
+              b = l >>> 16;
+              c = h & 65535;
+              d = h >>> 16;
+              h = wh[(j + 9) % 16];
+              l = wl[(j + 9) % 16];
+              a += l & 65535;
+              b += l >>> 16;
+              c += h & 65535;
+              d += h >>> 16;
+              th = wh[(j + 1) % 16];
+              tl = wl[(j + 1) % 16];
+              h = (th >>> 1 | tl << 32 - 1) ^ (th >>> 8 | tl << 32 - 8) ^ th >>> 7;
+              l = (tl >>> 1 | th << 32 - 1) ^ (tl >>> 8 | th << 32 - 8) ^ (tl >>> 7 | th << 32 - 7);
+              a += l & 65535;
+              b += l >>> 16;
+              c += h & 65535;
+              d += h >>> 16;
+              th = wh[(j + 14) % 16];
+              tl = wl[(j + 14) % 16];
+              h = (th >>> 19 | tl << 32 - 19) ^ (tl >>> 61 - 32 | th << 32 - (61 - 32)) ^ th >>> 6;
+              l = (tl >>> 19 | th << 32 - 19) ^ (th >>> 61 - 32 | tl << 32 - (61 - 32)) ^ (tl >>> 6 | th << 32 - 6);
+              a += l & 65535;
+              b += l >>> 16;
+              c += h & 65535;
+              d += h >>> 16;
+              b += a >>> 16;
+              c += b >>> 16;
+              d += c >>> 16;
+              wh[j] = c & 65535 | d << 16;
+              wl[j] = a & 65535 | b << 16;
+            }
+          }
+        }
+        h = ah0;
+        l = al0;
+        a = l & 65535;
+        b = l >>> 16;
+        c = h & 65535;
+        d = h >>> 16;
+        h = hh[0];
+        l = hl[0];
+        a += l & 65535;
+        b += l >>> 16;
+        c += h & 65535;
+        d += h >>> 16;
+        b += a >>> 16;
+        c += b >>> 16;
+        d += c >>> 16;
+        hh[0] = ah0 = c & 65535 | d << 16;
+        hl[0] = al0 = a & 65535 | b << 16;
+        h = ah1;
+        l = al1;
+        a = l & 65535;
+        b = l >>> 16;
+        c = h & 65535;
+        d = h >>> 16;
+        h = hh[1];
+        l = hl[1];
+        a += l & 65535;
+        b += l >>> 16;
+        c += h & 65535;
+        d += h >>> 16;
+        b += a >>> 16;
+        c += b >>> 16;
+        d += c >>> 16;
+        hh[1] = ah1 = c & 65535 | d << 16;
+        hl[1] = al1 = a & 65535 | b << 16;
+        h = ah2;
+        l = al2;
+        a = l & 65535;
+        b = l >>> 16;
+        c = h & 65535;
+        d = h >>> 16;
+        h = hh[2];
+        l = hl[2];
+        a += l & 65535;
+        b += l >>> 16;
+        c += h & 65535;
+        d += h >>> 16;
+        b += a >>> 16;
+        c += b >>> 16;
+        d += c >>> 16;
+        hh[2] = ah2 = c & 65535 | d << 16;
+        hl[2] = al2 = a & 65535 | b << 16;
+        h = ah3;
+        l = al3;
+        a = l & 65535;
+        b = l >>> 16;
+        c = h & 65535;
+        d = h >>> 16;
+        h = hh[3];
+        l = hl[3];
+        a += l & 65535;
+        b += l >>> 16;
+        c += h & 65535;
+        d += h >>> 16;
+        b += a >>> 16;
+        c += b >>> 16;
+        d += c >>> 16;
+        hh[3] = ah3 = c & 65535 | d << 16;
+        hl[3] = al3 = a & 65535 | b << 16;
+        h = ah4;
+        l = al4;
+        a = l & 65535;
+        b = l >>> 16;
+        c = h & 65535;
+        d = h >>> 16;
+        h = hh[4];
+        l = hl[4];
+        a += l & 65535;
+        b += l >>> 16;
+        c += h & 65535;
+        d += h >>> 16;
+        b += a >>> 16;
+        c += b >>> 16;
+        d += c >>> 16;
+        hh[4] = ah4 = c & 65535 | d << 16;
+        hl[4] = al4 = a & 65535 | b << 16;
+        h = ah5;
+        l = al5;
+        a = l & 65535;
+        b = l >>> 16;
+        c = h & 65535;
+        d = h >>> 16;
+        h = hh[5];
+        l = hl[5];
+        a += l & 65535;
+        b += l >>> 16;
+        c += h & 65535;
+        d += h >>> 16;
+        b += a >>> 16;
+        c += b >>> 16;
+        d += c >>> 16;
+        hh[5] = ah5 = c & 65535 | d << 16;
+        hl[5] = al5 = a & 65535 | b << 16;
+        h = ah6;
+        l = al6;
+        a = l & 65535;
+        b = l >>> 16;
+        c = h & 65535;
+        d = h >>> 16;
+        h = hh[6];
+        l = hl[6];
+        a += l & 65535;
+        b += l >>> 16;
+        c += h & 65535;
+        d += h >>> 16;
+        b += a >>> 16;
+        c += b >>> 16;
+        d += c >>> 16;
+        hh[6] = ah6 = c & 65535 | d << 16;
+        hl[6] = al6 = a & 65535 | b << 16;
+        h = ah7;
+        l = al7;
+        a = l & 65535;
+        b = l >>> 16;
+        c = h & 65535;
+        d = h >>> 16;
+        h = hh[7];
+        l = hl[7];
+        a += l & 65535;
+        b += l >>> 16;
+        c += h & 65535;
+        d += h >>> 16;
+        b += a >>> 16;
+        c += b >>> 16;
+        d += c >>> 16;
+        hh[7] = ah7 = c & 65535 | d << 16;
+        hl[7] = al7 = a & 65535 | b << 16;
+        pos += 128;
+        n -= 128;
+      }
+      return n;
+    }
+    function crypto_hash(out, m, n) {
+      var hh = new Int32Array(8), hl = new Int32Array(8), x = new Uint8Array(256), i, b = n;
+      hh[0] = 1779033703;
+      hh[1] = 3144134277;
+      hh[2] = 1013904242;
+      hh[3] = 2773480762;
+      hh[4] = 1359893119;
+      hh[5] = 2600822924;
+      hh[6] = 528734635;
+      hh[7] = 1541459225;
+      hl[0] = 4089235720;
+      hl[1] = 2227873595;
+      hl[2] = 4271175723;
+      hl[3] = 1595750129;
+      hl[4] = 2917565137;
+      hl[5] = 725511199;
+      hl[6] = 4215389547;
+      hl[7] = 327033209;
+      crypto_hashblocks_hl(hh, hl, m, n);
+      n %= 128;
+      for (i = 0; i < n; i++) x[i] = m[b - n + i];
+      x[n] = 128;
+      n = 256 - 128 * (n < 112 ? 1 : 0);
+      x[n - 9] = 0;
+      ts64(x, n - 8, b / 536870912 | 0, b << 3);
+      crypto_hashblocks_hl(hh, hl, x, n);
+      for (i = 0; i < 8; i++) ts64(out, 8 * i, hh[i], hl[i]);
+      return 0;
+    }
+    function add(p, q) {
+      var a = gf(), b = gf(), c = gf(), d = gf(), e = gf(), f = gf(), g = gf(), h = gf(), t = gf();
+      Z(a, p[1], p[0]);
+      Z(t, q[1], q[0]);
+      M(a, a, t);
+      A(b, p[0], p[1]);
+      A(t, q[0], q[1]);
+      M(b, b, t);
+      M(c, p[3], q[3]);
+      M(c, c, D2);
+      M(d, p[2], q[2]);
+      A(d, d, d);
+      Z(e, b, a);
+      Z(f, d, c);
+      A(g, d, c);
+      A(h, b, a);
+      M(p[0], e, f);
+      M(p[1], h, g);
+      M(p[2], g, f);
+      M(p[3], e, h);
+    }
+    function cswap(p, q, b) {
+      var i;
+      for (i = 0; i < 4; i++) {
+        sel25519(p[i], q[i], b);
+      }
+    }
+    function pack(r, p) {
+      var tx = gf(), ty = gf(), zi = gf();
+      inv25519(zi, p[2]);
+      M(tx, p[0], zi);
+      M(ty, p[1], zi);
+      pack25519(r, ty);
+      r[31] ^= par25519(tx) << 7;
+    }
+    function scalarmult(p, q, s) {
+      var b, i;
+      set25519(p[0], gf0);
+      set25519(p[1], gf1);
+      set25519(p[2], gf1);
+      set25519(p[3], gf0);
+      for (i = 255; i >= 0; --i) {
+        b = s[i / 8 | 0] >> (i & 7) & 1;
+        cswap(p, q, b);
+        add(q, p);
+        add(p, p);
+        cswap(p, q, b);
+      }
+    }
+    function scalarbase(p, s) {
+      var q = [gf(), gf(), gf(), gf()];
+      set25519(q[0], X);
+      set25519(q[1], Y);
+      set25519(q[2], gf1);
+      M(q[3], X, Y);
+      scalarmult(p, q, s);
+    }
+    function crypto_sign_keypair(pk, sk, seeded) {
+      var d = new Uint8Array(64);
+      var p = [gf(), gf(), gf(), gf()];
+      var i;
+      if (!seeded) randombytes(sk, 32);
+      crypto_hash(d, sk, 32);
+      d[0] &= 248;
+      d[31] &= 127;
+      d[31] |= 64;
+      scalarbase(p, d);
+      pack(pk, p);
+      for (i = 0; i < 32; i++) sk[i + 32] = pk[i];
+      return 0;
+    }
+    var L = new Float64Array([237, 211, 245, 92, 26, 99, 18, 88, 214, 156, 247, 162, 222, 249, 222, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16]);
+    function modL(r, x) {
+      var carry, i, j, k;
+      for (i = 63; i >= 32; --i) {
+        carry = 0;
+        for (j = i - 32, k = i - 12; j < k; ++j) {
+          x[j] += carry - 16 * x[i] * L[j - (i - 32)];
+          carry = Math.floor((x[j] + 128) / 256);
+          x[j] -= carry * 256;
+        }
+        x[j] += carry;
+        x[i] = 0;
+      }
+      carry = 0;
+      for (j = 0; j < 32; j++) {
+        x[j] += carry - (x[31] >> 4) * L[j];
+        carry = x[j] >> 8;
+        x[j] &= 255;
+      }
+      for (j = 0; j < 32; j++) x[j] -= carry * L[j];
+      for (i = 0; i < 32; i++) {
+        x[i + 1] += x[i] >> 8;
+        r[i] = x[i] & 255;
+      }
+    }
+    function reduce(r) {
+      var x = new Float64Array(64), i;
+      for (i = 0; i < 64; i++) x[i] = r[i];
+      for (i = 0; i < 64; i++) r[i] = 0;
+      modL(r, x);
+    }
+    function crypto_sign(sm, m, n, sk) {
+      var d = new Uint8Array(64), h = new Uint8Array(64), r = new Uint8Array(64);
+      var i, j, x = new Float64Array(64);
+      var p = [gf(), gf(), gf(), gf()];
+      crypto_hash(d, sk, 32);
+      d[0] &= 248;
+      d[31] &= 127;
+      d[31] |= 64;
+      var smlen = n + 64;
+      for (i = 0; i < n; i++) sm[64 + i] = m[i];
+      for (i = 0; i < 32; i++) sm[32 + i] = d[32 + i];
+      crypto_hash(r, sm.subarray(32), n + 32);
+      reduce(r);
+      scalarbase(p, r);
+      pack(sm, p);
+      for (i = 32; i < 64; i++) sm[i] = sk[i];
+      crypto_hash(h, sm, n + 64);
+      reduce(h);
+      for (i = 0; i < 64; i++) x[i] = 0;
+      for (i = 0; i < 32; i++) x[i] = r[i];
+      for (i = 0; i < 32; i++) {
+        for (j = 0; j < 32; j++) {
+          x[i + j] += h[i] * d[j];
         }
       }
+      modL(sm.subarray(32), x);
+      return smlen;
     }
-
-    // add
-    h = ah0;
-    l = al0;
-
-    a = l & 0xffff; b = l >>> 16;
-    c = h & 0xffff; d = h >>> 16;
-
-    h = hh[0];
-    l = hl[0];
-
-    a += l & 0xffff; b += l >>> 16;
-    c += h & 0xffff; d += h >>> 16;
-
-    b += a >>> 16;
-    c += b >>> 16;
-    d += c >>> 16;
-
-    hh[0] = ah0 = (c & 0xffff) | (d << 16);
-    hl[0] = al0 = (a & 0xffff) | (b << 16);
-
-    h = ah1;
-    l = al1;
-
-    a = l & 0xffff; b = l >>> 16;
-    c = h & 0xffff; d = h >>> 16;
-
-    h = hh[1];
-    l = hl[1];
-
-    a += l & 0xffff; b += l >>> 16;
-    c += h & 0xffff; d += h >>> 16;
-
-    b += a >>> 16;
-    c += b >>> 16;
-    d += c >>> 16;
-
-    hh[1] = ah1 = (c & 0xffff) | (d << 16);
-    hl[1] = al1 = (a & 0xffff) | (b << 16);
-
-    h = ah2;
-    l = al2;
-
-    a = l & 0xffff; b = l >>> 16;
-    c = h & 0xffff; d = h >>> 16;
-
-    h = hh[2];
-    l = hl[2];
-
-    a += l & 0xffff; b += l >>> 16;
-    c += h & 0xffff; d += h >>> 16;
-
-    b += a >>> 16;
-    c += b >>> 16;
-    d += c >>> 16;
-
-    hh[2] = ah2 = (c & 0xffff) | (d << 16);
-    hl[2] = al2 = (a & 0xffff) | (b << 16);
-
-    h = ah3;
-    l = al3;
-
-    a = l & 0xffff; b = l >>> 16;
-    c = h & 0xffff; d = h >>> 16;
-
-    h = hh[3];
-    l = hl[3];
-
-    a += l & 0xffff; b += l >>> 16;
-    c += h & 0xffff; d += h >>> 16;
-
-    b += a >>> 16;
-    c += b >>> 16;
-    d += c >>> 16;
-
-    hh[3] = ah3 = (c & 0xffff) | (d << 16);
-    hl[3] = al3 = (a & 0xffff) | (b << 16);
-
-    h = ah4;
-    l = al4;
-
-    a = l & 0xffff; b = l >>> 16;
-    c = h & 0xffff; d = h >>> 16;
-
-    h = hh[4];
-    l = hl[4];
-
-    a += l & 0xffff; b += l >>> 16;
-    c += h & 0xffff; d += h >>> 16;
-
-    b += a >>> 16;
-    c += b >>> 16;
-    d += c >>> 16;
-
-    hh[4] = ah4 = (c & 0xffff) | (d << 16);
-    hl[4] = al4 = (a & 0xffff) | (b << 16);
-
-    h = ah5;
-    l = al5;
-
-    a = l & 0xffff; b = l >>> 16;
-    c = h & 0xffff; d = h >>> 16;
-
-    h = hh[5];
-    l = hl[5];
-
-    a += l & 0xffff; b += l >>> 16;
-    c += h & 0xffff; d += h >>> 16;
-
-    b += a >>> 16;
-    c += b >>> 16;
-    d += c >>> 16;
-
-    hh[5] = ah5 = (c & 0xffff) | (d << 16);
-    hl[5] = al5 = (a & 0xffff) | (b << 16);
-
-    h = ah6;
-    l = al6;
-
-    a = l & 0xffff; b = l >>> 16;
-    c = h & 0xffff; d = h >>> 16;
-
-    h = hh[6];
-    l = hl[6];
-
-    a += l & 0xffff; b += l >>> 16;
-    c += h & 0xffff; d += h >>> 16;
-
-    b += a >>> 16;
-    c += b >>> 16;
-    d += c >>> 16;
-
-    hh[6] = ah6 = (c & 0xffff) | (d << 16);
-    hl[6] = al6 = (a & 0xffff) | (b << 16);
-
-    h = ah7;
-    l = al7;
-
-    a = l & 0xffff; b = l >>> 16;
-    c = h & 0xffff; d = h >>> 16;
-
-    h = hh[7];
-    l = hl[7];
-
-    a += l & 0xffff; b += l >>> 16;
-    c += h & 0xffff; d += h >>> 16;
-
-    b += a >>> 16;
-    c += b >>> 16;
-    d += c >>> 16;
-
-    hh[7] = ah7 = (c & 0xffff) | (d << 16);
-    hl[7] = al7 = (a & 0xffff) | (b << 16);
-
-    pos += 128;
-    n -= 128;
-  }
-
-  return n;
-}
-
-function crypto_hash(out, m, n) {
-  var hh = new Int32Array(8),
-      hl = new Int32Array(8),
-      x = new Uint8Array(256),
-      i, b = n;
-
-  hh[0] = 0x6a09e667;
-  hh[1] = 0xbb67ae85;
-  hh[2] = 0x3c6ef372;
-  hh[3] = 0xa54ff53a;
-  hh[4] = 0x510e527f;
-  hh[5] = 0x9b05688c;
-  hh[6] = 0x1f83d9ab;
-  hh[7] = 0x5be0cd19;
-
-  hl[0] = 0xf3bcc908;
-  hl[1] = 0x84caa73b;
-  hl[2] = 0xfe94f82b;
-  hl[3] = 0x5f1d36f1;
-  hl[4] = 0xade682d1;
-  hl[5] = 0x2b3e6c1f;
-  hl[6] = 0xfb41bd6b;
-  hl[7] = 0x137e2179;
-
-  crypto_hashblocks_hl(hh, hl, m, n);
-  n %= 128;
-
-  for (i = 0; i < n; i++) x[i] = m[b-n+i];
-  x[n] = 128;
-
-  n = 256-128*(n<112?1:0);
-  x[n-9] = 0;
-  ts64(x, n-8,  (b / 0x20000000) | 0, b << 3);
-  crypto_hashblocks_hl(hh, hl, x, n);
-
-  for (i = 0; i < 8; i++) ts64(out, 8*i, hh[i], hl[i]);
-
-  return 0;
-}
-
-function add(p, q) {
-  var a = gf(), b = gf(), c = gf(),
-      d = gf(), e = gf(), f = gf(),
-      g = gf(), h = gf(), t = gf();
-
-  Z(a, p[1], p[0]);
-  Z(t, q[1], q[0]);
-  M(a, a, t);
-  A(b, p[0], p[1]);
-  A(t, q[0], q[1]);
-  M(b, b, t);
-  M(c, p[3], q[3]);
-  M(c, c, D2);
-  M(d, p[2], q[2]);
-  A(d, d, d);
-  Z(e, b, a);
-  Z(f, d, c);
-  A(g, d, c);
-  A(h, b, a);
-
-  M(p[0], e, f);
-  M(p[1], h, g);
-  M(p[2], g, f);
-  M(p[3], e, h);
-}
-
-function cswap(p, q, b) {
-  var i;
-  for (i = 0; i < 4; i++) {
-    sel25519(p[i], q[i], b);
-  }
-}
-
-function pack(r, p) {
-  var tx = gf(), ty = gf(), zi = gf();
-  inv25519(zi, p[2]);
-  M(tx, p[0], zi);
-  M(ty, p[1], zi);
-  pack25519(r, ty);
-  r[31] ^= par25519(tx) << 7;
-}
-
-function scalarmult(p, q, s) {
-  var b, i;
-  set25519(p[0], gf0);
-  set25519(p[1], gf1);
-  set25519(p[2], gf1);
-  set25519(p[3], gf0);
-  for (i = 255; i >= 0; --i) {
-    b = (s[(i/8)|0] >> (i&7)) & 1;
-    cswap(p, q, b);
-    add(q, p);
-    add(p, p);
-    cswap(p, q, b);
-  }
-}
-
-function scalarbase(p, s) {
-  var q = [gf(), gf(), gf(), gf()];
-  set25519(q[0], X);
-  set25519(q[1], Y);
-  set25519(q[2], gf1);
-  M(q[3], X, Y);
-  scalarmult(p, q, s);
-}
-
-function crypto_sign_keypair(pk, sk, seeded) {
-  var d = new Uint8Array(64);
-  var p = [gf(), gf(), gf(), gf()];
-  var i;
-
-  if (!seeded) randombytes(sk, 32);
-  crypto_hash(d, sk, 32);
-  d[0] &= 248;
-  d[31] &= 127;
-  d[31] |= 64;
-
-  scalarbase(p, d);
-  pack(pk, p);
-
-  for (i = 0; i < 32; i++) sk[i+32] = pk[i];
-  return 0;
-}
-
-var L = new Float64Array([0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x10]);
-
-function modL(r, x) {
-  var carry, i, j, k;
-  for (i = 63; i >= 32; --i) {
-    carry = 0;
-    for (j = i - 32, k = i - 12; j < k; ++j) {
-      x[j] += carry - 16 * x[i] * L[j - (i - 32)];
-      carry = Math.floor((x[j] + 128) / 256);
-      x[j] -= carry * 256;
+    function unpackneg(r, p) {
+      var t = gf(), chk = gf(), num = gf(), den = gf(), den2 = gf(), den4 = gf(), den6 = gf();
+      set25519(r[2], gf1);
+      unpack25519(r[1], p);
+      S(num, r[1]);
+      M(den, num, D);
+      Z(num, num, r[2]);
+      A(den, r[2], den);
+      S(den2, den);
+      S(den4, den2);
+      M(den6, den4, den2);
+      M(t, den6, num);
+      M(t, t, den);
+      pow2523(t, t);
+      M(t, t, num);
+      M(t, t, den);
+      M(t, t, den);
+      M(r[0], t, den);
+      S(chk, r[0]);
+      M(chk, chk, den);
+      if (neq25519(chk, num)) M(r[0], r[0], I);
+      S(chk, r[0]);
+      M(chk, chk, den);
+      if (neq25519(chk, num)) return -1;
+      if (par25519(r[0]) === p[31] >> 7) Z(r[0], gf0, r[0]);
+      M(r[3], r[0], r[1]);
+      return 0;
     }
-    x[j] += carry;
-    x[i] = 0;
-  }
-  carry = 0;
-  for (j = 0; j < 32; j++) {
-    x[j] += carry - (x[31] >> 4) * L[j];
-    carry = x[j] >> 8;
-    x[j] &= 255;
-  }
-  for (j = 0; j < 32; j++) x[j] -= carry * L[j];
-  for (i = 0; i < 32; i++) {
-    x[i+1] += x[i] >> 8;
-    r[i] = x[i] & 255;
-  }
-}
-
-function reduce(r) {
-  var x = new Float64Array(64), i;
-  for (i = 0; i < 64; i++) x[i] = r[i];
-  for (i = 0; i < 64; i++) r[i] = 0;
-  modL(r, x);
-}
-
-// Note: difference from C - smlen returned, not passed as argument.
-function crypto_sign(sm, m, n, sk) {
-  var d = new Uint8Array(64), h = new Uint8Array(64), r = new Uint8Array(64);
-  var i, j, x = new Float64Array(64);
-  var p = [gf(), gf(), gf(), gf()];
-
-  crypto_hash(d, sk, 32);
-  d[0] &= 248;
-  d[31] &= 127;
-  d[31] |= 64;
-
-  var smlen = n + 64;
-  for (i = 0; i < n; i++) sm[64 + i] = m[i];
-  for (i = 0; i < 32; i++) sm[32 + i] = d[32 + i];
-
-  crypto_hash(r, sm.subarray(32), n+32);
-  reduce(r);
-  scalarbase(p, r);
-  pack(sm, p);
-
-  for (i = 32; i < 64; i++) sm[i] = sk[i];
-  crypto_hash(h, sm, n + 64);
-  reduce(h);
-
-  for (i = 0; i < 64; i++) x[i] = 0;
-  for (i = 0; i < 32; i++) x[i] = r[i];
-  for (i = 0; i < 32; i++) {
-    for (j = 0; j < 32; j++) {
-      x[i+j] += h[i] * d[j];
-    }
-  }
-
-  modL(sm.subarray(32), x);
-  return smlen;
-}
-
-function unpackneg(r, p) {
-  var t = gf(), chk = gf(), num = gf(),
-      den = gf(), den2 = gf(), den4 = gf(),
-      den6 = gf();
-
-  set25519(r[2], gf1);
-  unpack25519(r[1], p);
-  S(num, r[1]);
-  M(den, num, D);
-  Z(num, num, r[2]);
-  A(den, r[2], den);
-
-  S(den2, den);
-  S(den4, den2);
-  M(den6, den4, den2);
-  M(t, den6, num);
-  M(t, t, den);
-
-  pow2523(t, t);
-  M(t, t, num);
-  M(t, t, den);
-  M(t, t, den);
-  M(r[0], t, den);
-
-  S(chk, r[0]);
-  M(chk, chk, den);
-  if (neq25519(chk, num)) M(r[0], r[0], I);
-
-  S(chk, r[0]);
-  M(chk, chk, den);
-  if (neq25519(chk, num)) return -1;
-
-  if (par25519(r[0]) === (p[31]>>7)) Z(r[0], gf0, r[0]);
-
-  M(r[3], r[0], r[1]);
-  return 0;
-}
-
-function crypto_sign_open(m, sm, n, pk) {
-  var i;
-  var t = new Uint8Array(32), h = new Uint8Array(64);
-  var p = [gf(), gf(), gf(), gf()],
-      q = [gf(), gf(), gf(), gf()];
-
-  if (n < 64) return -1;
-
-  if (unpackneg(q, pk)) return -1;
-
-  for (i = 0; i < n; i++) m[i] = sm[i];
-  for (i = 0; i < 32; i++) m[i+32] = pk[i];
-  crypto_hash(h, m, n);
-  reduce(h);
-  scalarmult(p, q, h);
-
-  scalarbase(q, sm.subarray(32));
-  add(p, q);
-  pack(t, p);
-
-  n -= 64;
-  if (crypto_verify_32(sm, 0, t, 0)) {
-    for (i = 0; i < n; i++) m[i] = 0;
-    return -1;
-  }
-
-  for (i = 0; i < n; i++) m[i] = sm[i + 64];
-  return n;
-}
-
-var crypto_secretbox_KEYBYTES = 32,
-    crypto_secretbox_NONCEBYTES = 24,
-    crypto_secretbox_ZEROBYTES = 32,
-    crypto_secretbox_BOXZEROBYTES = 16,
-    crypto_scalarmult_BYTES = 32,
-    crypto_scalarmult_SCALARBYTES = 32,
-    crypto_box_PUBLICKEYBYTES = 32,
-    crypto_box_SECRETKEYBYTES = 32,
-    crypto_box_BEFORENMBYTES = 32,
-    crypto_box_NONCEBYTES = crypto_secretbox_NONCEBYTES,
-    crypto_box_ZEROBYTES = crypto_secretbox_ZEROBYTES,
-    crypto_box_BOXZEROBYTES = crypto_secretbox_BOXZEROBYTES,
-    crypto_sign_BYTES = 64,
-    crypto_sign_PUBLICKEYBYTES = 32,
-    crypto_sign_SECRETKEYBYTES = 64,
-    crypto_sign_SEEDBYTES = 32,
-    crypto_hash_BYTES = 64;
-
-nacl.lowlevel = {
-  crypto_core_hsalsa20: crypto_core_hsalsa20,
-  crypto_stream_xor: crypto_stream_xor,
-  crypto_stream: crypto_stream,
-  crypto_stream_salsa20_xor: crypto_stream_salsa20_xor,
-  crypto_stream_salsa20: crypto_stream_salsa20,
-  crypto_onetimeauth: crypto_onetimeauth,
-  crypto_onetimeauth_verify: crypto_onetimeauth_verify,
-  crypto_verify_16: crypto_verify_16,
-  crypto_verify_32: crypto_verify_32,
-  crypto_secretbox: crypto_secretbox,
-  crypto_secretbox_open: crypto_secretbox_open,
-  crypto_scalarmult: crypto_scalarmult,
-  crypto_scalarmult_base: crypto_scalarmult_base,
-  crypto_box_beforenm: crypto_box_beforenm,
-  crypto_box_afternm: crypto_box_afternm,
-  crypto_box: crypto_box,
-  crypto_box_open: crypto_box_open,
-  crypto_box_keypair: crypto_box_keypair,
-  crypto_hash: crypto_hash,
-  crypto_sign: crypto_sign,
-  crypto_sign_keypair: crypto_sign_keypair,
-  crypto_sign_open: crypto_sign_open,
-
-  crypto_secretbox_KEYBYTES: crypto_secretbox_KEYBYTES,
-  crypto_secretbox_NONCEBYTES: crypto_secretbox_NONCEBYTES,
-  crypto_secretbox_ZEROBYTES: crypto_secretbox_ZEROBYTES,
-  crypto_secretbox_BOXZEROBYTES: crypto_secretbox_BOXZEROBYTES,
-  crypto_scalarmult_BYTES: crypto_scalarmult_BYTES,
-  crypto_scalarmult_SCALARBYTES: crypto_scalarmult_SCALARBYTES,
-  crypto_box_PUBLICKEYBYTES: crypto_box_PUBLICKEYBYTES,
-  crypto_box_SECRETKEYBYTES: crypto_box_SECRETKEYBYTES,
-  crypto_box_BEFORENMBYTES: crypto_box_BEFORENMBYTES,
-  crypto_box_NONCEBYTES: crypto_box_NONCEBYTES,
-  crypto_box_ZEROBYTES: crypto_box_ZEROBYTES,
-  crypto_box_BOXZEROBYTES: crypto_box_BOXZEROBYTES,
-  crypto_sign_BYTES: crypto_sign_BYTES,
-  crypto_sign_PUBLICKEYBYTES: crypto_sign_PUBLICKEYBYTES,
-  crypto_sign_SECRETKEYBYTES: crypto_sign_SECRETKEYBYTES,
-  crypto_sign_SEEDBYTES: crypto_sign_SEEDBYTES,
-  crypto_hash_BYTES: crypto_hash_BYTES,
-
-  gf: gf,
-  D: D,
-  L: L,
-  pack25519: pack25519,
-  unpack25519: unpack25519,
-  M: M,
-  A: A,
-  S: S,
-  Z: Z,
-  pow2523: pow2523,
-  add: add,
-  set25519: set25519,
-  modL: modL,
-  scalarmult: scalarmult,
-  scalarbase: scalarbase,
-};
-
-/* High-level API */
-
-function checkLengths(k, n) {
-  if (k.length !== crypto_secretbox_KEYBYTES) throw new Error('bad key size');
-  if (n.length !== crypto_secretbox_NONCEBYTES) throw new Error('bad nonce size');
-}
-
-function checkBoxLengths(pk, sk) {
-  if (pk.length !== crypto_box_PUBLICKEYBYTES) throw new Error('bad public key size');
-  if (sk.length !== crypto_box_SECRETKEYBYTES) throw new Error('bad secret key size');
-}
-
-function checkArrayTypes() {
-  for (var i = 0; i < arguments.length; i++) {
-    if (!(arguments[i] instanceof Uint8Array))
-      throw new TypeError('unexpected type, use Uint8Array');
-  }
-}
-
-function cleanup(arr) {
-  for (var i = 0; i < arr.length; i++) arr[i] = 0;
-}
-
-nacl.randomBytes = function(n) {
-  var b = new Uint8Array(n);
-  randombytes(b, n);
-  return b;
-};
-
-nacl.secretbox = function(msg, nonce, key) {
-  checkArrayTypes(msg, nonce, key);
-  checkLengths(key, nonce);
-  var m = new Uint8Array(crypto_secretbox_ZEROBYTES + msg.length);
-  var c = new Uint8Array(m.length);
-  for (var i = 0; i < msg.length; i++) m[i+crypto_secretbox_ZEROBYTES] = msg[i];
-  crypto_secretbox(c, m, m.length, nonce, key);
-  return c.subarray(crypto_secretbox_BOXZEROBYTES);
-};
-
-nacl.secretbox.open = function(box, nonce, key) {
-  checkArrayTypes(box, nonce, key);
-  checkLengths(key, nonce);
-  var c = new Uint8Array(crypto_secretbox_BOXZEROBYTES + box.length);
-  var m = new Uint8Array(c.length);
-  for (var i = 0; i < box.length; i++) c[i+crypto_secretbox_BOXZEROBYTES] = box[i];
-  if (c.length < 32) return null;
-  if (crypto_secretbox_open(m, c, c.length, nonce, key) !== 0) return null;
-  return m.subarray(crypto_secretbox_ZEROBYTES);
-};
-
-nacl.secretbox.keyLength = crypto_secretbox_KEYBYTES;
-nacl.secretbox.nonceLength = crypto_secretbox_NONCEBYTES;
-nacl.secretbox.overheadLength = crypto_secretbox_BOXZEROBYTES;
-
-nacl.scalarMult = function(n, p) {
-  checkArrayTypes(n, p);
-  if (n.length !== crypto_scalarmult_SCALARBYTES) throw new Error('bad n size');
-  if (p.length !== crypto_scalarmult_BYTES) throw new Error('bad p size');
-  var q = new Uint8Array(crypto_scalarmult_BYTES);
-  crypto_scalarmult(q, n, p);
-  return q;
-};
-
-nacl.scalarMult.base = function(n) {
-  checkArrayTypes(n);
-  if (n.length !== crypto_scalarmult_SCALARBYTES) throw new Error('bad n size');
-  var q = new Uint8Array(crypto_scalarmult_BYTES);
-  crypto_scalarmult_base(q, n);
-  return q;
-};
-
-nacl.scalarMult.scalarLength = crypto_scalarmult_SCALARBYTES;
-nacl.scalarMult.groupElementLength = crypto_scalarmult_BYTES;
-
-nacl.box = function(msg, nonce, publicKey, secretKey) {
-  var k = nacl.box.before(publicKey, secretKey);
-  return nacl.secretbox(msg, nonce, k);
-};
-
-nacl.box.before = function(publicKey, secretKey) {
-  checkArrayTypes(publicKey, secretKey);
-  checkBoxLengths(publicKey, secretKey);
-  var k = new Uint8Array(crypto_box_BEFORENMBYTES);
-  crypto_box_beforenm(k, publicKey, secretKey);
-  return k;
-};
-
-nacl.box.after = nacl.secretbox;
-
-nacl.box.open = function(msg, nonce, publicKey, secretKey) {
-  var k = nacl.box.before(publicKey, secretKey);
-  return nacl.secretbox.open(msg, nonce, k);
-};
-
-nacl.box.open.after = nacl.secretbox.open;
-
-nacl.box.keyPair = function() {
-  var pk = new Uint8Array(crypto_box_PUBLICKEYBYTES);
-  var sk = new Uint8Array(crypto_box_SECRETKEYBYTES);
-  crypto_box_keypair(pk, sk);
-  return {publicKey: pk, secretKey: sk};
-};
-
-nacl.box.keyPair.fromSecretKey = function(secretKey) {
-  checkArrayTypes(secretKey);
-  if (secretKey.length !== crypto_box_SECRETKEYBYTES)
-    throw new Error('bad secret key size');
-  var pk = new Uint8Array(crypto_box_PUBLICKEYBYTES);
-  crypto_scalarmult_base(pk, secretKey);
-  return {publicKey: pk, secretKey: new Uint8Array(secretKey)};
-};
-
-nacl.box.publicKeyLength = crypto_box_PUBLICKEYBYTES;
-nacl.box.secretKeyLength = crypto_box_SECRETKEYBYTES;
-nacl.box.sharedKeyLength = crypto_box_BEFORENMBYTES;
-nacl.box.nonceLength = crypto_box_NONCEBYTES;
-nacl.box.overheadLength = nacl.secretbox.overheadLength;
-
-nacl.sign = function(msg, secretKey) {
-  checkArrayTypes(msg, secretKey);
-  if (secretKey.length !== crypto_sign_SECRETKEYBYTES)
-    throw new Error('bad secret key size');
-  var signedMsg = new Uint8Array(crypto_sign_BYTES+msg.length);
-  crypto_sign(signedMsg, msg, msg.length, secretKey);
-  return signedMsg;
-};
-
-nacl.sign.open = function(signedMsg, publicKey) {
-  checkArrayTypes(signedMsg, publicKey);
-  if (publicKey.length !== crypto_sign_PUBLICKEYBYTES)
-    throw new Error('bad public key size');
-  var tmp = new Uint8Array(signedMsg.length);
-  var mlen = crypto_sign_open(tmp, signedMsg, signedMsg.length, publicKey);
-  if (mlen < 0) return null;
-  var m = new Uint8Array(mlen);
-  for (var i = 0; i < m.length; i++) m[i] = tmp[i];
-  return m;
-};
-
-nacl.sign.detached = function(msg, secretKey) {
-  var signedMsg = nacl.sign(msg, secretKey);
-  var sig = new Uint8Array(crypto_sign_BYTES);
-  for (var i = 0; i < sig.length; i++) sig[i] = signedMsg[i];
-  return sig;
-};
-
-nacl.sign.detached.verify = function(msg, sig, publicKey) {
-  checkArrayTypes(msg, sig, publicKey);
-  if (sig.length !== crypto_sign_BYTES)
-    throw new Error('bad signature size');
-  if (publicKey.length !== crypto_sign_PUBLICKEYBYTES)
-    throw new Error('bad public key size');
-  var sm = new Uint8Array(crypto_sign_BYTES + msg.length);
-  var m = new Uint8Array(crypto_sign_BYTES + msg.length);
-  var i;
-  for (i = 0; i < crypto_sign_BYTES; i++) sm[i] = sig[i];
-  for (i = 0; i < msg.length; i++) sm[i+crypto_sign_BYTES] = msg[i];
-  return (crypto_sign_open(m, sm, sm.length, publicKey) >= 0);
-};
-
-nacl.sign.keyPair = function() {
-  var pk = new Uint8Array(crypto_sign_PUBLICKEYBYTES);
-  var sk = new Uint8Array(crypto_sign_SECRETKEYBYTES);
-  crypto_sign_keypair(pk, sk);
-  return {publicKey: pk, secretKey: sk};
-};
-
-nacl.sign.keyPair.fromSecretKey = function(secretKey) {
-  checkArrayTypes(secretKey);
-  if (secretKey.length !== crypto_sign_SECRETKEYBYTES)
-    throw new Error('bad secret key size');
-  var pk = new Uint8Array(crypto_sign_PUBLICKEYBYTES);
-  for (var i = 0; i < pk.length; i++) pk[i] = secretKey[32+i];
-  return {publicKey: pk, secretKey: new Uint8Array(secretKey)};
-};
-
-nacl.sign.keyPair.fromSeed = function(seed) {
-  checkArrayTypes(seed);
-  if (seed.length !== crypto_sign_SEEDBYTES)
-    throw new Error('bad seed size');
-  var pk = new Uint8Array(crypto_sign_PUBLICKEYBYTES);
-  var sk = new Uint8Array(crypto_sign_SECRETKEYBYTES);
-  for (var i = 0; i < 32; i++) sk[i] = seed[i];
-  crypto_sign_keypair(pk, sk, true);
-  return {publicKey: pk, secretKey: sk};
-};
-
-nacl.sign.publicKeyLength = crypto_sign_PUBLICKEYBYTES;
-nacl.sign.secretKeyLength = crypto_sign_SECRETKEYBYTES;
-nacl.sign.seedLength = crypto_sign_SEEDBYTES;
-nacl.sign.signatureLength = crypto_sign_BYTES;
-
-nacl.hash = function(msg) {
-  checkArrayTypes(msg);
-  var h = new Uint8Array(crypto_hash_BYTES);
-  crypto_hash(h, msg, msg.length);
-  return h;
-};
-
-nacl.hash.hashLength = crypto_hash_BYTES;
-
-nacl.verify = function(x, y) {
-  checkArrayTypes(x, y);
-  // Zero length arguments are considered not equal.
-  if (x.length === 0 || y.length === 0) return false;
-  if (x.length !== y.length) return false;
-  return (vn(x, 0, y, 0, x.length) === 0) ? true : false;
-};
-
-nacl.setPRNG = function(fn) {
-  randombytes = fn;
-};
-
-(function() {
-  // Initialize PRNG if environment provides CSPRNG.
-  // If not, methods calling randombytes will throw.
-  var crypto = typeof self !== 'undefined' ? (self.crypto || self.msCrypto) : null;
-  if (crypto && crypto.getRandomValues) {
-    // Browsers.
-    var QUOTA = 65536;
-    nacl.setPRNG(function(x, n) {
-      var i, v = new Uint8Array(n);
-      for (i = 0; i < n; i += QUOTA) {
-        crypto.getRandomValues(v.subarray(i, i + Math.min(n - i, QUOTA)));
+    function crypto_sign_open(m, sm, n, pk) {
+      var i;
+      var t = new Uint8Array(32), h = new Uint8Array(64);
+      var p = [gf(), gf(), gf(), gf()], q = [gf(), gf(), gf(), gf()];
+      if (n < 64) return -1;
+      if (unpackneg(q, pk)) return -1;
+      for (i = 0; i < n; i++) m[i] = sm[i];
+      for (i = 0; i < 32; i++) m[i + 32] = pk[i];
+      crypto_hash(h, m, n);
+      reduce(h);
+      scalarmult(p, q, h);
+      scalarbase(q, sm.subarray(32));
+      add(p, q);
+      pack(t, p);
+      n -= 64;
+      if (crypto_verify_32(sm, 0, t, 0)) {
+        for (i = 0; i < n; i++) m[i] = 0;
+        return -1;
       }
-      for (i = 0; i < n; i++) x[i] = v[i];
-      cleanup(v);
-    });
-  } else if (typeof require !== 'undefined') {
-    // Node.js.
-    crypto = require('crypto');
-    if (crypto && crypto.randomBytes) {
-      nacl.setPRNG(function(x, n) {
-        var i, v = crypto.randomBytes(n);
-        for (i = 0; i < n; i++) x[i] = v[i];
-        cleanup(v);
-      });
+      for (i = 0; i < n; i++) m[i] = sm[i + 64];
+      return n;
     }
-  }
+    var crypto_secretbox_KEYBYTES = 32, crypto_secretbox_NONCEBYTES = 24, crypto_secretbox_ZEROBYTES = 32, crypto_secretbox_BOXZEROBYTES = 16, crypto_scalarmult_BYTES = 32, crypto_scalarmult_SCALARBYTES = 32, crypto_box_PUBLICKEYBYTES = 32, crypto_box_SECRETKEYBYTES = 32, crypto_box_BEFORENMBYTES = 32, crypto_box_NONCEBYTES = crypto_secretbox_NONCEBYTES, crypto_box_ZEROBYTES = crypto_secretbox_ZEROBYTES, crypto_box_BOXZEROBYTES = crypto_secretbox_BOXZEROBYTES, crypto_sign_BYTES = 64, crypto_sign_PUBLICKEYBYTES = 32, crypto_sign_SECRETKEYBYTES = 64, crypto_sign_SEEDBYTES = 32, crypto_hash_BYTES = 64;
+    nacl.lowlevel = {
+      crypto_core_hsalsa20,
+      crypto_stream_xor,
+      crypto_stream,
+      crypto_stream_salsa20_xor,
+      crypto_stream_salsa20,
+      crypto_onetimeauth,
+      crypto_onetimeauth_verify,
+      crypto_verify_16,
+      crypto_verify_32,
+      crypto_secretbox,
+      crypto_secretbox_open,
+      crypto_scalarmult,
+      crypto_scalarmult_base,
+      crypto_box_beforenm,
+      crypto_box_afternm,
+      crypto_box,
+      crypto_box_open,
+      crypto_box_keypair,
+      crypto_hash,
+      crypto_sign,
+      crypto_sign_keypair,
+      crypto_sign_open,
+      crypto_secretbox_KEYBYTES,
+      crypto_secretbox_NONCEBYTES,
+      crypto_secretbox_ZEROBYTES,
+      crypto_secretbox_BOXZEROBYTES,
+      crypto_scalarmult_BYTES,
+      crypto_scalarmult_SCALARBYTES,
+      crypto_box_PUBLICKEYBYTES,
+      crypto_box_SECRETKEYBYTES,
+      crypto_box_BEFORENMBYTES,
+      crypto_box_NONCEBYTES,
+      crypto_box_ZEROBYTES,
+      crypto_box_BOXZEROBYTES,
+      crypto_sign_BYTES,
+      crypto_sign_PUBLICKEYBYTES,
+      crypto_sign_SECRETKEYBYTES,
+      crypto_sign_SEEDBYTES,
+      crypto_hash_BYTES,
+      gf,
+      D,
+      L,
+      pack25519,
+      unpack25519,
+      M,
+      A,
+      S,
+      Z,
+      pow2523,
+      add,
+      set25519,
+      modL,
+      scalarmult,
+      scalarbase
+    };
+    function checkLengths(k, n) {
+      if (k.length !== crypto_secretbox_KEYBYTES) throw new Error("bad key size");
+      if (n.length !== crypto_secretbox_NONCEBYTES) throw new Error("bad nonce size");
+    }
+    function checkBoxLengths(pk, sk) {
+      if (pk.length !== crypto_box_PUBLICKEYBYTES) throw new Error("bad public key size");
+      if (sk.length !== crypto_box_SECRETKEYBYTES) throw new Error("bad secret key size");
+    }
+    function checkArrayTypes() {
+      for (var i = 0; i < arguments.length; i++) {
+        if (!(arguments[i] instanceof Uint8Array))
+          throw new TypeError("unexpected type, use Uint8Array");
+      }
+    }
+    function cleanup(arr) {
+      for (var i = 0; i < arr.length; i++) arr[i] = 0;
+    }
+    nacl.randomBytes = function(n) {
+      var b = new Uint8Array(n);
+      randombytes(b, n);
+      return b;
+    };
+    nacl.secretbox = function(msg, nonce, key2) {
+      checkArrayTypes(msg, nonce, key2);
+      checkLengths(key2, nonce);
+      var m = new Uint8Array(crypto_secretbox_ZEROBYTES + msg.length);
+      var c = new Uint8Array(m.length);
+      for (var i = 0; i < msg.length; i++) m[i + crypto_secretbox_ZEROBYTES] = msg[i];
+      crypto_secretbox(c, m, m.length, nonce, key2);
+      return c.subarray(crypto_secretbox_BOXZEROBYTES);
+    };
+    nacl.secretbox.open = function(box, nonce, key2) {
+      checkArrayTypes(box, nonce, key2);
+      checkLengths(key2, nonce);
+      var c = new Uint8Array(crypto_secretbox_BOXZEROBYTES + box.length);
+      var m = new Uint8Array(c.length);
+      for (var i = 0; i < box.length; i++) c[i + crypto_secretbox_BOXZEROBYTES] = box[i];
+      if (c.length < 32) return null;
+      if (crypto_secretbox_open(m, c, c.length, nonce, key2) !== 0) return null;
+      return m.subarray(crypto_secretbox_ZEROBYTES);
+    };
+    nacl.secretbox.keyLength = crypto_secretbox_KEYBYTES;
+    nacl.secretbox.nonceLength = crypto_secretbox_NONCEBYTES;
+    nacl.secretbox.overheadLength = crypto_secretbox_BOXZEROBYTES;
+    nacl.scalarMult = function(n, p) {
+      checkArrayTypes(n, p);
+      if (n.length !== crypto_scalarmult_SCALARBYTES) throw new Error("bad n size");
+      if (p.length !== crypto_scalarmult_BYTES) throw new Error("bad p size");
+      var q = new Uint8Array(crypto_scalarmult_BYTES);
+      crypto_scalarmult(q, n, p);
+      return q;
+    };
+    nacl.scalarMult.base = function(n) {
+      checkArrayTypes(n);
+      if (n.length !== crypto_scalarmult_SCALARBYTES) throw new Error("bad n size");
+      var q = new Uint8Array(crypto_scalarmult_BYTES);
+      crypto_scalarmult_base(q, n);
+      return q;
+    };
+    nacl.scalarMult.scalarLength = crypto_scalarmult_SCALARBYTES;
+    nacl.scalarMult.groupElementLength = crypto_scalarmult_BYTES;
+    nacl.box = function(msg, nonce, publicKey, secretKey) {
+      var k = nacl.box.before(publicKey, secretKey);
+      return nacl.secretbox(msg, nonce, k);
+    };
+    nacl.box.before = function(publicKey, secretKey) {
+      checkArrayTypes(publicKey, secretKey);
+      checkBoxLengths(publicKey, secretKey);
+      var k = new Uint8Array(crypto_box_BEFORENMBYTES);
+      crypto_box_beforenm(k, publicKey, secretKey);
+      return k;
+    };
+    nacl.box.after = nacl.secretbox;
+    nacl.box.open = function(msg, nonce, publicKey, secretKey) {
+      var k = nacl.box.before(publicKey, secretKey);
+      return nacl.secretbox.open(msg, nonce, k);
+    };
+    nacl.box.open.after = nacl.secretbox.open;
+    nacl.box.keyPair = function() {
+      var pk = new Uint8Array(crypto_box_PUBLICKEYBYTES);
+      var sk = new Uint8Array(crypto_box_SECRETKEYBYTES);
+      crypto_box_keypair(pk, sk);
+      return { publicKey: pk, secretKey: sk };
+    };
+    nacl.box.keyPair.fromSecretKey = function(secretKey) {
+      checkArrayTypes(secretKey);
+      if (secretKey.length !== crypto_box_SECRETKEYBYTES)
+        throw new Error("bad secret key size");
+      var pk = new Uint8Array(crypto_box_PUBLICKEYBYTES);
+      crypto_scalarmult_base(pk, secretKey);
+      return { publicKey: pk, secretKey: new Uint8Array(secretKey) };
+    };
+    nacl.box.publicKeyLength = crypto_box_PUBLICKEYBYTES;
+    nacl.box.secretKeyLength = crypto_box_SECRETKEYBYTES;
+    nacl.box.sharedKeyLength = crypto_box_BEFORENMBYTES;
+    nacl.box.nonceLength = crypto_box_NONCEBYTES;
+    nacl.box.overheadLength = nacl.secretbox.overheadLength;
+    nacl.sign = function(msg, secretKey) {
+      checkArrayTypes(msg, secretKey);
+      if (secretKey.length !== crypto_sign_SECRETKEYBYTES)
+        throw new Error("bad secret key size");
+      var signedMsg = new Uint8Array(crypto_sign_BYTES + msg.length);
+      crypto_sign(signedMsg, msg, msg.length, secretKey);
+      return signedMsg;
+    };
+    nacl.sign.open = function(signedMsg, publicKey) {
+      checkArrayTypes(signedMsg, publicKey);
+      if (publicKey.length !== crypto_sign_PUBLICKEYBYTES)
+        throw new Error("bad public key size");
+      var tmp = new Uint8Array(signedMsg.length);
+      var mlen = crypto_sign_open(tmp, signedMsg, signedMsg.length, publicKey);
+      if (mlen < 0) return null;
+      var m = new Uint8Array(mlen);
+      for (var i = 0; i < m.length; i++) m[i] = tmp[i];
+      return m;
+    };
+    nacl.sign.detached = function(msg, secretKey) {
+      var signedMsg = nacl.sign(msg, secretKey);
+      var sig = new Uint8Array(crypto_sign_BYTES);
+      for (var i = 0; i < sig.length; i++) sig[i] = signedMsg[i];
+      return sig;
+    };
+    nacl.sign.detached.verify = function(msg, sig, publicKey) {
+      checkArrayTypes(msg, sig, publicKey);
+      if (sig.length !== crypto_sign_BYTES)
+        throw new Error("bad signature size");
+      if (publicKey.length !== crypto_sign_PUBLICKEYBYTES)
+        throw new Error("bad public key size");
+      var sm = new Uint8Array(crypto_sign_BYTES + msg.length);
+      var m = new Uint8Array(crypto_sign_BYTES + msg.length);
+      var i;
+      for (i = 0; i < crypto_sign_BYTES; i++) sm[i] = sig[i];
+      for (i = 0; i < msg.length; i++) sm[i + crypto_sign_BYTES] = msg[i];
+      return crypto_sign_open(m, sm, sm.length, publicKey) >= 0;
+    };
+    nacl.sign.keyPair = function() {
+      var pk = new Uint8Array(crypto_sign_PUBLICKEYBYTES);
+      var sk = new Uint8Array(crypto_sign_SECRETKEYBYTES);
+      crypto_sign_keypair(pk, sk);
+      return { publicKey: pk, secretKey: sk };
+    };
+    nacl.sign.keyPair.fromSecretKey = function(secretKey) {
+      checkArrayTypes(secretKey);
+      if (secretKey.length !== crypto_sign_SECRETKEYBYTES)
+        throw new Error("bad secret key size");
+      var pk = new Uint8Array(crypto_sign_PUBLICKEYBYTES);
+      for (var i = 0; i < pk.length; i++) pk[i] = secretKey[32 + i];
+      return { publicKey: pk, secretKey: new Uint8Array(secretKey) };
+    };
+    nacl.sign.keyPair.fromSeed = function(seed) {
+      checkArrayTypes(seed);
+      if (seed.length !== crypto_sign_SEEDBYTES)
+        throw new Error("bad seed size");
+      var pk = new Uint8Array(crypto_sign_PUBLICKEYBYTES);
+      var sk = new Uint8Array(crypto_sign_SECRETKEYBYTES);
+      for (var i = 0; i < 32; i++) sk[i] = seed[i];
+      crypto_sign_keypair(pk, sk, true);
+      return { publicKey: pk, secretKey: sk };
+    };
+    nacl.sign.publicKeyLength = crypto_sign_PUBLICKEYBYTES;
+    nacl.sign.secretKeyLength = crypto_sign_SECRETKEYBYTES;
+    nacl.sign.seedLength = crypto_sign_SEEDBYTES;
+    nacl.sign.signatureLength = crypto_sign_BYTES;
+    nacl.hash = function(msg) {
+      checkArrayTypes(msg);
+      var h = new Uint8Array(crypto_hash_BYTES);
+      crypto_hash(h, msg, msg.length);
+      return h;
+    };
+    nacl.hash.hashLength = crypto_hash_BYTES;
+    nacl.verify = function(x, y) {
+      checkArrayTypes(x, y);
+      if (x.length === 0 || y.length === 0) return false;
+      if (x.length !== y.length) return false;
+      return vn(x, 0, y, 0, x.length) === 0 ? true : false;
+    };
+    nacl.setPRNG = function(fn) {
+      randombytes = fn;
+    };
+    (function() {
+      var crypto2 = typeof self !== "undefined" ? self.crypto || self.msCrypto : null;
+      if (crypto2 && crypto2.getRandomValues) {
+        var QUOTA = 65536;
+        nacl.setPRNG(function(x, n) {
+          var i, v = new Uint8Array(n);
+          for (i = 0; i < n; i += QUOTA) {
+            crypto2.getRandomValues(v.subarray(i, i + Math.min(n - i, QUOTA)));
+          }
+          for (i = 0; i < n; i++) x[i] = v[i];
+          cleanup(v);
+        });
+      } else if (typeof require2 !== "undefined") {
+        crypto2 = require2("crypto");
+        if (crypto2 && crypto2.randomBytes) {
+          nacl.setPRNG(function(x, n) {
+            var i, v = crypto2.randomBytes(n);
+            for (i = 0; i < n; i++) x[i] = v[i];
+            cleanup(v);
+          });
+        }
+      }
+    })();
+  })(typeof module !== "undefined" && module.exports ? module.exports : self.nacl = self.nacl || {});
+  return module.exports;
 })();
-
-})(typeof module !== 'undefined' && module.exports ? module.exports : (self.nacl = self.nacl || {}));
-
-return module.exports; })();
-var __wtBlake = (function () { var mods = {}; var req = function (n) { return mods[n.replace("./", "")]; };
-(function (module, exports, require) {
-const ERROR_MSG_INPUT = 'Input must be an string, Buffer or Uint8Array'
-
-// For convenience, let people hash a string, not just a Uint8Array
-function normalizeInput (input) {
-  let ret
-  if (input instanceof Uint8Array) {
-    ret = input
-  } else if (typeof input === 'string') {
-    const encoder = new TextEncoder()
-    ret = encoder.encode(input)
-  } else {
-    throw new Error(ERROR_MSG_INPUT)
-  }
-  return ret
-}
-
-// Converts a Uint8Array to a hexadecimal string
-// For example, toHex([255, 0, 255]) returns "ff00ff"
-function toHex (bytes) {
-  return Array.prototype.map
-    .call(bytes, function (n) {
-      return (n < 16 ? '0' : '') + n.toString(16)
-    })
-    .join('')
-}
-
-// Converts any value in [0...2^32-1] to an 8-character hex string
-function uint32ToHex (val) {
-  return (0x100000000 + val).toString(16).substring(1)
-}
-
-// For debugging: prints out hash state in the same format as the RFC
-// sample computation exactly, so that you can diff
-function debugPrint (label, arr, size) {
-  let msg = '\n' + label + ' = '
-  for (let i = 0; i < arr.length; i += 2) {
-    if (size === 32) {
-      msg += uint32ToHex(arr[i]).toUpperCase()
-      msg += ' '
-      msg += uint32ToHex(arr[i + 1]).toUpperCase()
-    } else if (size === 64) {
-      msg += uint32ToHex(arr[i + 1]).toUpperCase()
-      msg += uint32ToHex(arr[i]).toUpperCase()
-    } else throw new Error('Invalid size ' + size)
-    if (i % 6 === 4) {
-      msg += '\n' + new Array(label.length + 4).join(' ')
-    } else if (i < arr.length - 2) {
-      msg += ' '
+var __wtBlake = (function() {
+  var mods = {};
+  var req = function(n) {
+    return mods[n.replace("./", "")];
+  };
+  (function(module, exports, require2) {
+    const ERROR_MSG_INPUT = "Input must be an string, Buffer or Uint8Array";
+    function normalizeInput(input) {
+      let ret;
+      if (input instanceof Uint8Array) {
+        ret = input;
+      } else if (typeof input === "string") {
+        const encoder = new TextEncoder();
+        ret = encoder.encode(input);
+      } else {
+        throw new Error(ERROR_MSG_INPUT);
+      }
+      return ret;
     }
-  }
-  console.log(msg)
-}
-
-// For performance testing: generates N bytes of input, hashes M times
-// Measures and prints MB/second hash performance each time
-function testSpeed (hashFn, N, M) {
-  let startMs = new Date().getTime()
-
-  const input = new Uint8Array(N)
-  for (let i = 0; i < N; i++) {
-    input[i] = i % 256
-  }
-  const genMs = new Date().getTime()
-  console.log('Generated random input in ' + (genMs - startMs) + 'ms')
-  startMs = genMs
-
-  for (let i = 0; i < M; i++) {
-    const hashHex = hashFn(input)
-    const hashMs = new Date().getTime()
-    const ms = hashMs - startMs
-    startMs = hashMs
-    console.log('Hashed in ' + ms + 'ms: ' + hashHex.substring(0, 20) + '...')
-    console.log(
-      Math.round((N / (1 << 20) / (ms / 1000)) * 100) / 100 + ' MB PER SECOND'
-    )
-  }
-}
-
-module.exports = {
-  normalizeInput: normalizeInput,
-  toHex: toHex,
-  debugPrint: debugPrint,
-  testSpeed: testSpeed
-}
-
-})(mods.__u = { exports: {} }, mods.__u.exports, req); mods.util = mods.__u.exports;
-var m2 = { exports: {} };
-(function (module, exports, require) {
-// Blake2B in pure Javascript
-// Adapted from the reference implementation in RFC7693
-// Ported to Javascript by DC - https://github.com/dcposch
-
-const util = require('./util')
-
-// 64-bit unsigned addition
-// Sets v[a,a+1] += v[b,b+1]
-// v should be a Uint32Array
-function ADD64AA (v, a, b) {
-  const o0 = v[a] + v[b]
-  let o1 = v[a + 1] + v[b + 1]
-  if (o0 >= 0x100000000) {
-    o1++
-  }
-  v[a] = o0
-  v[a + 1] = o1
-}
-
-// 64-bit unsigned addition
-// Sets v[a,a+1] += b
-// b0 is the low 32 bits of b, b1 represents the high 32 bits
-function ADD64AC (v, a, b0, b1) {
-  let o0 = v[a] + b0
-  if (b0 < 0) {
-    o0 += 0x100000000
-  }
-  let o1 = v[a + 1] + b1
-  if (o0 >= 0x100000000) {
-    o1++
-  }
-  v[a] = o0
-  v[a + 1] = o1
-}
-
-// Little-endian byte access
-function B2B_GET32 (arr, i) {
-  return arr[i] ^ (arr[i + 1] << 8) ^ (arr[i + 2] << 16) ^ (arr[i + 3] << 24)
-}
-
-// G Mixing function
-// The ROTRs are inlined for speed
-function B2B_G (a, b, c, d, ix, iy) {
-  const x0 = m[ix]
-  const x1 = m[ix + 1]
-  const y0 = m[iy]
-  const y1 = m[iy + 1]
-
-  ADD64AA(v, a, b) // v[a,a+1] += v[b,b+1] ... in JS we must store a uint64 as two uint32s
-  ADD64AC(v, a, x0, x1) // v[a, a+1] += x ... x0 is the low 32 bits of x, x1 is the high 32 bits
-
-  // v[d,d+1] = (v[d,d+1] xor v[a,a+1]) rotated to the right by 32 bits
-  let xor0 = v[d] ^ v[a]
-  let xor1 = v[d + 1] ^ v[a + 1]
-  v[d] = xor1
-  v[d + 1] = xor0
-
-  ADD64AA(v, c, d)
-
-  // v[b,b+1] = (v[b,b+1] xor v[c,c+1]) rotated right by 24 bits
-  xor0 = v[b] ^ v[c]
-  xor1 = v[b + 1] ^ v[c + 1]
-  v[b] = (xor0 >>> 24) ^ (xor1 << 8)
-  v[b + 1] = (xor1 >>> 24) ^ (xor0 << 8)
-
-  ADD64AA(v, a, b)
-  ADD64AC(v, a, y0, y1)
-
-  // v[d,d+1] = (v[d,d+1] xor v[a,a+1]) rotated right by 16 bits
-  xor0 = v[d] ^ v[a]
-  xor1 = v[d + 1] ^ v[a + 1]
-  v[d] = (xor0 >>> 16) ^ (xor1 << 16)
-  v[d + 1] = (xor1 >>> 16) ^ (xor0 << 16)
-
-  ADD64AA(v, c, d)
-
-  // v[b,b+1] = (v[b,b+1] xor v[c,c+1]) rotated right by 63 bits
-  xor0 = v[b] ^ v[c]
-  xor1 = v[b + 1] ^ v[c + 1]
-  v[b] = (xor1 >>> 31) ^ (xor0 << 1)
-  v[b + 1] = (xor0 >>> 31) ^ (xor1 << 1)
-}
-
-// Initialization Vector
-const BLAKE2B_IV32 = new Uint32Array([
-  0xf3bcc908, 0x6a09e667, 0x84caa73b, 0xbb67ae85, 0xfe94f82b, 0x3c6ef372,
-  0x5f1d36f1, 0xa54ff53a, 0xade682d1, 0x510e527f, 0x2b3e6c1f, 0x9b05688c,
-  0xfb41bd6b, 0x1f83d9ab, 0x137e2179, 0x5be0cd19
-])
-
-const SIGMA8 = [
-  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 14, 10, 4, 8, 9, 15, 13,
-  6, 1, 12, 0, 2, 11, 7, 5, 3, 11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1,
-  9, 4, 7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8, 9, 0, 5, 7, 2, 4,
-  10, 15, 14, 1, 11, 12, 6, 8, 3, 13, 2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5,
-  15, 14, 1, 9, 12, 5, 1, 15, 14, 13, 4, 10, 0, 7, 6, 3, 9, 2, 8, 11, 13, 11, 7,
-  14, 12, 1, 3, 9, 5, 0, 15, 4, 8, 6, 2, 10, 6, 15, 14, 9, 11, 3, 0, 8, 12, 2,
-  13, 7, 1, 4, 10, 5, 10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0, 0,
-  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 14, 10, 4, 8, 9, 15, 13, 6,
-  1, 12, 0, 2, 11, 7, 5, 3
-]
-
-// These are offsets into a uint64 buffer.
-// Multiply them all by 2 to make them offsets into a uint32 buffer,
-// because this is Javascript and we don't have uint64s
-const SIGMA82 = new Uint8Array(
-  SIGMA8.map(function (x) {
-    return x * 2
-  })
-)
-
-// Compression function. 'last' flag indicates last block.
-// Note we're representing 16 uint64s as 32 uint32s
-const v = new Uint32Array(32)
-const m = new Uint32Array(32)
-function blake2bCompress (ctx, last) {
-  let i = 0
-
-  // init work variables
-  for (i = 0; i < 16; i++) {
-    v[i] = ctx.h[i]
-    v[i + 16] = BLAKE2B_IV32[i]
-  }
-
-  // low 64 bits of offset
-  v[24] = v[24] ^ ctx.t
-  v[25] = v[25] ^ (ctx.t / 0x100000000)
-  // high 64 bits not supported, offset may not be higher than 2**53-1
-
-  // last block flag set ?
-  if (last) {
-    v[28] = ~v[28]
-    v[29] = ~v[29]
-  }
-
-  // get little-endian words
-  for (i = 0; i < 32; i++) {
-    m[i] = B2B_GET32(ctx.b, 4 * i)
-  }
-
-  // twelve rounds of mixing
-  // uncomment the DebugPrint calls to log the computation
-  // and match the RFC sample documentation
-  // util.debugPrint('          m[16]', m, 64)
-  for (i = 0; i < 12; i++) {
-    // util.debugPrint('   (i=' + (i < 10 ? ' ' : '') + i + ') v[16]', v, 64)
-    B2B_G(0, 8, 16, 24, SIGMA82[i * 16 + 0], SIGMA82[i * 16 + 1])
-    B2B_G(2, 10, 18, 26, SIGMA82[i * 16 + 2], SIGMA82[i * 16 + 3])
-    B2B_G(4, 12, 20, 28, SIGMA82[i * 16 + 4], SIGMA82[i * 16 + 5])
-    B2B_G(6, 14, 22, 30, SIGMA82[i * 16 + 6], SIGMA82[i * 16 + 7])
-    B2B_G(0, 10, 20, 30, SIGMA82[i * 16 + 8], SIGMA82[i * 16 + 9])
-    B2B_G(2, 12, 22, 24, SIGMA82[i * 16 + 10], SIGMA82[i * 16 + 11])
-    B2B_G(4, 14, 16, 26, SIGMA82[i * 16 + 12], SIGMA82[i * 16 + 13])
-    B2B_G(6, 8, 18, 28, SIGMA82[i * 16 + 14], SIGMA82[i * 16 + 15])
-  }
-  // util.debugPrint('   (i=12) v[16]', v, 64)
-
-  for (i = 0; i < 16; i++) {
-    ctx.h[i] = ctx.h[i] ^ v[i] ^ v[i + 16]
-  }
-  // util.debugPrint('h[8]', ctx.h, 64)
-}
-
-// reusable parameterBlock
-const parameterBlock = new Uint8Array([
-  0,
-  0,
-  0,
-  0, //  0: outlen, keylen, fanout, depth
-  0,
-  0,
-  0,
-  0, //  4: leaf length, sequential mode
-  0,
-  0,
-  0,
-  0, //  8: node offset
-  0,
-  0,
-  0,
-  0, // 12: node offset
-  0,
-  0,
-  0,
-  0, // 16: node depth, inner length, rfu
-  0,
-  0,
-  0,
-  0, // 20: rfu
-  0,
-  0,
-  0,
-  0, // 24: rfu
-  0,
-  0,
-  0,
-  0, // 28: rfu
-  0,
-  0,
-  0,
-  0, // 32: salt
-  0,
-  0,
-  0,
-  0, // 36: salt
-  0,
-  0,
-  0,
-  0, // 40: salt
-  0,
-  0,
-  0,
-  0, // 44: salt
-  0,
-  0,
-  0,
-  0, // 48: personal
-  0,
-  0,
-  0,
-  0, // 52: personal
-  0,
-  0,
-  0,
-  0, // 56: personal
-  0,
-  0,
-  0,
-  0 // 60: personal
-])
-
-// Creates a BLAKE2b hashing context
-// Requires an output length between 1 and 64 bytes
-// Takes an optional Uint8Array key
-// Takes an optinal Uint8Array salt
-// Takes an optinal Uint8Array personal
-function blake2bInit (outlen, key, salt, personal) {
-  if (outlen === 0 || outlen > 64) {
-    throw new Error('Illegal output length, expected 0 < length <= 64')
-  }
-  if (key && key.length > 64) {
-    throw new Error('Illegal key, expected Uint8Array with 0 < length <= 64')
-  }
-  if (salt && salt.length !== 16) {
-    throw new Error('Illegal salt, expected Uint8Array with length is 16')
-  }
-  if (personal && personal.length !== 16) {
-    throw new Error('Illegal personal, expected Uint8Array with length is 16')
-  }
-
-  // state, 'param block'
-  const ctx = {
-    b: new Uint8Array(128),
-    h: new Uint32Array(16),
-    t: 0, // input count
-    c: 0, // pointer within buffer
-    outlen: outlen // output length in bytes
-  }
-
-  // initialize parameterBlock before usage
-  parameterBlock.fill(0)
-  parameterBlock[0] = outlen
-  if (key) parameterBlock[1] = key.length
-  parameterBlock[2] = 1 // fanout
-  parameterBlock[3] = 1 // depth
-  if (salt) parameterBlock.set(salt, 32)
-  if (personal) parameterBlock.set(personal, 48)
-
-  // initialize hash state
-  for (let i = 0; i < 16; i++) {
-    ctx.h[i] = BLAKE2B_IV32[i] ^ B2B_GET32(parameterBlock, i * 4)
-  }
-
-  // key the hash, if applicable
-  if (key) {
-    blake2bUpdate(ctx, key)
-    // at the end
-    ctx.c = 128
-  }
-
-  return ctx
-}
-
-// Updates a BLAKE2b streaming hash
-// Requires hash context and Uint8Array (byte array)
-function blake2bUpdate (ctx, input) {
-  for (let i = 0; i < input.length; i++) {
-    if (ctx.c === 128) {
-      // buffer full ?
-      ctx.t += ctx.c // add counters
-      blake2bCompress(ctx, false) // compress (not last)
-      ctx.c = 0 // counter to zero
+    function toHex(bytes) {
+      return Array.prototype.map.call(bytes, function(n) {
+        return (n < 16 ? "0" : "") + n.toString(16);
+      }).join("");
     }
-    ctx.b[ctx.c++] = input[i]
-  }
-}
-
-// Completes a BLAKE2b streaming hash
-// Returns a Uint8Array containing the message digest
-function blake2bFinal (ctx) {
-  ctx.t += ctx.c // mark last block offset
-
-  while (ctx.c < 128) {
-    // fill up with zeros
-    ctx.b[ctx.c++] = 0
-  }
-  blake2bCompress(ctx, true) // final block flag = 1
-
-  // little endian convert and store
-  const out = new Uint8Array(ctx.outlen)
-  for (let i = 0; i < ctx.outlen; i++) {
-    out[i] = ctx.h[i >> 2] >> (8 * (i & 3))
-  }
-  return out
-}
-
-// Computes the BLAKE2B hash of a string or byte array, and returns a Uint8Array
-//
-// Returns a n-byte Uint8Array
-//
-// Parameters:
-// - input - the input bytes, as a string, Buffer or Uint8Array
-// - key - optional key Uint8Array, up to 64 bytes
-// - outlen - optional output length in bytes, default 64
-// - salt - optional salt bytes, string, Buffer or Uint8Array
-// - personal - optional personal bytes, string, Buffer or Uint8Array
-function blake2b (input, key, outlen, salt, personal) {
-  // preprocess inputs
-  outlen = outlen || 64
-  input = util.normalizeInput(input)
-  if (salt) {
-    salt = util.normalizeInput(salt)
-  }
-  if (personal) {
-    personal = util.normalizeInput(personal)
-  }
-
-  // do the math
-  const ctx = blake2bInit(outlen, key, salt, personal)
-  blake2bUpdate(ctx, input)
-  return blake2bFinal(ctx)
-}
-
-// Computes the BLAKE2B hash of a string or byte array
-//
-// Returns an n-byte hash in hex, all lowercase
-//
-// Parameters:
-// - input - the input bytes, as a string, Buffer, or Uint8Array
-// - key - optional key Uint8Array, up to 64 bytes
-// - outlen - optional output length in bytes, default 64
-// - salt - optional salt bytes, string, Buffer or Uint8Array
-// - personal - optional personal bytes, string, Buffer or Uint8Array
-function blake2bHex (input, key, outlen, salt, personal) {
-  const output = blake2b(input, key, outlen, salt, personal)
-  return util.toHex(output)
-}
-
-module.exports = {
-  blake2b: blake2b,
-  blake2bHex: blake2bHex,
-  blake2bInit: blake2bInit,
-  blake2bUpdate: blake2bUpdate,
-  blake2bFinal: blake2bFinal
-}
-
-})(m2, m2.exports, req);
-return m2.exports; })();
+    function uint32ToHex(val) {
+      return (4294967296 + val).toString(16).substring(1);
+    }
+    function debugPrint(label, arr, size) {
+      let msg = "\n" + label + " = ";
+      for (let i = 0; i < arr.length; i += 2) {
+        if (size === 32) {
+          msg += uint32ToHex(arr[i]).toUpperCase();
+          msg += " ";
+          msg += uint32ToHex(arr[i + 1]).toUpperCase();
+        } else if (size === 64) {
+          msg += uint32ToHex(arr[i + 1]).toUpperCase();
+          msg += uint32ToHex(arr[i]).toUpperCase();
+        } else throw new Error("Invalid size " + size);
+        if (i % 6 === 4) {
+          msg += "\n" + new Array(label.length + 4).join(" ");
+        } else if (i < arr.length - 2) {
+          msg += " ";
+        }
+      }
+      console.log(msg);
+    }
+    function testSpeed(hashFn, N, M) {
+      let startMs = (/* @__PURE__ */ new Date()).getTime();
+      const input = new Uint8Array(N);
+      for (let i = 0; i < N; i++) {
+        input[i] = i % 256;
+      }
+      const genMs = (/* @__PURE__ */ new Date()).getTime();
+      console.log("Generated random input in " + (genMs - startMs) + "ms");
+      startMs = genMs;
+      for (let i = 0; i < M; i++) {
+        const hashHex = hashFn(input);
+        const hashMs = (/* @__PURE__ */ new Date()).getTime();
+        const ms = hashMs - startMs;
+        startMs = hashMs;
+        console.log("Hashed in " + ms + "ms: " + hashHex.substring(0, 20) + "...");
+        console.log(
+          Math.round(N / (1 << 20) / (ms / 1e3) * 100) / 100 + " MB PER SECOND"
+        );
+      }
+    }
+    module.exports = {
+      normalizeInput,
+      toHex,
+      debugPrint,
+      testSpeed
+    };
+  })(mods.__u = { exports: {} }, mods.__u.exports, req);
+  mods.util = mods.__u.exports;
+  var m2 = { exports: {} };
+  (function(module, exports, require2) {
+    const util = require2("./util");
+    function ADD64AA(v2, a, b) {
+      const o0 = v2[a] + v2[b];
+      let o1 = v2[a + 1] + v2[b + 1];
+      if (o0 >= 4294967296) {
+        o1++;
+      }
+      v2[a] = o0;
+      v2[a + 1] = o1;
+    }
+    function ADD64AC(v2, a, b0, b1) {
+      let o0 = v2[a] + b0;
+      if (b0 < 0) {
+        o0 += 4294967296;
+      }
+      let o1 = v2[a + 1] + b1;
+      if (o0 >= 4294967296) {
+        o1++;
+      }
+      v2[a] = o0;
+      v2[a + 1] = o1;
+    }
+    function B2B_GET32(arr, i) {
+      return arr[i] ^ arr[i + 1] << 8 ^ arr[i + 2] << 16 ^ arr[i + 3] << 24;
+    }
+    function B2B_G(a, b, c, d, ix, iy) {
+      const x0 = m[ix];
+      const x1 = m[ix + 1];
+      const y0 = m[iy];
+      const y1 = m[iy + 1];
+      ADD64AA(v, a, b);
+      ADD64AC(v, a, x0, x1);
+      let xor0 = v[d] ^ v[a];
+      let xor1 = v[d + 1] ^ v[a + 1];
+      v[d] = xor1;
+      v[d + 1] = xor0;
+      ADD64AA(v, c, d);
+      xor0 = v[b] ^ v[c];
+      xor1 = v[b + 1] ^ v[c + 1];
+      v[b] = xor0 >>> 24 ^ xor1 << 8;
+      v[b + 1] = xor1 >>> 24 ^ xor0 << 8;
+      ADD64AA(v, a, b);
+      ADD64AC(v, a, y0, y1);
+      xor0 = v[d] ^ v[a];
+      xor1 = v[d + 1] ^ v[a + 1];
+      v[d] = xor0 >>> 16 ^ xor1 << 16;
+      v[d + 1] = xor1 >>> 16 ^ xor0 << 16;
+      ADD64AA(v, c, d);
+      xor0 = v[b] ^ v[c];
+      xor1 = v[b + 1] ^ v[c + 1];
+      v[b] = xor1 >>> 31 ^ xor0 << 1;
+      v[b + 1] = xor0 >>> 31 ^ xor1 << 1;
+    }
+    const BLAKE2B_IV32 = new Uint32Array([
+      4089235720,
+      1779033703,
+      2227873595,
+      3144134277,
+      4271175723,
+      1013904242,
+      1595750129,
+      2773480762,
+      2917565137,
+      1359893119,
+      725511199,
+      2600822924,
+      4215389547,
+      528734635,
+      327033209,
+      1541459225
+    ]);
+    const SIGMA8 = [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      14,
+      10,
+      4,
+      8,
+      9,
+      15,
+      13,
+      6,
+      1,
+      12,
+      0,
+      2,
+      11,
+      7,
+      5,
+      3,
+      11,
+      8,
+      12,
+      0,
+      5,
+      2,
+      15,
+      13,
+      10,
+      14,
+      3,
+      6,
+      7,
+      1,
+      9,
+      4,
+      7,
+      9,
+      3,
+      1,
+      13,
+      12,
+      11,
+      14,
+      2,
+      6,
+      5,
+      10,
+      4,
+      0,
+      15,
+      8,
+      9,
+      0,
+      5,
+      7,
+      2,
+      4,
+      10,
+      15,
+      14,
+      1,
+      11,
+      12,
+      6,
+      8,
+      3,
+      13,
+      2,
+      12,
+      6,
+      10,
+      0,
+      11,
+      8,
+      3,
+      4,
+      13,
+      7,
+      5,
+      15,
+      14,
+      1,
+      9,
+      12,
+      5,
+      1,
+      15,
+      14,
+      13,
+      4,
+      10,
+      0,
+      7,
+      6,
+      3,
+      9,
+      2,
+      8,
+      11,
+      13,
+      11,
+      7,
+      14,
+      12,
+      1,
+      3,
+      9,
+      5,
+      0,
+      15,
+      4,
+      8,
+      6,
+      2,
+      10,
+      6,
+      15,
+      14,
+      9,
+      11,
+      3,
+      0,
+      8,
+      12,
+      2,
+      13,
+      7,
+      1,
+      4,
+      10,
+      5,
+      10,
+      2,
+      8,
+      4,
+      7,
+      6,
+      1,
+      5,
+      15,
+      11,
+      9,
+      14,
+      3,
+      12,
+      13,
+      0,
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      14,
+      10,
+      4,
+      8,
+      9,
+      15,
+      13,
+      6,
+      1,
+      12,
+      0,
+      2,
+      11,
+      7,
+      5,
+      3
+    ];
+    const SIGMA82 = new Uint8Array(
+      SIGMA8.map(function(x) {
+        return x * 2;
+      })
+    );
+    const v = new Uint32Array(32);
+    const m = new Uint32Array(32);
+    function blake2bCompress(ctx, last) {
+      let i = 0;
+      for (i = 0; i < 16; i++) {
+        v[i] = ctx.h[i];
+        v[i + 16] = BLAKE2B_IV32[i];
+      }
+      v[24] = v[24] ^ ctx.t;
+      v[25] = v[25] ^ ctx.t / 4294967296;
+      if (last) {
+        v[28] = ~v[28];
+        v[29] = ~v[29];
+      }
+      for (i = 0; i < 32; i++) {
+        m[i] = B2B_GET32(ctx.b, 4 * i);
+      }
+      for (i = 0; i < 12; i++) {
+        B2B_G(0, 8, 16, 24, SIGMA82[i * 16 + 0], SIGMA82[i * 16 + 1]);
+        B2B_G(2, 10, 18, 26, SIGMA82[i * 16 + 2], SIGMA82[i * 16 + 3]);
+        B2B_G(4, 12, 20, 28, SIGMA82[i * 16 + 4], SIGMA82[i * 16 + 5]);
+        B2B_G(6, 14, 22, 30, SIGMA82[i * 16 + 6], SIGMA82[i * 16 + 7]);
+        B2B_G(0, 10, 20, 30, SIGMA82[i * 16 + 8], SIGMA82[i * 16 + 9]);
+        B2B_G(2, 12, 22, 24, SIGMA82[i * 16 + 10], SIGMA82[i * 16 + 11]);
+        B2B_G(4, 14, 16, 26, SIGMA82[i * 16 + 12], SIGMA82[i * 16 + 13]);
+        B2B_G(6, 8, 18, 28, SIGMA82[i * 16 + 14], SIGMA82[i * 16 + 15]);
+      }
+      for (i = 0; i < 16; i++) {
+        ctx.h[i] = ctx.h[i] ^ v[i] ^ v[i + 16];
+      }
+    }
+    const parameterBlock = new Uint8Array([
+      0,
+      0,
+      0,
+      0,
+      //  0: outlen, keylen, fanout, depth
+      0,
+      0,
+      0,
+      0,
+      //  4: leaf length, sequential mode
+      0,
+      0,
+      0,
+      0,
+      //  8: node offset
+      0,
+      0,
+      0,
+      0,
+      // 12: node offset
+      0,
+      0,
+      0,
+      0,
+      // 16: node depth, inner length, rfu
+      0,
+      0,
+      0,
+      0,
+      // 20: rfu
+      0,
+      0,
+      0,
+      0,
+      // 24: rfu
+      0,
+      0,
+      0,
+      0,
+      // 28: rfu
+      0,
+      0,
+      0,
+      0,
+      // 32: salt
+      0,
+      0,
+      0,
+      0,
+      // 36: salt
+      0,
+      0,
+      0,
+      0,
+      // 40: salt
+      0,
+      0,
+      0,
+      0,
+      // 44: salt
+      0,
+      0,
+      0,
+      0,
+      // 48: personal
+      0,
+      0,
+      0,
+      0,
+      // 52: personal
+      0,
+      0,
+      0,
+      0,
+      // 56: personal
+      0,
+      0,
+      0,
+      0
+      // 60: personal
+    ]);
+    function blake2bInit(outlen, key2, salt, personal) {
+      if (outlen === 0 || outlen > 64) {
+        throw new Error("Illegal output length, expected 0 < length <= 64");
+      }
+      if (key2 && key2.length > 64) {
+        throw new Error("Illegal key, expected Uint8Array with 0 < length <= 64");
+      }
+      if (salt && salt.length !== 16) {
+        throw new Error("Illegal salt, expected Uint8Array with length is 16");
+      }
+      if (personal && personal.length !== 16) {
+        throw new Error("Illegal personal, expected Uint8Array with length is 16");
+      }
+      const ctx = {
+        b: new Uint8Array(128),
+        h: new Uint32Array(16),
+        t: 0,
+        // input count
+        c: 0,
+        // pointer within buffer
+        outlen
+        // output length in bytes
+      };
+      parameterBlock.fill(0);
+      parameterBlock[0] = outlen;
+      if (key2) parameterBlock[1] = key2.length;
+      parameterBlock[2] = 1;
+      parameterBlock[3] = 1;
+      if (salt) parameterBlock.set(salt, 32);
+      if (personal) parameterBlock.set(personal, 48);
+      for (let i = 0; i < 16; i++) {
+        ctx.h[i] = BLAKE2B_IV32[i] ^ B2B_GET32(parameterBlock, i * 4);
+      }
+      if (key2) {
+        blake2bUpdate(ctx, key2);
+        ctx.c = 128;
+      }
+      return ctx;
+    }
+    function blake2bUpdate(ctx, input) {
+      for (let i = 0; i < input.length; i++) {
+        if (ctx.c === 128) {
+          ctx.t += ctx.c;
+          blake2bCompress(ctx, false);
+          ctx.c = 0;
+        }
+        ctx.b[ctx.c++] = input[i];
+      }
+    }
+    function blake2bFinal(ctx) {
+      ctx.t += ctx.c;
+      while (ctx.c < 128) {
+        ctx.b[ctx.c++] = 0;
+      }
+      blake2bCompress(ctx, true);
+      const out = new Uint8Array(ctx.outlen);
+      for (let i = 0; i < ctx.outlen; i++) {
+        out[i] = ctx.h[i >> 2] >> 8 * (i & 3);
+      }
+      return out;
+    }
+    function blake2b(input, key2, outlen, salt, personal) {
+      outlen = outlen || 64;
+      input = util.normalizeInput(input);
+      if (salt) {
+        salt = util.normalizeInput(salt);
+      }
+      if (personal) {
+        personal = util.normalizeInput(personal);
+      }
+      const ctx = blake2bInit(outlen, key2, salt, personal);
+      blake2bUpdate(ctx, input);
+      return blake2bFinal(ctx);
+    }
+    function blake2bHex(input, key2, outlen, salt, personal) {
+      const output = blake2b(input, key2, outlen, salt, personal);
+      return util.toHex(output);
+    }
+    module.exports = {
+      blake2b,
+      blake2bHex,
+      blake2bInit,
+      blake2bUpdate,
+      blake2bFinal
+    };
+  })(m2, m2.exports, req);
+  return m2.exports;
+})();
 function wtSealedBox(messageBytes, recipientPublicKey) {
   var eph = __wtNacl.box.keyPair();
-  var both = new Uint8Array(64); both.set(eph.publicKey, 0); both.set(recipientPublicKey, 32);
+  var both = new Uint8Array(64);
+  both.set(eph.publicKey, 0);
+  both.set(recipientPublicKey, 32);
   var nonce = __wtBlake.blake2b(both, null, 24);
   var boxed = __wtNacl.box(messageBytes, nonce, recipientPublicKey, eph.secretKey);
-  var out = new Uint8Array(32 + boxed.length); out.set(eph.publicKey, 0); out.set(boxed, 32);
+  var out = new Uint8Array(32 + boxed.length);
+  out.set(eph.publicKey, 0);
+  out.set(boxed, 32);
   return out;
 }
-
-// autodeploy.js — phase 2 for Walrus Tusk users: sites with server code (Functions / _worker) deploy
-// from the user's GitHub repo through GitHub Actions, so no PC is ever needed.
-//   site_autodeploy: (1) makes sure the Pages project exists, (2) stores CLOUDFLARE_API_TOKEN +
-//   CLOUDFLARE_ACCOUNT_ID as encrypted repo secrets (libsodium sealed box, see sealed-box.js),
-//   (3) opens a PR adding .github/workflows/walrus-tusk-deploy.yml. The USER taps Merge — that is
-//   their consent; the hub never writes the default branch or .github/ directly.
-//   After that, every push/merge to the default branch builds + deploys the whole site.
-
 var AD_WORKFLOW_PATH = ".github/workflows/walrus-tusk-deploy.yml";
 var AD_BRANCH = "agent/walrus-tusk-autodeploy";
-
 function adWorkflow({ deployBranch, project, prodBranch, outputDir, buildCommand, rootDir }) {
   const lines = [
     "# Added by Walrus Tusk (mcp.artificialmindhive.com). Deploys this repo to Cloudflare Pages",
@@ -5663,7 +5605,7 @@ function adWorkflow({ deployBranch, project, prodBranch, outputDir, buildCommand
     "      - uses: actions/checkout@v4",
     "      - uses: actions/setup-node@v4",
     "        with:",
-    "          node-version: 20",
+    "          node-version: 20"
   ];
   if (buildCommand) lines.push("      - name: Build", `        working-directory: ${JSON.stringify(rootDir)}`, "        run: |", `          ${buildCommand}`);
   lines.push(
@@ -5673,15 +5615,24 @@ function adWorkflow({ deployBranch, project, prodBranch, outputDir, buildCommand
     "          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}",
     "          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
     `          workingDirectory: ${JSON.stringify(rootDir)}`,
-    `          command: pages deploy ${outputDir} --project-name=${project} --branch=${prodBranch} --commit-dirty=true`,
+    `          command: pages deploy ${outputDir} --project-name=${project} --branch=${prodBranch} --commit-dirty=true`
   );
   return lines.join("\n") + "\n";
 }
-
-function adBytes(s) { return new TextEncoder().encode(s); }
-function adB64(bytes) { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
-function adUnb64(s) { const bin = atob(s); const o = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) o[i] = bin.charCodeAt(i); return o; }
-
+function adBytes(s) {
+  return new TextEncoder().encode(s);
+}
+function adB64(bytes) {
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 32768) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+  return btoa(s);
+}
+function adUnb64(s) {
+  const bin = atob(s);
+  const o = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) o[i] = bin.charCodeAt(i);
+  return o;
+}
 async function siteAutodeploy(cfClient, cfToken, accountId, ghEnv, args) {
   const repo = ghRepo(args.repo, ghEnv);
   const project = pagesProject(args.project);
@@ -5690,82 +5641,111 @@ async function siteAutodeploy(cfClient, cfToken, accountId, ghEnv, args) {
   for (const [k, v] of [["output_dir", outputDir], ["root_dir", rootDir]]) if (!/^[A-Za-z0-9._/-]{1,120}$/.test(v) || v.includes("..")) throw new Error(`${k} must be a simple relative folder like "." or "dist"`);
   const buildCommand = String(args.build_command || "").trim();
   if (/[\r\n]/.test(buildCommand) || buildCommand.length > 300) throw new Error("build_command must be one line (e.g. npm ci && npm run build)");
-
   const info = await gh(ghEnv, "GET", `/repos/${repo}`);
   const deployBranch = String(args.deploy_branch || info.default_branch);
   let proj = null, created = false;
-  try { proj = await pagesGetProject(cfClient, accountId, project); } catch (e) { if (!/not found|8000007|404/i.test(String(e.message))) throw e; }
+  try {
+    proj = await pagesGetProject(cfClient, accountId, project);
+  } catch (e) {
+    if (!/not found|8000007|404/i.test(String(e.message))) throw e;
+  }
   const prodBranch = proj ? proj.production_branch : "main";
   const workflow = adWorkflow({ deployBranch, project, prodBranch, outputDir, buildCommand, rootDir });
   const plan = {
-    repo, deploys_on_push_to: deployBranch, pages_project: project, project_exists: !!proj, live_domains: proj ? proj.domains : [`${project}.pages.dev (new)`],
-    production_branch: prodBranch, secrets_to_set: ["CLOUDFLARE_API_TOKEN (your saved Cloudflare token)", "CLOUDFLARE_ACCOUNT_ID"],
-    workflow_file: AD_WORKFLOW_PATH, workflow,
-    after: "A pull request opens in your repo. Tap Merge in the GitHub app: from then on every merge to " + deployBranch + " deploys the whole site, server code included.",
+    repo,
+    deploys_on_push_to: deployBranch,
+    pages_project: project,
+    project_exists: !!proj,
+    live_domains: proj ? proj.domains : [`${project}.pages.dev (new)`],
+    production_branch: prodBranch,
+    secrets_to_set: ["CLOUDFLARE_API_TOKEN (your saved Cloudflare token)", "CLOUDFLARE_ACCOUNT_ID"],
+    workflow_file: AD_WORKFLOW_PATH,
+    workflow,
+    after: "A pull request opens in your repo. Tap Merge in the GitHub app: from then on every merge to " + deployBranch + " deploys the whole site, server code included."
   };
   if (args.apply !== true) return { dry_run: true, ...plan, next: "call again with apply=true" };
-
   if (!proj) {
     const { result } = await cfClient.request("POST", `/accounts/${accountId}/pages/projects`, { name: project, production_branch: "main" });
-    proj = result; created = true;
+    proj = result;
+    created = true;
   }
-  // repo secrets (sealed box with the repo's public key)
   const pk = await gh(ghEnv, "GET", `/repos/${repo}/actions/secrets/public-key`);
   for (const [name, value] of [["CLOUDFLARE_API_TOKEN", cfToken], ["CLOUDFLARE_ACCOUNT_ID", accountId]]) {
     const sealed = wtSealedBox(adBytes(value), adUnb64(pk.key));
     await gh(ghEnv, "PUT", `/repos/${repo}/actions/secrets/${name}`, { encrypted_value: adB64(sealed), key_id: pk.key_id });
   }
-  // workflow on a branch + PR (never the default branch)
   const head = (await gh(ghEnv, "GET", `/repos/${repo}/git/ref/heads/${encodeURIComponent(info.default_branch)}`)).object.sha;
-  try { await gh(ghEnv, "POST", `/repos/${repo}/git/refs`, { ref: `refs/heads/${AD_BRANCH}`, sha: head }); }
-  catch (e) { if (e.status !== 422) throw e; } // branch already exists
+  try {
+    await gh(ghEnv, "POST", `/repos/${repo}/git/refs`, { ref: `refs/heads/${AD_BRANCH}`, sha: head });
+  } catch (e) {
+    if (e.status !== 422) throw e;
+  }
   let existingSha;
-  try { existingSha = (await gh(ghEnv, "GET", `/repos/${repo}/contents/${AD_WORKFLOW_PATH}?ref=${encodeURIComponent(AD_BRANCH)}`)).sha; } catch (e) { if (e.status !== 404) throw e; }
-  await gh(ghEnv, "PUT", `/repos/${repo}/contents/${AD_WORKFLOW_PATH}`, { message: "Walrus Tusk: deploy to Cloudflare Pages on push", content: adB64(adBytes(workflow)), branch: AD_BRANCH, ...(existingSha ? { sha: existingSha } : {}) });
+  try {
+    existingSha = (await gh(ghEnv, "GET", `/repos/${repo}/contents/${AD_WORKFLOW_PATH}?ref=${encodeURIComponent(AD_BRANCH)}`)).sha;
+  } catch (e) {
+    if (e.status !== 404) throw e;
+  }
+  await gh(ghEnv, "PUT", `/repos/${repo}/contents/${AD_WORKFLOW_PATH}`, { message: "Walrus Tusk: deploy to Cloudflare Pages on push", content: adB64(adBytes(workflow)), branch: AD_BRANCH, ...existingSha ? { sha: existingSha } : {} });
   let pr;
   const open = await gh(ghEnv, "GET", `/repos/${repo}/pulls?state=open&head=${repo.split("/")[0]}:${encodeURIComponent(AD_BRANCH)}`);
   if (open.length) pr = open[0];
-  else pr = await gh(ghEnv, "POST", `/repos/${repo}/pulls`, { title: "Walrus Tusk: auto-deploy to Cloudflare Pages", head: AD_BRANCH, base: info.default_branch, body: `Adds \`${AD_WORKFLOW_PATH}\`. After you merge, every push to \`${deployBranch}\` deploys \`${outputDir}\` to the Cloudflare Pages project **${project}** (${(proj.domains || []).join(", ") || project + ".pages.dev"}).\n\nRepo secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID were set by Walrus Tusk. Remove them under Settings → Secrets → Actions to turn this off.` });
+  else pr = await gh(ghEnv, "POST", `/repos/${repo}/pulls`, { title: "Walrus Tusk: auto-deploy to Cloudflare Pages", head: AD_BRANCH, base: info.default_branch, body: `Adds \`${AD_WORKFLOW_PATH}\`. After you merge, every push to \`${deployBranch}\` deploys \`${outputDir}\` to the Cloudflare Pages project **${project}** (${(proj.domains || []).join(", ") || project + ".pages.dev"}).
+
+Repo secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID were set by Walrus Tusk. Remove them under Settings \u2192 Secrets \u2192 Actions to turn this off.` });
   return { applied: true, ...plan, project_created: created, secrets_set: ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"], pull_request: pr.html_url, next: "Tap Merge on that pull request. The first deploy starts right after; check it with site_autodeploy_status." };
 }
-
 async function siteAutodeployStatus(ghEnv, args) {
   const repo = ghRepo(args.repo, ghEnv);
   let runs;
-  try { runs = await gh(ghEnv, "GET", `/repos/${repo}/actions/workflows/walrus-tusk-deploy.yml/runs?per_page=5`); }
-  catch (e) { if (e.status === 404) return { repo, set_up: false, note: "No Walrus Tusk deploy workflow on the default branch yet. Run site_autodeploy, then merge its PR." }; throw e; }
+  try {
+    runs = await gh(ghEnv, "GET", `/repos/${repo}/actions/workflows/walrus-tusk-deploy.yml/runs?per_page=5`);
+  } catch (e) {
+    if (e.status === 404) return { repo, set_up: false, note: "No Walrus Tusk deploy workflow on the default branch yet. Run site_autodeploy, then merge its PR." };
+    throw e;
+  }
   return { repo, set_up: true, runs: (runs.workflow_runs || []).map((r) => ({ status: r.status, result: r.conclusion, commit: (r.head_sha || "").slice(0, 7), message: (r.display_title || "").slice(0, 80), started: r.run_started_at, url: r.html_url })) };
 }
-
 var AUTODEPLOY_TOOL_DEFS = [
-  { name: "site_autodeploy", description: "One-time setup for sites with server code (Functions/_worker), or any site you keep in GitHub: deploys the repo to a Cloudflare Pages project on every push via GitHub Actions — no PC. Sets the repo secrets and opens a pull request adding the workflow; the user taps Merge to turn it on. Dry-run by default; apply=true does it. After that, change the site with repo_commit_push + repo_open_pr + repo_merge_pr.",
+  {
+    name: "site_autodeploy",
+    description: "One-time setup for sites with server code (Functions/_worker), or any site you keep in GitHub: deploys the repo to a Cloudflare Pages project on every push via GitHub Actions \u2014 no PC. Sets the repo secrets and opens a pull request adding the workflow; the user taps Merge to turn it on. Dry-run by default; apply=true does it. After that, change the site with repo_commit_push + repo_open_pr + repo_merge_pr.",
     inputSchema: { type: "object", properties: {
-      repo: { type: "string", description: "owner/name" }, project: { type: "string", description: "Cloudflare Pages project (created if it doesn't exist)" },
-      account: { type: "string" }, output_dir: { type: "string", description: "folder to deploy, default '.'" },
-      build_command: { type: "string", description: "optional, one line, e.g. npm ci && npm run build" }, root_dir: { type: "string", description: "repo subfolder to work in, default '.'" },
-      deploy_branch: { type: "string", description: "default: the repo's default branch" }, apply: { type: "boolean" },
-    }, required: ["repo", "project"] } },
-  { name: "site_autodeploy_status", description: "Latest Walrus Tusk deploy runs for a repo (queued / running / success / failure, with links).",
-    inputSchema: { type: "object", properties: { repo: { type: "string" } }, required: ["repo"] } },
+      repo: { type: "string", description: "owner/name" },
+      project: { type: "string", description: "Cloudflare Pages project (created if it doesn't exist)" },
+      account: { type: "string" },
+      output_dir: { type: "string", description: "folder to deploy, default '.'" },
+      build_command: { type: "string", description: "optional, one line, e.g. npm ci && npm run build" },
+      root_dir: { type: "string", description: "repo subfolder to work in, default '.'" },
+      deploy_branch: { type: "string", description: "default: the repo's default branch" },
+      apply: { type: "boolean" }
+    }, required: ["repo", "project"] }
+  },
+  {
+    name: "site_autodeploy_status",
+    description: "Latest Walrus Tusk deploy runs for a repo (queued / running / success / failure, with links).",
+    inputSchema: { type: "object", properties: { repo: { type: "string" } }, required: ["repo"] }
+  }
 ];
-
-// wt-users.js — Walrus Tusk self-serve users: anyone gets a key at /join, adds THEIR OWN Cloudflare
-// (and optional GitHub) token at /setup, then their AI (Grok, Claude, ChatGPT…) can read, patch and deploy
-// THEIR sites and commit to THEIR repos from a phone. Nothing here can reach the owner's accounts:
-//   - user keys are `wtu_…`, stored only as a SHA-256 hash (KV wtuser:<hash>)
-//   - their tokens are AES-GCM encrypted with the hub secret WT_USER_SECRET (KV wtcreds:<id>)
-//   - every Cloudflare call uses their token and is limited to the accounts that token can see
-//   - every GitHub call uses their token and is limited to their login + orgs
-//   - the tool list for user keys is a fixed allowlist (no federation, no owner/admin tools)
-
 var WTU_PREFIX = "wtu_";
 var WTU_PAGES_TOOLS = ["pages_list_deployments", "pages_get_deployment", "pages_read_file", "pages_patch", "pages_deploy", "pages_rollback", "pages_special_files"];
 var WTU_REPO_TOOLS = ["repo_list", "repo_read", "repo_search", "repo_commit_push", "repo_open_pr", "repo_merge_pr"];
 var WTU_JOIN_PER_HOUR = 5;
-
-function wtuB64(bytes) { let s = ""; for (const b of bytes) s += String.fromCharCode(b); return btoa(s); }
-function wtuUnb64(s) { const bin = atob(s); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; }
-async function wtuSha(s) { const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)); return [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, "0")).join(""); }
+function wtuB64(bytes) {
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s);
+}
+function wtuUnb64(s) {
+  const bin = atob(s);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+async function wtuSha(s) {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
 function wtuRandom(n) {
   const abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   const r = crypto.getRandomValues(new Uint8Array(n));
@@ -5784,7 +5764,6 @@ async function wtuDecrypt(env, rec) {
   const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: wtuUnb64(rec.iv) }, await wtuCryptoKey(env), wtuUnb64(rec.ct));
   return JSON.parse(new TextDecoder().decode(pt));
 }
-
 async function wtuAuthorize(env, provided) {
   if (!env.CLOUDFLARE_OPS_OAUTH) return { ok: false, reason: "storage_unavailable" };
   const keyHash = await wtuSha(provided);
@@ -5796,18 +5775,19 @@ async function wtuCreds(env, userId) {
   const rec = await env.CLOUDFLARE_OPS_OAUTH.get(`wtcreds:${userId}`, "json");
   return rec ? await wtuDecrypt(env, rec) : null;
 }
-
-// ---------- verifying what a user pastes ----------
 async function wtuCheckCloudflare(token) {
-  const call = async (p) => { const r = await fetch(`https://api.cloudflare.com/client/v4${p}`, { headers: { authorization: `Bearer ${token}` } }); return r.json().catch(() => ({})); };
+  const call = async (p) => {
+    const r = await fetch(`https://api.cloudflare.com/client/v4${p}`, { headers: { authorization: `Bearer ${token}` } });
+    return r.json().catch(() => ({}));
+  };
   const acc = await call("/accounts?per_page=50");
-  if (!acc.success || !(acc.result || []).length) return { ok: false, error: "Cloudflare didn't accept that token, or it can't see any account. Make sure it has Account → Cloudflare Pages → Edit." };
+  if (!acc.success || !(acc.result || []).length) return { ok: false, error: "Cloudflare didn't accept that token, or it can't see any account. Make sure it has Account \u2192 Cloudflare Pages \u2192 Edit." };
   const accounts = [];
   for (const a of acc.result) {
     const names = [];
     let pagesOk = false;
-    for (let page = 1; page <= 10; page++) {
-      const p = await call(`/accounts/${a.id}/pages/projects?per_page=10&page=${page}`);
+    for (let page2 = 1; page2 <= 10; page2++) {
+      const p = await call(`/accounts/${a.id}/pages/projects?per_page=10&page=${page2}`);
       if (!p.success) break;
       pagesOk = true;
       names.push(...(p.result || []).map((x) => x.name));
@@ -5815,7 +5795,7 @@ async function wtuCheckCloudflare(token) {
     }
     accounts.push({ id: a.id, name: a.name, pages: pagesOk, projects: names });
   }
-  if (!accounts.some((a) => a.pages)) return { ok: false, error: "The token works but has no Pages permission. Edit it and add Account → Cloudflare Pages → Edit." };
+  if (!accounts.some((a) => a.pages)) return { ok: false, error: "The token works but has no Pages permission. Edit it and add Account \u2192 Cloudflare Pages \u2192 Edit." };
   return { ok: true, accounts };
 }
 async function wtuCheckGithub(token) {
@@ -5827,9 +5807,9 @@ async function wtuCheckGithub(token) {
   const orgs = o.ok ? (await o.json()).map((x) => x.login) : [];
   return { ok: true, login: me.login, owners: [me.login, ...orgs] };
 }
-
-// ---------- HTTP: /join and /setup ----------
-function wtuJson(obj, status = 200) { return new Response(JSON.stringify(obj, null, 2), { status, headers: { "content-type": "application/json", "cache-control": "no-store", "access-control-allow-origin": "*" } }); }
+function wtuJson(obj, status = 200) {
+  return new Response(JSON.stringify(obj, null, 2), { status, headers: { "content-type": "application/json", "cache-control": "no-store", "access-control-allow-origin": "*" } });
+}
 async function wtuBody(request) {
   const ct = request.headers.get("content-type") || "";
   if (ct.includes("application/json")) return await request.json().catch(() => ({}));
@@ -5840,29 +5820,25 @@ async function wtuHandleHttp(request, env, url) {
   const p = url.pathname.replace(/\/+$/, "") || "/";
   if (p !== "/join" && p !== "/setup") return null;
   if (request.method === "OPTIONS") return new Response(null, { headers: { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST", "access-control-allow-headers": "content-type" } });
-  // These two pages run their own small inline script and show the walrus from walohq.com; the hub-wide default CSP would block both.
   if (request.method === "GET") return new Response(wtuPage(p, url.origin), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://walohq.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" } });
   if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
   const kv = env.CLOUDFLARE_OPS_OAUTH;
   const body = await wtuBody(request);
-
   if (p === "/join") {
     const ip = request.headers.get("cf-connecting-ip") || "unknown";
-    const hourKey = `wtjoin:${await wtuSha(ip)}:${new Date().toISOString().slice(0, 13)}`;
+    const hourKey = `wtjoin:${await wtuSha(ip)}:${(/* @__PURE__ */ new Date()).toISOString().slice(0, 13)}`;
     const n = Number(await kv.get(hourKey)) || 0;
     if (n >= WTU_JOIN_PER_HOUR) return wtuJson({ error: "too many new keys from this network this hour; try again later" }, 429);
     await kv.put(hourKey, String(n + 1), { expirationTtl: 7200 });
-    const key = WTU_PREFIX + wtuRandom(40);
+    const key3 = WTU_PREFIX + wtuRandom(40);
     const id = "u_" + wtuRandom(16);
-    await kv.put(`wtuser:${await wtuSha(key)}`, JSON.stringify({ id, created: new Date().toISOString(), label: String(body.label || "").slice(0, 60) }));
-    return wtuJson({ ok: true, key, mcp_url: `${url.origin}/mcp?key=${key}`, setup_url: `${url.origin}/setup`, note: "Save this key now — it is shown once. Next: add your Cloudflare token at /setup." });
+    await kv.put(`wtuser:${await wtuSha(key3)}`, JSON.stringify({ id, created: (/* @__PURE__ */ new Date()).toISOString(), label: String(body.label || "").slice(0, 60) }));
+    return wtuJson({ ok: true, key: key3, mcp_url: `${url.origin}/mcp?key=${key3}`, setup_url: `${url.origin}/setup`, note: "Save this key now \u2014 it is shown once. Next: add the MCP link to your AI app. Tokens are optional: add a Cloudflare or GitHub token at /setup only when you want your AI to edit your own sites." });
   }
-
-  // /setup
-  const key = String(body.key || "").trim();
-  const auth = key.startsWith(WTU_PREFIX) ? await wtuAuthorize(env, key) : { ok: false };
-  if (!auth.ok) return wtuJson({ error: "unknown key — get one at /join" }, 401);
-  const creds = (await wtuCreds(env, auth.userId)) || {};
+  const key2 = String(body.key || "").trim();
+  const auth = key2.startsWith(WTU_PREFIX) ? await wtuAuthorize(env, key2) : { ok: false };
+  if (!auth.ok) return wtuJson({ error: "unknown key \u2014 get one at /join" }, 401);
+  const creds = await wtuCreds(env, auth.userId) || {};
   if (body.delete === true || body.delete === "true") {
     await kv.delete(`wtcreds:${auth.userId}`);
     return wtuJson({ ok: true, deleted: true, note: "Your saved tokens are gone from the hub. Also revoke them in Cloudflare/GitHub." });
@@ -5870,7 +5846,7 @@ async function wtuHandleHttp(request, env, url) {
   const out = { ok: true };
   const cfTok = String(body.cloudflare_token || "").trim();
   const ghTok = String(body.github_token || "").trim();
-  if (!cfTok && !ghTok && !creds.cf_token) return wtuJson({ error: "paste a Cloudflare API token" }, 400);
+  if (!cfTok && !ghTok) return wtuJson({ ok: true, saved: false, next: `Your key works. Add it to your AI app as an MCP connector: ${url.origin}/mcp?key=<your key>. Tokens are optional; add one here when you want your AI to edit your sites.` });
   if (cfTok) {
     const c = await wtuCheckCloudflare(cfTok);
     if (!c.ok) return wtuJson({ error: c.error }, 400);
@@ -5886,16 +5862,14 @@ async function wtuHandleHttp(request, env, url) {
     creds.gh_owners = g.owners;
     out.github = { login: g.login, owners: g.owners };
   }
-  creds.updated = new Date().toISOString();
+  creds.updated = (/* @__PURE__ */ new Date()).toISOString();
   await kv.put(`wtcreds:${auth.userId}`, JSON.stringify(await wtuEncrypt(env, creds)));
   out.next = `Add this to your AI app as an MCP connector: ${url.origin}/mcp?key=<your key>. Then ask it to "list my sites".`;
   return wtuJson(out);
 }
-
-// ---------- MCP: tool list + calls for user keys ----------
 var WTU_EXTRA_DEFS = [
   { name: "my_sites", description: "List the Cloudflare Pages sites your token can see (all your accounts): project, production branch, domains, last deploy. Start here.", inputSchema: { type: "object", properties: {} } },
-  { name: "wt_whoami", description: "Show what this Walrus Tusk key is connected to (Cloudflare accounts, GitHub login). Tokens are never shown.", inputSchema: { type: "object", properties: {} } },
+  { name: "wt_whoami", description: "Show what this Walrus Tusk key is connected to (Cloudflare accounts, GitHub login). Tokens are never shown.", inputSchema: { type: "object", properties: {} } }
 ];
 function wtuToolDefs() {
   const all = [...TOOLS, ...GITHUB_TOOL_DEFS];
@@ -5930,10 +5904,10 @@ async function wtuCallTool(name, args, env, authContext, origin) {
       const client = new CloudflareClient({ token: creds.cf_token });
       const out = [];
       for (const a of creds.cf_accounts.filter((x) => x.pages)) {
-        for (let page = 1; page <= 10; page++) {
-        const { result } = await client.request("GET", `/accounts/${a.id}/pages/projects?per_page=10&page=${page}`);
-        for (const pr of result || []) out.push({ account: a.name, project: pr.name, production_branch: pr.production_branch, domains: pr.domains, last_deploy: pr.canonical_deployment && pr.canonical_deployment.created_on });
-        if (!result || result.length < 10) break;
+        for (let page2 = 1; page2 <= 10; page2++) {
+          const { result } = await client.request("GET", `/accounts/${a.id}/pages/projects?per_page=10&page=${page2}`);
+          for (const pr of result || []) out.push({ account: a.name, project: pr.name, production_branch: pr.production_branch, domains: pr.domains, last_deploy: pr.canonical_deployment && pr.canonical_deployment.created_on });
+          if (!result || result.length < 10) break;
         }
       }
       return { sites: out, tip: "Read a page with pages_read_file, change it with pages_patch (dry-run first, then apply:true)." };
@@ -5960,10 +5934,10 @@ async function wtuCallTool(name, args, env, authContext, origin) {
       return await siteAutodeploy(new CloudflareClient({ token: creds.cf_token }), creds.cf_token, wtuAccount(creds, args.account), env2, args);
     }
     return { error: `${name} isn't available on user keys` };
-  } catch (e) { return { error: String((e && e.message) || e).slice(0, 600) }; }
+  } catch (e) {
+    return { error: String(e && e.message || e).slice(0, 600) };
+  }
 }
-
-// ---------- pages ----------
 function wtuPage(p, origin) {
   const css = `:root{--bg:#06140d;--card:#0c2117;--line:#4cdc8233;--gold:#4cdc82;--gold2:#8ff0b6;--ink:#f3efe2;--mut:#b6cbbd;--bad:#ff7a7a;--ok:#4cdc82;--amh:#f5a524}
 *{box-sizing:border-box}html,body{margin:0}body{background:radial-gradient(800px 420px at 85% -5%,#1d5c3a 0%,transparent 65%),radial-gradient(700px 480px at 0% 0%,#0f2a1c 0%,transparent 60%),var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh}
@@ -5989,34 +5963,31 @@ code,.mono{font-family:ui-monospace,Consolas,monospace;font-size:13px;word-break
 .wt-foot{border-top:1px solid var(--line);margin-top:30px;padding:22px 16px 34px;text-align:center;color:var(--mut);font-size:13px}
 .wt-foot nav{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 14px;margin:10px 0}.wt-foot a{color:var(--mut);text-decoration:none}.wt-foot a:hover{color:var(--gold2)}
 @media (max-width:520px){.hero{grid-template-columns:72px 1fr}.hero img{width:72px}h1{font-size:24px}.amh small{display:none}}`;
-  const head = (t) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${t} — Walrus Tusk</title><link rel="icon" href="https://walohq.com/board/walrus-tusk.webp"><style>${css}</style></head><body><div class="wt-topbar"><a class="back" href="https://artificialmindhive.com/WT/" aria-label="Back to Walrus Tusk">‹</a><a class="wt-brand" href="https://artificialmindhive.com/WT/"><img src="https://walohq.com/board/walrus-tusk.webp" alt=""><span>Walrus Tusk<br><small>Cloudflare Ops MCP</small></span></a><a class="amh" href="https://artificialmindhive.com" title="Artificial Mind Hive"><span class="badge"><i class="ufo a"></i><i class="ufo b"></i><b>AMH</b></span></a></div><main>`;
+  const head = (t) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${t} \u2014 Walrus Tusk</title><link rel="icon" href="https://walohq.com/board/walrus-tusk.webp"><style>${css}</style></head><body><div class="wt-topbar"><a class="back" href="https://artificialmindhive.com/WT/" aria-label="Back to Walrus Tusk">\u2039</a><a class="wt-brand" href="https://artificialmindhive.com/WT/"><img src="https://walohq.com/board/walrus-tusk.webp" alt=""><span>Walrus Tusk<br><small>Cloudflare Ops MCP</small></span></a><a class="amh" href="https://artificialmindhive.com" title="Artificial Mind Hive"><span class="badge"><i class="ufo a"></i><i class="ufo b"></i><b>AMH</b></span></a></div><main>`;
   if (p === "/join") return head("Get your key") + `
 <div class="hero"><img src="https://walohq.com/board/walrus-tusk.webp" alt="Walrus Tusk"><div><h1>Walrus <b>Tusk</b></h1><p class="sub">Let your AI edit and deploy your Cloudflare sites from your phone.</p></div></div><p class="what"><b>What is this?</b> Walrus Tusk is the hub Austin's own agents use to ship his sites safely: dry run first, a health check after every change, automatic rollback. This page gives <b>your</b> AI (Grok, Claude, ChatGPT) the same tools for <b>your</b> sites. Your tokens are encrypted and only ever used on your own accounts.</p>
-<div class="card"><h2>1 · Get your key</h2><p>One tap. No account, no email.</p><button id="go">Get my key</button><div id="res" class="out"></div></div>
-<div class="card"><h2>How it works</h2><ol><li>Get a key here.</li><li>Add your Cloudflare token on the <a href="${origin}/setup">setup page</a> (and GitHub, optional).</li><li>Add the MCP link to Grok, Claude or ChatGPT.</li><li>Say “list my sites”, then “change … on my homepage”. It reads the live page, shows a dry run, and deploys only the changed file.</li></ol></div>
-<script>document.getElementById('go').onclick=async()=>{const b=document.getElementById('go');b.disabled=true;b.textContent='…';const r=await fetch('/join',{method:'POST',headers:{'content-type':'application/json'},body:'{}'});const j=await r.json();const o=document.getElementById('res');
+<div class="card"><h2>1 \xB7 Get your key</h2><p>One tap. No account, no email.</p><button id="go">Get my key</button><div id="res" class="out"></div></div>
+<div class="card"><h2>How it works</h2><ol><li>Get a key here.</li><li>Add the MCP link to Grok, Claude or ChatGPT.</li><li>Optional, when you want your AI to edit your own sites: add a Cloudflare or GitHub token on the <a href="${origin}/setup">setup page</a>.</li><li>Say \u201Clist my sites\u201D, then \u201Cchange \u2026 on my homepage\u201D. It reads the live page, shows a dry run, and deploys only the changed file.</li></ol></div>
+<script>document.getElementById('go').onclick=async()=>{const b=document.getElementById('go');b.disabled=true;b.textContent='\u2026';const r=await fetch('/join',{method:'POST',headers:{'content-type':'application/json'},body:'{}'});const j=await r.json();const o=document.getElementById('res');
 if(!r.ok){o.innerHTML='<span class=bad>'+(j.error||'failed')+'</span>';b.disabled=false;b.textContent='Get my key';return}
-b.style.display='none';o.innerHTML='<b class=ok>Your key (save it now, shown once):</b><div class="key mono">'+j.key+'</div><b>MCP link for your AI app:</b><div class="key mono">'+j.mcp_url+'</div><a href="/setup#'+j.key+'">Next: add your Cloudflare token →</a>';try{localStorage.setItem('wtu',j.key)}catch(e){}}</script></main><footer class="wt-foot"><a class="amh" href="https://artificialmindhive.com" style="margin:0 auto;justify-content:center"><span class="badge"><i class="ufo a"></i><i class="ufo b"></i><b>AMH</b></span></a><nav><a href="https://artificialmindhive.com/WT/">Walrus Tusk</a><a href="https://walohq.com/board/">Agent Board</a><a href="https://walohq.com/">WALO</a><a href="https://amhagentbook.com/">Agent Book</a><a href="https://artificialmindhive.com">Artificial Mind Hive</a></nav><div>Walrus Tusk by Artificial Mind Hive · your tokens stay encrypted and only touch your own accounts</div></footer></body></html>`;
+b.style.display='none';o.innerHTML='<b class=ok>Your key (save it now, shown once):</b><div class="key mono">'+j.key+'</div><b>MCP link for your AI app:</b><div class="key mono">'+j.mcp_url+'</div><p class="sub">Paste that link into Grok, Claude or ChatGPT as an MCP connector and you're in. No token needed for this.</p><a href="/setup#'+j.key+'">Later, to let your AI edit your own sites: add a token (optional) \u2192</a>';try{localStorage.setItem('wtu',j.key)}catch(e){}}<\/script></main><footer class="wt-foot"><a class="amh" href="https://artificialmindhive.com" style="margin:0 auto;justify-content:center"><span class="badge"><i class="ufo a"></i><i class="ufo b"></i><b>AMH</b></span></a><nav><a href="https://artificialmindhive.com/WT/">Walrus Tusk</a><a href="https://walohq.com/board/">Agent Board</a><a href="https://walohq.com/">WALO</a><a href="https://amhagentbook.com/">Agent Book</a><a href="https://artificialmindhive.com">Artificial Mind Hive</a></nav><div>Walrus Tusk by Artificial Mind Hive \xB7 your tokens stay encrypted and only touch your own accounts</div></footer></body></html>`;
   return head("Setup") + `
-<div class="hero"><img src="https://walohq.com/board/walrus-tusk.webp" alt="Walrus Tusk"><div><h1>Walrus <b>Tusk</b> setup</h1><p class="sub" style="margin:0">Step 2 of 3: connect your own Cloudflare (and GitHub, if you want).</p></div></div><p class="sub">Your tokens are encrypted and only ever used for your own accounts. You can delete them any time.</p>
-<div class="card"><h2>Cloudflare token</h2><ol><li>Open <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank">Cloudflare → API Tokens</a> → <b>Create Token</b> → <b>Custom token</b>.</li><li>Permissions: <b>Account → Cloudflare Pages → Edit</b>. Optional: <b>Zone → Analytics → Read</b>.</li><li>Account resources: your account. Create, then copy the token.</li></ol></div>
-<div class="card"><h2>GitHub token (optional)</h2><ol><li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">GitHub → Fine-grained token</a>.</li><li>Repository access: the repos you want your AI to edit.</li><li>Permissions: <b>Contents</b>, <b>Pull requests</b> → Read and write. For sites with server code also <b>Secrets</b>, <b>Workflows</b>, <b>Actions</b> → Read and write (used once, by auto-deploy setup).</li></ol><p class="sub" style="margin:8px 0 0">Your AI can then commit to <code>grok/…</code> or <code>agent/…</code> branches and open/merge PRs. It can't force-push, delete branches, or touch <code>.github/</code>.</p></div>
-<div class="card"><h2>Save</h2><label>Your Walrus Tusk key</label><input id="k" placeholder="wtu_…" autocomplete="off"><label>Cloudflare API token</label><input id="cf" type="password" autocomplete="off"><label>GitHub token (optional)</label><input id="gh" type="password" autocomplete="off"><button id="save">Check &amp; save</button><div id="res" class="out"></div></div>
-<script>const k=document.getElementById('k');k.value=(location.hash.slice(1)||(()=>{try{return localStorage.getItem('wtu')||''}catch(e){return''}})());
-document.getElementById('save').onclick=async()=>{const b=document.getElementById('save');b.disabled=true;b.textContent='Checking…';const r=await fetch('/setup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({key:k.value.trim(),cloudflare_token:document.getElementById('cf').value.trim(),github_token:document.getElementById('gh').value.trim()})});const j=await r.json();const o=document.getElementById('res');b.disabled=false;b.textContent='Check & save';
+<div class="hero"><img src="https://walohq.com/board/walrus-tusk.webp" alt="Walrus Tusk"><div><h1>Walrus <b>Tusk</b> setup</h1><p class="sub" style="margin:0">Tokens are optional. Your key already connects; a token only lets your AI edit and deploy <b>your own</b> sites.</p></div></div><p class="sub">Your tokens are encrypted and only ever used for your own accounts. You can delete them any time.</p>
+<div class="card"><h2>Connect your AI now</h2><p class="sub" style="margin:0 0 6px">Paste this into Grok, Claude or ChatGPT as an MCP connector. No token needed.</p><div id="mcp" class="key mono">Put your key in the box at the bottom.</div></div>
+<div class="card"><h2>Cloudflare token <small>(optional \xB7 lets your AI edit your Cloudflare sites)</small></h2><ol><li>Open <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank">Cloudflare \u2192 API Tokens</a> \u2192 <b>Create Token</b> \u2192 <b>Custom token</b>.</li><li>Permissions: <b>Account \u2192 Cloudflare Pages \u2192 Edit</b>. Optional: <b>Zone \u2192 Analytics \u2192 Read</b>.</li><li>Account resources: your account. Create, then copy the token.</li></ol></div>
+<div class="card"><h2>GitHub token (optional)</h2><ol><li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">GitHub \u2192 Fine-grained token</a>.</li><li>Repository access: the repos you want your AI to edit.</li><li>Permissions: <b>Contents</b>, <b>Pull requests</b> \u2192 Read and write. For sites with server code also <b>Secrets</b>, <b>Workflows</b>, <b>Actions</b> \u2192 Read and write (used once, by auto-deploy setup).</li></ol><p class="sub" style="margin:8px 0 0">Your AI can then commit to <code>grok/\u2026</code> or <code>agent/\u2026</code> branches and open/merge PRs. It can't force-push, delete branches, or touch <code>.github/</code>.</p></div>
+<div class="card"><h2>Save</h2><label>Your Walrus Tusk key</label><input id="k" placeholder="wtu_\u2026" autocomplete="off"><label>Cloudflare API token (optional)</label><input id="cf" type="password" autocomplete="off"><label>GitHub token (optional)</label><input id="gh" type="password" autocomplete="off"><button id="save">Check &amp; save</button><div id="res" class="out"></div></div>
+<script>const k=document.getElementById('k');k.value=(location.hash.slice(1)||(()=>{try{return localStorage.getItem('wtu')||''}catch(e){return''}})());const showMcp=()=>{const v=k.value.trim();document.getElementById('mcp').textContent=v.startsWith('wtu_')?location.origin+'/mcp?key='+v:'Put your key in the box at the bottom.'};k.oninput=showMcp;showMcp();
+document.getElementById('save').onclick=async()=>{const b=document.getElementById('save');b.disabled=true;b.textContent='Checking\u2026';const r=await fetch('/setup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({key:k.value.trim(),cloudflare_token:document.getElementById('cf').value.trim(),github_token:document.getElementById('gh').value.trim()})});const j=await r.json();const o=document.getElementById('res');b.disabled=false;b.textContent='Check & save';
 if(!r.ok){o.innerHTML='<span class=bad>'+(j.error||'failed')+'</span>';return}document.getElementById('cf').value='';document.getElementById('gh').value='';
-let h='<b class=ok>Saved.</b>\\n';(j.cloudflare||[]).forEach(a=>h+='Cloudflare: '+a.account+(a.pages_access?' — '+a.sites.length+' site(s): '+a.sites.join(', '):' — no Pages access')+'\\n');if(j.github)h+='GitHub: '+j.github.login+'\\n';h+='\\nAdd to your AI app as an MCP connector:\\n<span class=mono>'+location.origin+'/mcp?key='+k.value.trim()+'</span>\\n\\nThen say: “list my sites”.';o.innerHTML=h}</script></main><footer class="wt-foot"><a class="amh" href="https://artificialmindhive.com" style="margin:0 auto;justify-content:center"><span class="badge"><i class="ufo a"></i><i class="ufo b"></i><b>AMH</b></span></a><nav><a href="https://artificialmindhive.com/WT/">Walrus Tusk</a><a href="https://walohq.com/board/">Agent Board</a><a href="https://walohq.com/">WALO</a><a href="https://amhagentbook.com/">Agent Book</a><a href="https://artificialmindhive.com">Artificial Mind Hive</a></nav><div>Walrus Tusk by Artificial Mind Hive · your tokens stay encrypted and only touch your own accounts</div></footer></body></html>`;
+let h='<b class=ok>'+((j.cloudflare||j.github)?'Saved.':'Your key works. No tokens added, and that is fine.')+'</b>\\n';(j.cloudflare||[]).forEach(a=>h+='Cloudflare: '+a.account+(a.pages_access?' \u2014 '+a.sites.length+' site(s): '+a.sites.join(', '):' \u2014 no Pages access')+'\\n');if(j.github)h+='GitHub: '+j.github.login+'\\n';h+='\\nAdd to your AI app as an MCP connector:\\n<span class=mono>'+location.origin+'/mcp?key='+k.value.trim()+'</span>\\n\\nThen say: \u201Clist my sites\u201D.';o.innerHTML=h}<\/script></main><footer class="wt-foot"><a class="amh" href="https://artificialmindhive.com" style="margin:0 auto;justify-content:center"><span class="badge"><i class="ufo a"></i><i class="ufo b"></i><b>AMH</b></span></a><nav><a href="https://artificialmindhive.com/WT/">Walrus Tusk</a><a href="https://walohq.com/board/">Agent Board</a><a href="https://walohq.com/">WALO</a><a href="https://amhagentbook.com/">Agent Book</a><a href="https://artificialmindhive.com">Artificial Mind Hive</a></nav><div>Walrus Tusk by Artificial Mind Hive \xB7 your tokens stay encrypted and only touch your own accounts</div></footer></body></html>`;
 }
-
-// inbox.js — the agent inbox: one shared task board for Austin's agents (Grok, Claude, Jubber, Codex…).
-// Chat agents can't be woken from outside, so they PULL: "check your inbox" → my_tasks → claim_task →
-// do the work → finish_task. Always-on agents (Jubber on the PC) poll it. Austin posts from the board
-// page (/board), from any connected AI, and (later) WhatsApp. Owner/agent (admin) keys only.
-// KV: task:<id> (90-day TTL). finish_task can ping Austin on WhatsApp through the federated walo MCP.
-
-var INBOX_AGENTS = ["grok", "claude", "jubber", "codex", "owner", "any"];
+var INBOX_AGENTS = ["grok", "claude", "jubber", "codex", "gemini", "owner", "any"];
+var CLOUD_WAKE = ["grok", "austinsdoors", "claude", "codex", "gemini"];
+async function wakeCloudAgent(env, task) {
+  await runGithubTool("repo_commit_push", { repo: "pain2hustle/amhicle", branch: "agent/dispatch", message: "wake for " + task.id, files: [{ path: "wake.txt", content: new Date().toISOString() + " " + task.id }] }, env, "board").catch(() => null);
+}
 var INBOX_TTL = 60 * 60 * 24 * 90;
-
 function inboxId() {
   const r = crypto.getRandomValues(new Uint8Array(4));
   return Date.now().toString(36) + "-" + [...r].map((x) => x.toString(16).padStart(2, "0")).join("");
@@ -6031,164 +6002,242 @@ async function inboxAll(env) {
   const out = [];
   let cursor;
   for (let i = 0; i < 5; i++) {
-    const page = await kv.list({ prefix: "task:", cursor, limit: 1000 });
-    for (const k of page.keys) { const t = await kv.get(k.name, "json"); if (t) out.push(t); }
-    if (page.list_complete) break;
-    cursor = page.cursor;
+    const page2 = await kv.list({ prefix: "task:", cursor, limit: 1e3 });
+    for (const k of page2.keys) {
+      const t = await kv.get(k.name, "json");
+      if (t) out.push(t);
+    }
+    if (page2.list_complete) break;
+    cursor = page2.cursor;
   }
-  return out.sort((a, b) => (a.created < b.created ? 1 : -1));
+  return out.sort((a, b) => a.created < b.created ? 1 : -1);
 }
-async function inboxPut(env, t) { await env.CLOUDFLARE_OPS_OAUTH.put(`task:${t.id}`, JSON.stringify(t), { expirationTtl: INBOX_TTL }); }
+async function inboxPut(env, t) {
+  await env.CLOUDFLARE_OPS_OAUTH.put(`task:${t.id}`, JSON.stringify(t), { expirationTtl: INBOX_TTL });
+}
 async function inboxGet(env, id) {
   if (!/^[a-z0-9]+-[0-9a-f]{8}$/.test(String(id || ""))) throw new Error("bad task id");
   const t = await env.CLOUDFLARE_OPS_OAUTH.get(`task:${id}`, "json");
-  if (!t) throw new Error("no such task (done tasks expire after 90 days)");
+  if (!t) throw new Error("no such task");
   return t;
 }
-var inboxView = (t) => ({ id: t.id, to: t.to, from: t.from, status: t.status, text: t.text, created: t.created, claimed_by: t.claimed_by || null, claimed: t.claimed || null, finished: t.finished || null, result: t.result || null, notify: !!t.notify });
-
+var inboxView = (t) => ({ id: t.id, to: t.to, from: t.from, status: t.status, text: t.text, created: t.created, claimed_by: t.claimed_by || null, claimed: t.claimed || null, finished: t.finished || null, result: t.result || null, notify: !!t.notify, ...(t.receipt_only ? {receipt_only: true, details_removed_at: t.details_removed_at} : {}) });
 async function inboxNotify(env, t) {
   try {
     const out = await callFederated(env, "walo", "walo_notify", { template: "ping", text: `Task ${t.id} ${t.status} by ${t.claimed_by || t.to}: ${String(t.text).slice(0, 80)}` });
     return { whatsapp: out && !out.error ? "pinged" : "not sent", detail: out && (out.error || out.status || null) };
-  } catch (e) { return { whatsapp: "not sent", detail: String(e.message || e).slice(0, 120) }; }
+  } catch (e) {
+    return { whatsapp: "not sent", detail: String(e.message || e).slice(0, 120) };
+  }
 }
-
-
-// One isolated board instance in the existing SQLite namespace. Rate-limit instances
-// retain their original behavior. Board reads never list Workers KV.
 var INBOX_BOARD_NAME = "agent-task-board-v1";
-var INBOX_LEGACY_IDS = ["mv96v15c-41e53ec4","mv96vynp-1d7c71dc","mv99xhp2-a3153c61","mv98rt0s-dfbc684a","mv98rtff-be6634f2","mv96b3zy-8829a26a","mv96cx0i-f256714c"];
+var INBOX_LEGACY_IDS = ["mv96v15c-41e53ec4", "mv96vynp-1d7c71dc", "mv99xhp2-a3153c61", "mv98rt0s-dfbc684a", "mv98rtff-be6634f2", "mv96b3zy-8829a26a", "mv96cx0i-f256714c"];
 var INBOX_MIGRATION_AFTER = Date.parse("2026-10-16T00:02:00Z");
-function inboxNextDay() { return Math.floor(Date.now()/86400000)*86400000+86520000; }
+function inboxNextDay() {
+  return Math.floor(Date.now() / 864e5) * 864e5 + 8652e4;
+}
 async function inboxDurableCall(name, args, env, who) {
   const stub = env.RATE_LIMITER_DO.get(env.RATE_LIMITER_DO.idFromName(INBOX_BOARD_NAME));
   const r = await stub.fetch("https://internal/task-board", {
-    method: "POST", body: JSON.stringify({name, args, who})
+    method: "POST",
+    body: JSON.stringify({ name, args, who })
   });
   if (!r.ok) throw new Error("task board unavailable: " + r.status);
   const out = await r.json();
   if (name === "finish_task" && out.ok && out.task.notify) Object.assign(out, await inboxNotify(env, out.task));
   return out;
 }
+// WALO task detail retention: owner chose seven days on 2026-10-19.
+var INBOX_DETAIL_MS = 7 * 86400000;
+function inboxCompactTask(t, now = Date.now()) {
+  if (t.receipt_only || t.status !== 'done') return t;
+  const finished = Date.parse(t.finished);
+  if (!Number.isFinite(finished) || now - finished < INBOX_DETAIL_MS) return t;
+  const result = String(t.result || '');
+  // Legacy runners sometimes called a handoff or approval 'done'. Preserve
+  // these until a reviewer explicitly resolves the missing deliverable.
+  if (/not done|not complete|needs approval|awaiting approval|still pending|handed (?:off|to)|handoff:|couldn.t|could not|blocked/i.test(result)) return t;
+  const report = result.split(/Phone report:\s*/i).pop().replace(/\s+/g, ' ').trim();
+  const usage = result.match(/^\[usage\][^\n]{0,160}/m)?.[0] || '';
+  const links = [...new Set(result.match(/https?:\/\/[^\s<>"']+/g) || [])]
+    .filter(link => !/[?&](?:token|key|signature|sig|code)=/i.test(link)).slice(0, 4).map(link => link.slice(0, 300));
+  return {
+    id: t.id, to: t.to, from: t.from, status: t.status, created: t.created,
+    claimed_by: t.claimed_by || null, claimed: t.claimed || null, finished: t.finished,
+    text: String(t.text || '').replace(/\s+/g, ' ').slice(0, 160),
+    result: (usage ? usage + '\n' : '') + report.slice(0, 600) + (links.length ? '\nEvidence: ' + links.join(' ') : ''),
+    notify: !!t.notify, receipt_only: true, details_removed_at: new Date(now).toISOString()
+  };
+}
+async function inboxRetentionSweep(storage, now = Date.now()) {
+  return storage.transaction(async tx => {
+    const previous = await tx.get('board:retention') || {};
+    if (previous.next > now) return previous;
+    const entries = await tx.list({prefix: 'board:task:', limit: 200, ...(previous.cursor ? {startAfter: previous.cursor} : {})});
+    let compacted = 0;
+    for (const [key, entry] of entries) {
+      const task = inboxCompactTask(entry.task, now);
+      // Clear the old expiry on every record: unresolved work must not expire.
+      if (task !== entry.task || entry.expires != null) await tx.put(key, {task, expires: null});
+      if (task !== entry.task) compacted++;
+    }
+    const cursor = entries.size === 200 ? [...entries.keys()].pop() : null;
+    const status = {detail_days: 7, last_sweep: new Date(now).toISOString(), compacted: (previous.compacted || 0) + compacted,
+      cursor, next: now + (cursor ? 60000 : 86400000)};
+    await tx.put('board:retention', status);
+    return status;
+  });
+}
+async function inboxScheduleBoard(state) {
+  const retention = await state.storage.get('board:retention');
+  const migration = await state.storage.get('board:meta');
+  const next = Math.min(retention?.next || Date.now() + 1000,
+    migration?.migration === 'pending' ? migration.next : Infinity);
+  const alarm = await state.storage.getAlarm();
+  if (alarm == null || alarm > next) await state.storage.setAlarm(next);
+}
+async function inboxBoardAlarm(state, env, meta) {
+  try {
+    await inboxRetentionSweep(state.storage);
+    await inboxBoardMigrationAlarm(state, env, meta);
+  } finally {
+    await inboxScheduleBoard(state);
+  }
+}
+
 function inboxBoardKV(storage) {
   return {
-    async get(key) {
-      const entry = await storage.get("board:" + key);
+    async get(key2) {
+      const entry = await storage.get("board:" + key2);
       if (!entry) return null;
-      if (entry.expires <= Date.now()) { await storage.delete("board:" + key); return null; }
-      return entry.task;
+      const task = inboxCompactTask(entry.task);
+      if (task !== entry.task || entry.expires != null) await storage.put("board:" + key2, {task, expires: null});
+      return task;
     },
-    async put(key, value, options) {
-      await storage.put("board:" + key, {task: JSON.parse(value), expires: Date.now()+options.expirationTtl*1000});
+    async put(key2, value, options) {
+      await storage.put("board:" + key2, { task: JSON.parse(value), expires: null });
     },
     async list() {
-      const entries = await storage.list({prefix:"board:task:"});
-      const keys=[];
-      for (const [key, entry] of entries) {
-        if (entry.expires > Date.now()) keys.push({name:key.slice(6)});
-        else await storage.delete(key);
+      const entries = await storage.list({ prefix: "board:task:" });
+      const keys = [];
+      for (const [key2, entry] of entries) {
+        keys.push({ name: key2.slice(6) });
       }
-      return {keys, list_complete:true};
+      return { keys, list_complete: true };
     }
   };
 }
 async function inboxImport(storage, tasks) {
   for (const task of tasks) {
     if (!task || !/^[a-z0-9]+-[0-9a-f]{8}$/.test(task.id)) continue;
-    const key="board:task:"+task.id;
-    if (await storage.get(key)) continue; // Never overwrite a newer claim/result.
-    const stamp=Date.parse(task.finished || task.claimed || task.created);
-    const expires=stamp+INBOX_TTL*1000;
-    if (expires > Date.now()) await storage.put(key,{task,expires});
+    const key2 = "board:task:" + task.id;
+    if (await storage.get(key2)) continue;
+    await storage.put(key2, { task: inboxCompactTask(task), expires: null });
   }
 }
 async function inboxBoardInit(state, env) {
-  if (await state.storage.get("board:meta")) return;
-  // External I/O stays outside storage transactions and concurrency blocks.
-  const tasks=await Promise.all(INBOX_LEGACY_IDS.map(id=>env.CLOUDFLARE_OPS_OAUTH.get("task:"+id,"json")));
-  await state.storage.transaction(async tx=>{
+  if (await state.storage.get("board:meta")) { await inboxScheduleBoard(state); return; }
+  const tasks = await Promise.all(INBOX_LEGACY_IDS.map((id) => env.CLOUDFLARE_OPS_OAUTH.get("task:" + id, "json")));
+  await state.storage.transaction(async (tx) => {
     if (await tx.get("board:meta")) return;
-    await inboxImport(tx,tasks);
-    await tx.put("board:meta",{version:1,migration:"pending",pages:0,failures:0,
-      next:Math.max(INBOX_MIGRATION_AFTER,Date.now()+60000)});
+    await inboxImport(tx, tasks);
+    await tx.put("board:meta", {
+      version: 1,
+      migration: "pending",
+      pages: 0,
+      failures: 0,
+      next: Math.max(INBOX_MIGRATION_AFTER, Date.now() + 6e4)
+    });
   });
-  const meta=await state.storage.get("board:meta");
-  if (meta.migration==="pending" && !await state.storage.getAlarm()) await state.storage.setAlarm(meta.next);
+  const meta = await state.storage.get("board:meta");
+  await inboxScheduleBoard(state);
 }
 async function inboxBoardFetch(request, state, env) {
-  const body=await request.json();
-  if (!INBOX_TOOLS.has(body.name)) return Response.json({error:"unknown inbox tool"},{status:400});
-  await inboxBoardInit(state,env);
-  // An old task whose id is already known remains addressable before full backfill.
-  const id=body.args && body.args.id;
-  if (/^[a-z0-9]+-[0-9a-f]{8}$/.test(id || "") && !await state.storage.get("board:task:"+id)) {
-    const old=await env.CLOUDFLARE_OPS_OAUTH.get("task:"+id,"json");
-    if(old) await state.storage.transaction(tx=>inboxImport(tx,[old]));
+  const body = await request.json();
+  if (!INBOX_TOOLS.has(body.name)) return Response.json({ error: "unknown inbox tool" }, { status: 400 });
+  await inboxBoardInit(state, env);
+  const id = body.args && body.args.id;
+  if (/^[a-z0-9]+-[0-9a-f]{8}$/.test(id || "") && !await state.storage.get("board:task:" + id)) {
+    const old = await env.CLOUDFLARE_OPS_OAUTH.get("task:" + id, "json");
+    if (old) await state.storage.transaction((tx) => inboxImport(tx, [old]));
   }
-  const out=await state.storage.transaction(tx=>runInboxTool(body.name,body.args || {},
-    {INBOX_BOARD_LOCAL:true,CLOUDFLARE_OPS_OAUTH:inboxBoardKV(tx)},body.who));
-  if (body.name==="list_tasks" || body.name==="my_tasks") {
-    const meta=await state.storage.get("board:meta");
-    out.storage="durable-object";
-    out.legacy_history={status:meta.migration,pages:meta.pages,next:meta.next || null};
+  const out = await state.storage.transaction((tx) => runInboxTool(
+    body.name,
+    body.args || {},
+    { INBOX_BOARD_LOCAL: true, CLOUDFLARE_OPS_OAUTH: inboxBoardKV(tx) },
+    body.who
+  ));
+  if (body.name === "list_tasks" || body.name === "my_tasks") {
+    const meta = await state.storage.get("board:meta");
+    out.storage = "durable-object";
+    out.retention = {detail_days: 7, unresolved_expire: false, receipts: "compact", ...(await state.storage.get("board:retention") || {}), next_alarm: await state.storage.getAlarm()};
+    out.legacy_history = { status: meta.migration, pages: meta.pages, next: meta.next || null };
   }
   return Response.json(out);
 }
-async function inboxBoardAlarm(state, env, meta) {
-  if (meta.migration!=="pending") return;
-  if (Date.now()<meta.next) { await state.storage.setAlarm(meta.next); return; }
+async function inboxBoardMigrationAlarm(state, env, meta) {
+  if (meta.migration !== "pending") return;
+  if (Date.now() < meta.next) {
+    await state.storage.setAlarm(meta.next);
+    return;
+  }
   try {
-    // One bounded, resumable historical backfill, after the KV quota resets.
-    // This alarm never starts an AI agent, and stops when the backfill is done.
-    const page=await env.CLOUDFLARE_OPS_OAUTH.list({prefix:"task:",limit:25,cursor:meta.cursor});
-    const tasks=await Promise.all(page.keys.map(k=>env.CLOUDFLARE_OPS_OAUTH.get(k.name,"json")));
-    await state.storage.transaction(async tx=>{
-      await inboxImport(tx,tasks);
-      meta={...meta,pages:meta.pages+1,failures:0,cursor:page.cursor || null,
-        migration:page.list_complete?"complete":meta.pages>=199?"paused":"pending",
-        next:page.list_complete?null:Date.now()+60000};
-      await tx.put("board:meta",meta);
+    const page2 = await env.CLOUDFLARE_OPS_OAUTH.list({ prefix: "task:", limit: 25, cursor: meta.cursor });
+    const tasks = await Promise.all(page2.keys.map((k) => env.CLOUDFLARE_OPS_OAUTH.get(k.name, "json")));
+    await state.storage.transaction(async (tx) => {
+      await inboxImport(tx, tasks);
+      meta = {
+        ...meta,
+        pages: meta.pages + 1,
+        failures: 0,
+        cursor: page2.cursor || null,
+        migration: page2.list_complete ? "complete" : meta.pages >= 199 ? "paused" : "pending",
+        next: page2.list_complete ? null : Date.now() + 6e4
+      };
+      await tx.put("board:meta", meta);
     });
   } catch (e) {
-    meta={...meta,failures:meta.failures+1,migration:meta.failures>=2?"paused":"pending",
-      error:String(e.message || e).slice(0,160),next:inboxNextDay()};
-    await state.storage.put("board:meta",meta);
+    meta = {
+      ...meta,
+      failures: meta.failures + 1,
+      migration: meta.failures >= 2 ? "paused" : "pending",
+      error: String(e.message || e).slice(0, 160),
+      next: inboxNextDay()
+    };
+    await state.storage.put("board:meta", meta);
   }
-  if(meta.migration==="pending") await state.storage.setAlarm(meta.next);
+  if (meta.migration === "pending") await state.storage.setAlarm(meta.next);
 }
-
 async function runInboxTool(name, args, env, who) {
   try {
     if (!env.INBOX_BOARD_LOCAL) return await inboxDurableCall(name, args, env, who);
     if (name === "post_task") {
       const text = String(args.text || "").trim();
       if (!text) throw new Error("text required");
-      if (text.length > 4000) throw new Error("text over 4000 chars; link a Drive doc instead");
-      const t = { id: inboxId(), to: inboxAgent(args.to || "any", "to"), from: inboxAgent(args.from || who || "owner", "from"), text, status: "open", created: new Date().toISOString(), notify: args.notify !== false };
+      if (text.length > 4e3) throw new Error("text over 4000 chars; link a Drive doc instead");
+      const t = { id: inboxId(), to: inboxAgent(args.to || "any", "to"), from: inboxAgent(args.from || who || "owner", "from"), text, status: "open", created: (/* @__PURE__ */ new Date()).toISOString(), notify: args.notify !== false };
       await inboxPut(env, t);
       return { ok: true, task: inboxView(t), note: `Waiting for ${t.to}. Chat agents pick it up when someone says "check your inbox".` };
     }
     if (name === "my_tasks") {
       const agent = inboxAgent(args.agent || who, "agent");
       const all = await inboxAll(env);
-      const mine = all.filter((t) => (t.to === agent || t.to === "any") && (args.include_done ? true : t.status === "open" || (t.status === "claimed" && t.claimed_by === agent)));
-      return { agent, count: mine.length, tasks: mine.slice(0, 25).map(inboxView), how: "claim_task {id, agent} → do it → finish_task {id, agent, result}" };
+      const mine = all.filter((t) => (t.to === agent || t.to === "any") && (args.include_done ? true : t.status === "open" || t.status === "claimed" && t.claimed_by === agent));
+      return { agent, count: mine.length, tasks: mine.slice(0, 25).map(inboxView), how: "claim_task {id, agent} \u2192 do it \u2192 finish_task {id, agent, result}" };
     }
     if (name === "claim_task") {
       const agent = inboxAgent(args.agent || who, "agent");
       const t = await inboxGet(env, args.id);
       if (t.status === "done" || t.status === "failed") throw new Error(`task already ${t.status}`);
       if (t.status === "claimed" && t.claimed_by !== agent) throw new Error(`already claimed by ${t.claimed_by}`);
-      // This function runs inside the board Durable Object storage transaction.
-      // A claim is exclusive for 30 minutes, longer than the 25-minute task cap.
-      const recentClaim = (x) => x.status === "claimed" && !x.finished &&
-        (!Number.isFinite(Date.parse(x.claimed || x.created)) || Date.now() - Date.parse(x.claimed || x.created) < 30 * 60_000);
+      const recentClaim = (x) => x.status === "claimed" && !x.finished && (!Number.isFinite(Date.parse(x.claimed || x.created)) || Date.now() - Date.parse(x.claimed || x.created) < 30 * 6e4);
       if (recentClaim(t)) throw new Error(`task already running as ${agent}; wait for its result`);
-      const active = (await inboxAll(env)).find(x => x.id !== t.id && x.claimed_by === agent && recentClaim(x));
+      const active = (await inboxAll(env)).find((x) => x.id !== t.id && x.claimed_by === agent && recentClaim(x));
       if (active) throw new Error(`${agent} is already running task ${active.id}; this task stays queued`);
       if (t.to !== "any" && t.to !== agent) throw new Error(`task is for ${t.to}, not ${agent}`);
-      t.status = "claimed"; t.claimed_by = agent; t.claimed = new Date().toISOString();
+      t.status = "claimed";
+      t.claimed_by = agent;
+      t.claimed = (/* @__PURE__ */ new Date()).toISOString();
       await inboxPut(env, t);
       return { ok: true, task: inboxView(t) };
     }
@@ -6198,8 +6247,9 @@ async function runInboxTool(name, args, env, who) {
       if (t.status === "done" || t.status === "failed") throw new Error(`task already ${t.status}`);
       if (t.claimed_by && t.claimed_by !== agent) throw new Error(`claimed by ${t.claimed_by}`);
       t.status = args.failed === true ? "failed" : "done";
-      t.claimed_by = agent; t.finished = new Date().toISOString();
-      t.result = String(args.result || "").slice(0, 8000);
+      t.claimed_by = agent;
+      t.finished = (/* @__PURE__ */ new Date()).toISOString();
+      t.result = String(args.result || "").slice(0, 8e3);
       await inboxPut(env, t);
       const ping = t.notify && !env.INBOX_BOARD_LOCAL ? await inboxNotify(env, t) : { whatsapp: t.notify ? "pending outer notification" : "off for this task" };
       return { ok: true, task: inboxView(t), ...ping };
@@ -6212,37 +6262,33 @@ async function runInboxTool(name, args, env, who) {
     if (name === "cancel_task") {
       const t = await inboxGet(env, args.id);
       if (t.status === "done") throw new Error("already done");
-      t.status = "failed"; t.result = "cancelled: " + String(args.reason || "").slice(0, 300); t.finished = new Date().toISOString();
+      t.status = "failed";
+      t.result = "cancelled: " + String(args.reason || "").slice(0, 300);
+      t.finished = (/* @__PURE__ */ new Date()).toISOString();
       await inboxPut(env, t);
       return { ok: true, task: inboxView(t) };
     }
-  } catch (e) { return { error: String((e && e.message) || e).slice(0, 600) }; }
+  } catch (e) {
+    return { error: String(e && e.message || e).slice(0, 600) };
+  }
   return { error: "unknown inbox tool" };
 }
-
-// email_austin — any agent (owner/agent keys) can email Austin a result, a link or a file link.
-// Goes out through the agent-mail Worker over a service binding (AGENT_MAIL -> agent-mail), which
-// sends via Resend as jubber@artificialmindhive.com. agent-mail treats the binding hostname
-// "agent-mail" as internal, so no admin token travels through the hub. agent-mail also rate-limits
-// (30 sends / 10 min) so a looping agent cannot drain the day's quota.
-// 2026-10-17: Austin asked "gen me a cosmo vid then email me it" and no agent had a sender.
-
 var EMAIL_AUSTIN_TO = ["pain2hustle@gmail.com", "austinsdoors1@gmail.com"];
-var EMAIL_AUSTIN_MAX = 20000;
-
+var EMAIL_AUSTIN_MAX = 2e4;
 var EMAIL_TOOL_DEFS = [
-  { name: "email_austin",
+  {
+    name: "email_austin",
     description: "Email Austin a result: a short note, a link (preview URL, PR, file), or a report. Plain text; keep it short and put links on their own lines. Use it when Austin says 'email me', or to deliver something that does not fit WhatsApp. Owner/agent keys only.",
     inputSchema: { type: "object", properties: {
       subject: { type: "string", description: "short subject, no prefix needed" },
       text: { type: "string", description: "the body, plain text (max 20k chars)" },
       link: { type: "string", description: "optional URL put on its own line at the end" },
       from_agent: { type: "string", description: "your name, e.g. grok, codex, claude, jubber" },
-      html: { type: "string", description: "optional HTML body (text is still required)" },
-    }, required: ["subject", "text"] } },
+      html: { type: "string", description: "optional HTML body (text is still required)" }
+    }, required: ["subject", "text"] }
+  }
 ];
 var EMAIL_TOOLS = new Set(EMAIL_TOOL_DEFS.map((t) => t.name));
-
 async function runEmailTool(name, args, env, who) {
   if (name !== "email_austin") return { error: "unknown email tool" };
   if (!env.AGENT_MAIL || typeof env.AGENT_MAIL.fetch !== "function") return { error: "email_austin is not wired on this deployment (service binding AGENT_MAIL -> agent-mail missing)" };
@@ -6253,35 +6299,285 @@ async function runEmailTool(name, args, env, who) {
   const link = String(args.link || "").trim();
   if (link && !/^https?:\/\/\S+$/i.test(link)) return { error: "link must be a full http(s) URL" };
   const from = String(args.from_agent || who || "an AMH agent").replace(/[^\w .-]/g, "").slice(0, 40) || "an AMH agent";
-  const body = text + (link ? "\n\n" + link : "") + "\n\n— " + from + " via the Walrus Tusk hub";
+  const body = text + (link ? "\n\n" + link : "") + "\n\n\u2014 " + from + " via the Walrus Tusk hub";
   let res, j;
   try {
     res = await env.AGENT_MAIL.fetch("https://agent-mail/send", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ agent: "jubber", to: EMAIL_AUSTIN_TO, subject: "[AMH] " + subject, text: body, html: args.html ? String(args.html) : undefined, replyTo: "austin@walohq.com" }),
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ agent: "jubber", to: EMAIL_AUSTIN_TO, subject: "[AMH] " + subject, text: body, html: args.html ? String(args.html) : void 0, replyTo: "austin@walohq.com" })
     });
     j = await res.json().catch(() => ({}));
-  } catch (e) { return { error: "agent-mail unreachable: " + String((e && e.message) || e).slice(0, 200) }; }
+  } catch (e) {
+    return { error: "agent-mail unreachable: " + String(e && e.message || e).slice(0, 200) };
+  }
   if (!res.ok || !j.sent) return { error: "not sent", status: res.status, detail: j.error || j.detail || null };
   return { ok: true, sent: true, to: EMAIL_AUSTIN_TO, subject: "[AMH] " + subject, from: j.from || "jubber@artificialmindhive.com", providerId: j.providerId || null };
 }
+// worker_patch (2026-10-21, Austin + dot's brief): land an exact code patch on an allow-listed Worker straight through
+// the Cloudflare API, no GitHub runner and no AI in the deploy step.
+//   worker_patch_grant  -> a short-lived, single-use grant bound to caller, script, operation, request id and patch hash
+//   worker_patch        -> verifies the grant, claims it ONCE (Durable Object = atomic), checks live == latest == repo,
+//                          uploads a version, checks it on its preview URL, sends 100% traffic, checks live, rolls back
+//                          on failure, syncs the repo file ([skip ci]) and keeps a receipt
+//   worker_patch_status -> the receipt for a request id (needs a key like every hub call)
+var WP_SCRIPTS = {
+  "amh-site-revival-proxy": { account: "0ebf6d65d7a9ddccd41cba0b8bd1414c", subdomain: "pain2hustle1", repo: "pain2hustle1/Amhsitereviver", path: "workers/amh-site-proxy/index.js",
+    live: "https://www.amhsiterevival.com", previewChecks: [["/", "<title"], ["/insights", "<title"], ["/fieldscan/", "<title"], ["/api/te?op=quotes&syms=SPY", '"price"']],
+    liveChecks: [["/", "<title"], ["/tradingexpert", "<title"], ["/api/public-config", "{"], ["/api/te?op=quotes&syms=SPY", '"price"']] },
+  "wp-test": { account: "0ebf6d65d7a9ddccd41cba0b8bd1414c", subdomain: "pain2hustle1", repo: null, path: null,
+    live: "https://wp-test.pain2hustle1.workers.dev", previewChecks: [["/", "wp-test"]], liveChecks: [["/", "wp-test"]] },
+};
+var WP_GRANT_TTL = 600;
+var WP_TOOL_DEFS = [
+  { name: "worker_patch_grant", description: "Step 1 of landing server code on an allow-listed Worker (" + Object.keys(WP_SCRIPTS).join(", ") + "): get a single-use grant for this exact patch (expires in 10 min). Same script/edits/request_id go to worker_patch.",
+    inputSchema: { type: "object", properties: { script: { type: "string" }, request_id: { type: "string", description: "unique, a-z0-9-, 8-80" }, edits: { type: "array", items: { type: "object", properties: { find: { type: "string" }, replace: { type: "string" }, count: { type: "number" } }, required: ["find", "replace"] } } }, required: ["script", "request_id", "edits"] } },
+  { name: "worker_patch", description: "Step 2: land the patch. dry_run:true shows what would change and uses nothing. Live code must equal the latest version and the repo file, or it refuses. Checks the new version on its preview URL, goes live, checks live, rolls back by itself on failure, syncs the repo. Same request_id again returns the first receipt.",
+    inputSchema: { type: "object", properties: { grant: { type: "string" }, script: { type: "string" }, request_id: { type: "string" }, edits: { type: "array", items: { type: "object" } }, base_version: { type: "string", description: "optional: the live version you read; refuses if it changed" }, dry_run: { type: "boolean" } }, required: ["grant", "script", "request_id", "edits"] } },
+  { name: "worker_patch_sync", description: "Owner: put the repo's main file for an allow-listed Worker live exactly as written (preview check, live check, rollback). Needed once, or after someone deployed another way. dry_run defaults to true.",
+    inputSchema: { type: "object", properties: { script: { type: "string" }, dry_run: { type: "boolean" } }, required: ["script"] } },
+  { name: "worker_patch_status", description: "Receipt for a worker_patch request id (state, versions, checks, rollback, repo commit).",
+    inputSchema: { type: "object", properties: { request_id: { type: "string" } }, required: ["request_id"] } },
+];
+var WP_TOOLS = new Set(WP_TOOL_DEFS.map((t) => t.name));
+var wpEnc = new TextEncoder();
+var wpB64u = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+var wpUnb64u = (s) => Uint8Array.from(atob(String(s).replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+async function wpSha(text) { return [...new Uint8Array(await crypto.subtle.digest("SHA-256", wpEnc.encode(text)))].map((b) => b.toString(16).padStart(2, "0")).join(""); }
+async function wpKey(env) {
+  if (!env.MCP_ACCESS_KEY) throw new Error("hub has no signing secret");
+  const base = await crypto.subtle.importKey("raw", wpEnc.encode(env.MCP_ACCESS_KEY), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const derived = await crypto.subtle.sign("HMAC", base, wpEnc.encode("worker-patch-grant-v1"));
+  return crypto.subtle.importKey("raw", derived, { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+}
+function wpNorm(args) {
+  const script = String(args.script || "").trim(), rid = String(args.request_id || "").trim();
+  if (!WP_SCRIPTS[script]) throw new Error("script not allowed; allowed: " + Object.keys(WP_SCRIPTS).join(", "));
+  if (!/^[a-z0-9][a-z0-9-]{7,79}$/.test(rid)) throw new Error("request_id must be a-z0-9-, 8-80 chars");
+  const edits = Array.isArray(args.edits) ? args.edits : [];
+  if (!edits.length || edits.length > 20) throw new Error("1-20 edits");
+  const clean = edits.map((e) => {
+    if (!e || typeof e.find !== "string" || !e.find || typeof e.replace !== "string") throw new Error("each edit needs find + replace text");
+    return { find: e.find, replace: e.replace, count: Number(e.count) || 1 };
+  });
+  return { script, rid, edits: clean };
+}
+var wpPatchSha = (n) => wpSha(JSON.stringify({ script: n.script, edits: n.edits.map((e) => [e.find, e.replace, e.count]) }));
+async function wpLedger(env, body) {
+  const stub = env.RATE_LIMITER_DO.get(env.RATE_LIMITER_DO.idFromName("worker-patch-ledger"));
+  const r = await stub.fetch("https://ledger/worker-patch", { method: "POST", body: JSON.stringify(body) });
+  return r.json();
+}
+// Runs inside the Durable Object: one request at a time, so a grant can only be claimed once.
+async function wpLedgerFetch(request, state) {
+  const b = await request.json(), st = state.storage;
+  if (b.action === "claim") {
+    const old = await st.get("rid:" + b.rid);
+    if (old) return Response.json(old.sha === b.sha ? { existing: old } : { error: "request_id was already used for a different patch" });
+    if (await st.get("jti:" + b.jti)) return Response.json({ error: "grant already used" });
+    const lock = await st.get("lock:" + b.script);
+    if (lock && Date.now() - lock.at < 10 * 60e3) return Response.json({ error: "another patch is landing on " + b.script + " (" + lock.rid + "), try again in a few minutes" });
+    const rec = { request_id: b.rid, script: b.script, sha: b.sha, actor: b.actor, state: "accepted", accepted_at: new Date().toISOString() };
+    await st.put("jti:" + b.jti, { rid: b.rid, at: Date.now() });
+    await st.put("rid:" + b.rid, rec);
+    await st.put("lock:" + b.script, { rid: b.rid, at: Date.now() });
+    return Response.json({ claimed: rec });
+  }
+  if (b.action === "update") {
+    const rec = { ...(await st.get("rid:" + b.rid) || {}), ...b.patch };
+    await st.put("rid:" + b.rid, rec);
+    if (b.release) await st.delete("lock:" + rec.script);
+    return Response.json({ ok: true });
+  }
+  if (b.action === "get") return Response.json({ record: await st.get("rid:" + b.rid) || null });
+  return Response.json({ error: "bad action" }, { status: 400 });
+}
+async function wpGrant(env, args, actor) {
+  const n = wpNorm(args), sha = await wpPatchSha(n), now = Math.floor(Date.now() / 1e3);
+  const ttl = Math.min(Math.max(Number(args.ttl_seconds) || WP_GRANT_TTL, 5), WP_GRANT_TTL);
+  const claims = { v: 1, aud: "worker_patch", op: "deploy", sub: String(actor || "admin"), script: n.script, rid: n.rid, sha, jti: crypto.randomUUID(), iat: now, exp: now + ttl };
+  const body = wpB64u(wpEnc.encode(JSON.stringify(claims)));
+  const sig = wpB64u(await crypto.subtle.sign("HMAC", await wpKey(env), wpEnc.encode(body)));
+  return { grant: body + "." + sig, patch_sha256: sha, request_id: n.rid, script: n.script, expires_at: new Date(claims.exp * 1e3).toISOString(), next: "call worker_patch with this grant and the SAME script, request_id and edits" };
+}
+async function wpVerify(env, grant, n, sha, actor) {
+  const [body, sig] = String(grant || "").split(".");
+  if (!body || !sig) throw new Error("grant missing or malformed");
+  if (!await crypto.subtle.verify("HMAC", await wpKey(env), wpUnb64u(sig), wpEnc.encode(body))) throw new Error("grant signature invalid");
+  const c = JSON.parse(new TextDecoder().decode(wpUnb64u(body)));
+  if (c.v !== 1 || c.aud !== "worker_patch" || c.op !== "deploy") throw new Error("grant is not for worker_patch");
+  if (c.exp < Math.floor(Date.now() / 1e3)) throw new Error("grant expired");
+  if (c.sub !== String(actor || "admin")) throw new Error("grant belongs to a different caller");
+  if (c.script !== n.script) throw new Error("grant is for a different script");
+  if (c.rid !== n.rid) throw new Error("grant is for a different request_id");
+  if (c.sha !== sha) throw new Error("patch differs from the one the grant was issued for");
+  return c;
+}
+async function wpCf(env, acct, path, init = {}) {
+  const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acct}/workers/scripts/${path}`, { ...init, headers: { authorization: "Bearer " + env.CLOUDFLARE_API_TOKEN, ...(init.headers || {}) } });
+  return r;
+}
+async function wpCfJson(env, acct, path, init) {
+  const r = await wpCf(env, acct, path, init), j = await r.json().catch(() => ({}));
+  if (!r.ok || j.success === false) throw new Error(`Cloudflare ${path.split("?")[0]}: ${r.status} ${(j.errors || []).map((e) => e.message).join("; ").slice(0, 200)}`);
+  return j.result;
+}
+async function wpChecks(base, checks) {
+  const out = [];
+  for (const [p, want] of checks) {
+    let code = 0, ok = false;
+    try { const r = await fetch(base + p, { headers: { "user-agent": "Mozilla/5.0 (amh-worker-patch-check)" }, redirect: "manual" }); code = r.status; ok = code === 200 && (await r.text()).toLowerCase().includes(want.toLowerCase()); } catch {}
+    out.push({ path: p, status: code, ok });
+  }
+  return { ok: out.every((c) => c.ok), checks: out };
+}
+async function wpLiveState(env, s, name) {
+  const dep = await wpCfJson(env, s.account, name + "/deployments");
+  const cur = (dep.deployments || [])[0];
+  if (!cur || cur.versions.length !== 1 || cur.versions[0].percentage !== 100) throw new Error("live traffic is split across versions; finish that first");
+  const active = cur.versions[0].version_id;
+  // The code of the version that is actually serving (uploads that never went live don't matter).
+  const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${s.account}/workers/workers/${name}/versions/${active}?include=modules`, { headers: { authorization: "Bearer " + env.CLOUDFLARE_API_TOKEN } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.success) throw new Error("could not read the live version's code: " + r.status);
+  const mods = j.result.modules || [], main = j.result.main_module || (mods[0] && mods[0].name);
+  if (mods.length !== 1 || !main) throw new Error("live version has " + mods.length + " modules; only single-file Workers are supported");
+  const code = new TextDecoder().decode(Uint8Array.from(atob(mods[0].content_base64), (c) => c.charCodeAt(0)));
+  return { active, code: code.replace(/\r\n/g, "\n"), mainName: main };
+}
+function wpApply(code, edits) {
+  let out = code;
+  for (const e of edits) {
+    const n = out.split(e.find).length - 1;
+    if (n !== e.count) throw new Error(`find occurs ${n} time(s), expected ${e.count}: ${e.find.slice(0, 80)}`);
+    out = out.split(e.find).join(e.replace);
+  }
+  if (out === code) throw new Error("patch changes nothing");
+  if (out.length > 9e5) throw new Error("result too large");
+  return out;
+}
+async function wpRun(env, args, actor) {
+  const n = wpNorm(args), s = WP_SCRIPTS[n.script], sha = await wpPatchSha(n);
+  const claims = await wpVerify(env, args.grant, n, sha, actor);
+  // A repeat of a request that was already accepted gets its receipt back, even after the code changed.
+  const seen = (await wpLedger(env, { action: "get", rid: n.rid })).record;
+  if (seen) return seen.sha === sha ? { already_handled: true, receipt: seen } : { error: "request_id was already used for a different patch" };
+  const live = await wpLiveState(env, s, n.script);
+  if (args.base_version && !live.active.startsWith(String(args.base_version))) throw new Error("live version is " + live.active + ", not the base_version you read");
+  let repoFile = null;
+  if (s.repo) {
+    const meta = await gh(env, "GET", `/repos/${s.repo}/contents/${s.path}?ref=main`);
+    repoFile = { sha: meta.sha, text: new TextDecoder().decode(await gh(env, "GET", `/repos/${s.repo}/contents/${s.path}?ref=main`, null, "application/vnd.github.raw")).replace(/\r\n/g, "\n") };
+    if (repoFile.text.trim() !== live.code.trim()) throw new Error(`live code differs from ${s.repo}/${s.path} on main (someone deployed another way, or the repo moved on). The owner runs worker_patch_sync once, then patch again.`);
+  }
+  const next = wpApply(live.code, n.edits);
+  if (args.dry_run === true) return { dry_run: true, script: n.script, request_id: n.rid, patch_sha256: sha, live_version: live.active, bytes_before: live.code.length, bytes_after: next.length, edits: n.edits.length, grant_used: false, next: "call again without dry_run (same grant) to land it" };
+  const claim = await wpLedger(env, { action: "claim", rid: n.rid, jti: claims.jti, sha, script: n.script, actor: String(actor || "admin") });
+  if (claim.error) throw new Error(claim.error);
+  if (claim.existing) return { already_handled: true, receipt: claim.existing };
+  return wpShip(env, s, n.script, n.rid, live, next, { base_version: live.active, patch_sha256: sha }, repoFile);
+}
+async function wpShip(env, s, script, rid, live, next, base, repoFile) {
+  const n = { script, rid };
+  const upd = (patch, release) => wpLedger(env, { action: "update", rid, patch, release });
+  const rec = { ...base, state: "uploading" };
+  await upd(rec);
+  try {
+    const settings = await wpCfJson(env, s.account, n.script + "/settings");
+    const keep = [...new Set((settings.bindings || []).map((b) => b.type))];
+    const msg = "worker_patch " + n.rid;
+    const form = new FormData();
+    form.append("metadata", new Blob([JSON.stringify({ main_module: live.mainName, compatibility_date: settings.compatibility_date, compatibility_flags: settings.compatibility_flags || [], bindings: [], keep_bindings: keep, annotations: { "workers/message": msg, "workers/tag": n.rid.slice(0, 50) } })], { type: "application/json" }));
+    form.append(live.mainName, new Blob([next], { type: "application/javascript+module" }), live.mainName);
+    const ver = await wpCfJson(env, s.account, n.script + "/versions", { method: "POST", body: form });
+    rec.new_version = ver.id;
+    const preview = `https://${ver.id.slice(0, 8)}-${n.script}.${s.subdomain}.workers.dev`;
+    rec.preview = await wpChecks(preview, s.previewChecks);
+    if (!rec.preview.ok) { Object.assign(rec, { state: "refused_preview_failed", finished_at: new Date().toISOString(), live_changed: false }); await upd(rec, true); return rec; }
+    const dep = await wpCfJson(env, s.account, n.script + "/deployments", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ strategy: "percentage", versions: [{ version_id: ver.id, percentage: 100 }], annotations: { "workers/message": msg } }) });
+    rec.deployment_id = dep.id; rec.rollback_to = live.active; rec.state = "live_checking";
+    await upd(rec);
+    await new Promise((r) => setTimeout(r, 3e3));
+    rec.live = await wpChecks(s.live, s.liveChecks);
+    if (!rec.live.ok) {
+      const back = await wpCfJson(env, s.account, n.script + "/deployments", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ strategy: "percentage", versions: [{ version_id: live.active, percentage: 100 }], annotations: { "workers/message": "worker_patch rollback " + n.rid } }) });
+      Object.assign(rec, { state: "rolled_back_live_check_failed", rollback_deployment_id: back.id, finished_at: new Date().toISOString() });
+      await upd(rec, true); return rec;
+    }
+    rec.state = "live";
+    if (s.repo && repoFile) {
+      try {
+        const c = await gh(env, "PUT", `/repos/${s.repo}/contents/${s.path}`, { message: `worker_patch ${n.rid}: synced from live version ${ver.id.slice(0, 8)} [skip ci]`, content: btoa(String.fromCharCode(...wpEnc.encode(next))), sha: repoFile.sha, branch: "main" });
+        rec.repo_commit = c.commit && c.commit.sha;
+      } catch (e) { rec.repo_sync_error = String(e.message || e).slice(0, 200); rec.state = "live_repo_not_synced"; }
+    }
+    rec.finished_at = new Date().toISOString();
+    await upd(rec, true);
+    return rec;
+  } catch (e) {
+    Object.assign(rec, { state: rec.deployment_id ? "error_after_deploy_check_live" : "error_nothing_live", error: String(e.message || e).slice(0, 300), finished_at: new Date().toISOString() });
+    await upd(rec, true);
+    return rec;
+  }
+}
+// One-time (or after a deploy made another way): put the repo's main file live verbatim, same checks + rollback.
+async function wpSync(env, args, actor) {
+  const script = String(args.script || ""), s = WP_SCRIPTS[script];
+  if (!s || !s.repo) throw new Error("script not allowed or has no repo");
+  const meta = await gh(env, "GET", `/repos/${s.repo}/contents/${s.path}?ref=main`);
+  const text = new TextDecoder().decode(await gh(env, "GET", `/repos/${s.repo}/contents/${s.path}?ref=main`, null, "application/vnd.github.raw")).replace(/\r\n/g, "\n");
+  const live = await wpLiveState(env, s, script);
+  if (live.code.trim() === text.trim()) return { in_sync: true, live_version: live.active };
+  const sha = await wpSha(text), rid = "sync-" + sha.slice(0, 12) + "-" + live.active.slice(0, 8);
+  if (args.dry_run !== false) return { dry_run: true, script, live_version: live.active, repo_file_sha: meta.sha, bytes_live: live.code.length, bytes_repo: text.length, next: "call again with dry_run:false to put the repo file live" };
+  const claim = await wpLedger(env, { action: "claim", rid, jti: "sync-" + crypto.randomUUID(), sha, script, actor: String(actor || "admin") });
+  if (claim.error) throw new Error(claim.error);
+  if (claim.existing) return { already_handled: true, receipt: claim.existing };
+  return wpShip(env, s, script, rid, live, text, { base_version: live.active, repo_file_sha: meta.sha, kind: "sync" }, null);
+}
+async function runWorkerPatchTool(name, args, env, actor) {
+  try {
+    if (name === "worker_patch_sync") return await wpSync(env, args, actor);
+    if (name === "worker_patch_grant") return await wpGrant(env, args, actor);
+    if (name === "worker_patch") return await wpRun(env, args, actor);
+    if (name === "worker_patch_status") {
+      const rid = String(args.request_id || "");
+      if (!/^[a-z0-9][a-z0-9-]{7,79}$/.test(rid)) throw new Error("bad request_id");
+      const r = await wpLedger(env, { action: "get", rid });
+      return r.record ? { receipt: r.record } : { receipt: null, note: "no such request (never claimed)" };
+    }
+  } catch (e) { return { error: String(e && e.message || e).slice(0, 400) }; }
+}
 
 var INBOX_TOOL_DEFS = [
-  { name: "my_tasks", description: "Check your inbox: open tasks for you (or for 'any'). Run this when Austin says 'check your inbox'. Then claim_task → do the work → finish_task.",
-    inputSchema: { type: "object", properties: { agent: { type: "string", description: "your name: grok, claude, jubber, codex" }, include_done: { type: "boolean" } }, required: ["agent"] } },
-  { name: "post_task", description: "Give a task to another agent (or yourself later) on the shared AMH agent board. to: grok | claude | jubber | codex | owner (Austin) | any.",
-    inputSchema: { type: "object", properties: { to: { type: "string" }, text: { type: "string" }, from: { type: "string", description: "your name" }, notify: { type: "boolean", description: "WhatsApp-ping Austin when it's finished (default true)" } }, required: ["to", "text", "from"] } },
-  { name: "claim_task", description: "Claim an inbox task before working on it, so no other agent does it twice.",
-    inputSchema: { type: "object", properties: { id: { type: "string" }, agent: { type: "string" } }, required: ["id", "agent"] } },
-  { name: "finish_task", description: "Mark an inbox task done (or failed=true) with a short result: what you did, links, deployment ids. Pings Austin on WhatsApp if the task asked for it.",
-    inputSchema: { type: "object", properties: { id: { type: "string" }, agent: { type: "string" }, result: { type: "string" }, failed: { type: "boolean" } }, required: ["id", "agent", "result"] } },
-  { name: "list_tasks", description: "The whole agent board: every task, optionally by status (open/claimed/done/failed) or by who it's for.",
-    inputSchema: { type: "object", properties: { status: { type: "string" }, to: { type: "string" }, limit: { type: "number" } } } },
-  { name: "cancel_task", description: "Cancel an open or claimed task.", inputSchema: { type: "object", properties: { id: { type: "string" }, reason: { type: "string" } }, required: ["id"] } },
+  {
+    name: "my_tasks",
+    description: "Check your inbox: open tasks for you (or for 'any'). Run this when Austin says 'check your inbox'. Then claim_task \u2192 do the work \u2192 finish_task.",
+    inputSchema: { type: "object", properties: { agent: { type: "string", description: "your name: grok, claude, jubber, codex" }, include_done: { type: "boolean" } }, required: ["agent"] }
+  },
+  {
+    name: "post_task",
+    description: "Give a task to another agent (or yourself later) on the shared AMH agent board. to: grok | claude | jubber | codex | owner (Austin) | any.",
+    inputSchema: { type: "object", properties: { to: { type: "string" }, text: { type: "string" }, from: { type: "string", description: "your name" }, notify: { type: "boolean", description: "WhatsApp-ping Austin when it's finished (default true)" } }, required: ["to", "text", "from"] }
+  },
+  {
+    name: "claim_task",
+    description: "Claim an inbox task before working on it, so no other agent does it twice.",
+    inputSchema: { type: "object", properties: { id: { type: "string" }, agent: { type: "string" } }, required: ["id", "agent"] }
+  },
+  {
+    name: "finish_task",
+    description: "Mark an inbox task done (or failed=true) with a short result: what you did, links, deployment ids. Pings Austin on WhatsApp if the task asked for it.",
+    inputSchema: { type: "object", properties: { id: { type: "string" }, agent: { type: "string" }, result: { type: "string" }, failed: { type: "boolean" } }, required: ["id", "agent", "result"] }
+  },
+  {
+    name: "list_tasks",
+    description: "The whole agent board: every task, optionally by status (open/claimed/done/failed) or by who it's for.",
+    inputSchema: { type: "object", properties: { status: { type: "string" }, to: { type: "string" }, limit: { type: "number" } } }
+  },
+  { name: "cancel_task", description: "Cancel an open or claimed task.", inputSchema: { type: "object", properties: { id: { type: "string" }, reason: { type: "string" } }, required: ["id"] } }
 ];
 var INBOX_TOOLS = new Set(INBOX_TOOL_DEFS.map((t) => t.name));
-
-// ---------- /board: Austin's command board (owner/agent keys) ----------
 async function inboxHandleHttp(request, env, url) {
   const p = url.pathname.replace(/\/+$/, "");
   if (p !== "/board" && p !== "/board/api") return null;
@@ -6293,13 +6589,14 @@ async function inboxHandleHttp(request, env, url) {
   const body = await request.json().catch(() => ({}));
   const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json", "cache-control": "no-store", ...cors } });
   if (body.action === "public") return J(await boardPublicFeed(env));
-  const auth = await authorizeConnector(env, String(body.key || "").trim());
+  const boardKey = String(body.key || "").trim();
+  const auth = env.WALO_BOARD_KEY && boardKey && await timingSafeEqual(boardKey, env.WALO_BOARD_KEY) ? { ok: true, mode: "admin", caller: "walo", connectionId: null } : await authorizeConnector(env, boardKey);
   if (!auth.ok || auth.mode !== "admin") return J({ error: "wrong key" }, 401);
   if (body.action === "list") return J(await runInboxTool("list_tasks", { limit: 100 }, env, "owner"));
   if (body.action === "post") {
     const posted = await runInboxTool("post_task", { to: body.to, text: body.text, from: "owner", notify: body.notify !== false }, env, "owner");
-    if (posted && posted.task && ["grok", "austinsdoors", "claude", "codex"].includes(posted.task.to)) {
-      await runGithubTool("repo_commit_push", { repo: "pain2hustle/amhicle", branch: "agent/dispatch", message: "wake for " + posted.task.id, files: [{ path: "wake.txt", content: new Date().toISOString() + " " + posted.task.id }] }, env, "board").catch(() => null);
+    if (posted && posted.task && CLOUD_WAKE.includes(posted.task.to)) {
+      await runGithubTool("repo_commit_push", { repo: "pain2hustle/amhicle", branch: "agent/dispatch", message: "wake for " + posted.task.id, files: [{ path: "wake.txt", content: (/* @__PURE__ */ new Date()).toISOString() + " " + posted.task.id }] }, env, "board").catch(() => null);
     }
     return J(posted);
   }
@@ -6309,7 +6606,6 @@ async function inboxHandleHttp(request, env, url) {
 async function boardPublicFeed(env) {
   const all = await runInboxTool("list_tasks", { limit: 100 }, env, "public");
   if (all.error) return { error: "Task board unavailable", tasks: null, today: null };
-
   const kind = (t) => {
     const x = String(t.text || "");
     if (/^\[poem\]/.test(x) || t.from === "poem") return "poem line";
@@ -6324,52 +6620,732 @@ async function boardPublicFeed(env) {
   const day = new Date(Date.now() - 864e5).toISOString();
   return { tasks, today: { jobs: tasks.filter((t) => t.created > day).length, done: tasks.filter((t) => t.created > day && t.status === "done").length, working: tasks.filter((t) => t.status === "claimed").length } };
 }
-function inboxBoardPage() {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Agent Board — AMH</title><style>
-:root{--bg:#07080b;--card:#11131a;--line:#262a36;--gold:#e8b64c;--gold2:#ffd27a;--ink:#f3f1ea;--mut:#9aa0ad;--ok:#5fd38d;--bad:#ff6b6b;--run:#6fb7ff}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}main{max-width:720px;margin:0 auto;padding:20px 16px 60px}
-h1{font-size:24px;margin:0 0 2px}h1 b{color:var(--gold)}.sub{color:var(--mut);margin:0 0 16px;font-size:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0}
-select,textarea,input{width:100%;background:#0b0d12;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font:14px system-ui}textarea{min-height:80px;resize:vertical}
-.row{display:flex;gap:8px;margin-bottom:8px}.row>*{flex:1}button{padding:12px 14px;border:0;border-radius:10px;background:linear-gradient(180deg,var(--gold2),var(--gold));color:#1a1405;font-weight:700;font-size:15px;width:100%}
-.t{border-top:1px solid var(--line);padding:10px 0}.t:first-child{border-top:0}.meta{font-size:12px;color:var(--mut)}.st{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:2px 8px;border-radius:99px;border:1px solid var(--line)}
-.open{color:var(--gold2)}.claimed{color:var(--run)}.done{color:var(--ok)}.failed{color:var(--bad)}.res{white-space:pre-wrap;background:#0b0d12;border-radius:8px;padding:8px;margin-top:6px;font-size:13px}.x{background:none;color:var(--mut);width:auto;padding:0;font-size:12px;font-weight:400;text-decoration:underline}
-</style></head><body><main><h1>Agent <b>Board</b></h1><p class="sub">Give any agent a task. Grok and Claude pick theirs up when you tell them “check your inbox”; Jubber picks his up on his own.</p>
-<div class="card" id="login"><input id="k" type="password" placeholder="Owner or agent key" autocomplete="off"><div style="height:8px"></div><button onclick="saveKey()">Open board</button></div>
-<div id="app" style="display:none"><div class="card"><div class="row"><select id="to"><option value="grok">Grok</option><option value="claude">Claude</option><option value="jubber">Jubber</option><option value="codex">Codex</option><option value="any">Anyone</option></select><select id="nt"><option value="1">Ping my WhatsApp when done</option><option value="0">No ping</option></select></div><textarea id="tx" placeholder="What should they do?"></textarea><div style="height:8px"></div><button onclick="post()">Send task</button></div>
-<div class="card"><div class="row" style="margin:0"><div class="meta" id="sum"></div><button class="x" style="text-align:right" onclick="load()">refresh</button></div><div id="list"></div></div></div>
-<script>let K='';try{K=localStorage.getItem('amhboard')||''}catch(e){}
-const api=async(b)=>{const r=await fetch('/board/api',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({key:K,...b})});return r.json()};
-const esc=(s)=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-async function saveKey(){K=document.getElementById('k').value.trim();const j=await api({action:'list'});if(j.error){alert(j.error);return}try{localStorage.setItem('amhboard',K)}catch(e){}show(j)}
-function show(j){document.getElementById('login').style.display='none';document.getElementById('app').style.display='';const ts=j.tasks||[];const open=ts.filter(t=>t.status==='open'||t.status==='claimed').length;document.getElementById('sum').textContent=open+' open · '+ts.length+' total';
-document.getElementById('list').innerHTML=ts.map(t=>'<div class="t"><span class="st '+t.status+'">'+t.status+'</span> <b>'+esc(t.to)+'</b> <span class="meta">from '+esc(t.from)+' · '+new Date(t.created).toLocaleString()+(t.claimed_by?' · by '+esc(t.claimed_by):'')+'</span><div>'+esc(t.text)+'</div>'+(t.result?'<div class="res">'+esc(t.result)+'</div>':'')+((t.status==='open'||t.status==='claimed')?'<button class="x" onclick="cancelT(\\''+t.id+'\\')">cancel</button>':'')+'</div>').join('')||'<p class="meta">No tasks yet.</p>'}
-async function load(){const j=await api({action:'list'});if(j.error){document.getElementById('login').style.display='';document.getElementById('app').style.display='none';return}show(j)}
-async function post(){const tx=document.getElementById('tx');if(!tx.value.trim())return;const j=await api({action:'post',to:document.getElementById('to').value,text:tx.value.trim(),notify:document.getElementById('nt').value==='1'});if(j.error){alert(j.error);return}tx.value='';load()}
-async function cancelT(id){await api({action:'cancel',id});load()}
-if(K)load();setInterval(()=>{if(K&&document.visibilityState==='visible')load()},20000)</script></main></body></html>`;
+// Proposal only: fixed-resource, GET-only Apiary diagnostics. No deployment/writes.
+var APIARY_READ_ACCOUNT = '1d5fae607a857fc56cd575763bf8f3bc';
+var APIARY_READ_SCRIPT = 'apiary-bee';
+var APIARY_READ_BUCKET = 'apiary-reading-html';
+var APIARY_READ_PREFIX = 'community/reading/';
+var APIARY_READ_TOOL_DEFS = [
+  { name: 'apiary_worker_deployments', description: 'Read active deployment and recent deployment history for apiary-bee on Austin Doors. First item serves traffic. Past versions are rollback candidates, not validated rollbacks.', inputSchema: { type: 'object', additionalProperties: false, properties: { _approved: {type:'boolean'} } } },
+  { name: 'apiary_worker_version', description: 'Read only version identity, script etag, runtime compatibility and binding names/types for one apiary-bee version. Never returns values, source code or secrets.', inputSchema: { type: 'object', additionalProperties: false, properties: { version_id: {type:'string',pattern:'^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$'}, _approved:{type:'boolean'} }, required:['version_id'] } },
+  { name: 'apiary_r2_objects_list', description: 'One metadata-only page from apiary-reading-html, fixed community/reading/ prefix. Follow every next_cursor until page_exhausted; this call never proves the entire inventory complete.', inputSchema: { type:'object', additionalProperties:false, properties: {cursor:{type:'string',maxLength:8192},per_page:{type:'integer',minimum:1,maximum:1000,default:1000},_approved:{type:'boolean'}} } }
+];
+var APIARY_READ_TOOLS = new Set(APIARY_READ_TOOL_DEFS.map(t=>t.name));
+function apiaryReadArgs(name, args) {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) throw new Error('invalid arguments');
+  const allowed = name === 'apiary_worker_version' ? ['version_id','_approved'] : name === 'apiary_r2_objects_list' ? ['cursor','per_page','_approved'] : ['_approved'];
+  if(Object.keys(args).some(k=>!allowed.includes(k))) throw new Error('unsupported argument');
+  if(args._approved !== undefined && typeof args._approved !== 'boolean') throw new Error('invalid approval flag');
+  if(name === 'apiary_worker_version' && (typeof args.version_id !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(args.version_id))) throw new Error('invalid version id');
+  if(name === 'apiary_r2_objects_list') {
+    if(args.cursor !== undefined && (typeof args.cursor !== 'string' || args.cursor.length > 8192 || /[\u0000-\u001f\u007f]/.test(args.cursor))) throw new Error('invalid cursor');
+    if(args.per_page !== undefined && (!Number.isInteger(args.per_page) || args.per_page < 1 || args.per_page > 1000)) throw new Error('invalid per_page');
+  }
+}
+function apiaryReadText(value) { return typeof value === 'string' ? value : null; }
+async function runApiaryReadTool(name, args, env, authContext) {
+  if(!APIARY_READ_TOOLS.has(name)) return {error:'unknown Apiary read tool'};
+  if(authContext?.mode !== 'admin') return {error:'Apiary diagnostics require the existing owner/agent authorization'};
+  try { apiaryReadArgs(name, args); } catch { return {error:'Invalid arguments for the fixed Apiary read scope'}; }
+  // Deliberately no default-account, Pages-only or federated-execute fallback.
+  if(!env.CLOUDFLARE_API_TOKEN_DOORS) return {error:'Existing Doors credential is unavailable; no fallback attempted'};
+  const client = new CloudflareClient({token:env.CLOUDFLARE_API_TOKEN_DOORS});
+  const root = `/accounts/${APIARY_READ_ACCOUNT}`;
+  const identity = {account:APIARY_READ_ACCOUNT,script:APIARY_READ_SCRIPT};
+  try {
+    if(name === 'apiary_worker_deployments') {
+      const {result} = await client.request('GET', `${root}/workers/scripts/${APIARY_READ_SCRIPT}/deployments`);
+      if(!Array.isArray(result?.deployments)) return {error:'Unexpected deployments response; active deployment unverified'};
+      const deployments = result.deployments.slice(0,50).map(d=>({id:apiaryReadText(d.id),created_on:apiaryReadText(d.created_on),source:apiaryReadText(d.source),strategy:apiaryReadText(d.strategy),versions:Array.isArray(d.versions)?d.versions.map(v=>({version_id:apiaryReadText(v.version_id),percentage:typeof v.percentage==='number'?v.percentage:null})):null}));
+      return {...identity,active_deployment:deployments[0]||null,deployments,history_truncated:result.deployments.length>50,rollback_validated:false};
+    }
+    if(name === 'apiary_worker_version') {
+      const {result:v} = await client.request('GET', `${root}/workers/scripts/${APIARY_READ_SCRIPT}/versions/${args.version_id}`);
+      if(v?.id !== args.version_id) return {error:'Version identity mismatch; metadata unverified'};
+      const b=v.resources?.bindings, rt=v.resources?.script_runtime;
+      return {...identity,version_id:v.id,number:typeof v.number==='number'?v.number:null,created_on:apiaryReadText(v.metadata?.created_on),script_etag:apiaryReadText(v.resources?.script?.etag),compatibility_date:apiaryReadText(rt?.compatibility_date),compatibility_flags:Array.isArray(rt?.compatibility_flags)?rt.compatibility_flags.filter(x=>typeof x==='string'):null,bindings:Array.isArray(b)?b.map(x=>({name:apiaryReadText(x.name),type:apiaryReadText(x.type),...(x.type==='r2_bucket'?{bucket_name:apiaryReadText(x.bucket_name)}:{})})):null,rollback_validated:false};
+    }
+    const q=new URLSearchParams({prefix:APIARY_READ_PREFIX,per_page:String(args.per_page??1000)});
+    if(args.cursor) q.set('cursor',args.cursor);
+    const {result, result_info:rawInfo} = await client.request('GET', `${root}/r2/buckets/${APIARY_READ_BUCKET}/objects?${q}`);
+    let info = rawInfo;
+    // The REST API omits optional result_info on its terminal short page.
+    // Confirm the boundary with a fixed-prefix start_after probe before ending.
+    if (!info && Array.isArray(result) && result.length < (args.per_page ?? 1000)) {
+      if(result.some(x=>typeof x.key!=='string' || !x.key.startsWith(APIARY_READ_PREFIX) || !Number.isSafeInteger(x.size) || x.size<0)) return {error:'Unexpected terminal object metadata; inventory unverified'};
+      if(result.length) {
+        const last = result.map(x=>x.key).sort().at(-1);
+        const terminalQuery = new URLSearchParams({prefix:APIARY_READ_PREFIX,per_page:'1',start_after:last});
+        const terminal = await client.request('GET', `${root}/r2/buckets/${APIARY_READ_BUCKET}/objects?${terminalQuery}`);
+        if(!Array.isArray(terminal.result) || terminal.result.length || (terminal.result_info && (terminal.result_info.is_truncated !== false || terminal.result_info.delimited?.length))) return {error:'Terminal boundary probe did not confirm exhaustion; inventory incomplete'};
+      }
+      info = {is_truncated:false};
+    }
+    if(!Array.isArray(result) || typeof info?.is_truncated !== 'boolean' || (info.delimited?.length)) return {error:'Incomplete or grouped pagination metadata; inventory completeness unverified',shape:{result_is_array:Array.isArray(result),object_count:Array.isArray(result)?result.length:null,info_present:!!info,truncated_type:typeof info?.is_truncated,truncated:typeof info?.is_truncated==='boolean'?info.is_truncated:null,cursor_present:typeof info?.cursor==='string'&&!!info.cursor,delimited_type:typeof info?.delimited,delimited_count:Array.isArray(info?.delimited)?info.delimited.length:null}};
+    if(info.is_truncated && (typeof info.cursor !== 'string' || !info.cursor || info.cursor===args.cursor)) return {error:'Missing or repeated continuation cursor; inventory incomplete'};
+    if(result.some(x=>typeof x.key!=='string' || !x.key.startsWith(APIARY_READ_PREFIX) || !Number.isSafeInteger(x.size) || x.size<0)) return {error:'Unexpected object metadata; inventory unverified'};
+    return {account:APIARY_READ_ACCOUNT,bucket:APIARY_READ_BUCKET,prefix:APIARY_READ_PREFIX,objects:result.map(x=>({key:x.key,size:x.size,etag:apiaryReadText(x.etag),last_modified:apiaryReadText(x.last_modified),content_type:apiaryReadText(x.http_metadata?.contentType)})),next_cursor:info.is_truncated?info.cursor:null,page_exhausted:!info.is_truncated,inventory_complete:false};
+  } catch(e) {
+    // Never echo provider error text, credentials, raw headers, or arbitrary metadata.
+    return {error:'Apiary metadata read failed',status:Number.isInteger(e?.status)?e.status:null,code:Number.isInteger(e?.code)?e.code:null};
+  }
 }
 
+// One-time, owner-only repair of the already-approved Apiary cache defect.
+var APIARY_REPAIR_BASE = '0a4b44d7-f34b-4ca1-9637-248373c80de3';
+var APIARY_REPAIR_ETAG = '1c78e284070450cd7bd56bf8700b06f9451e62c60b339fcd568e912ffde92a9d';
+var APIARY_REPAIR_RID = 'apiary-head-cache-20261028-v1';
+// One owner-approved credential correction. Plaintext exists only in request memory and the Worker secret.
+var KR_RID='walo-tenant1-relay-key-20261029-v1',KR_DB='203fa727-30e1-4e07-b6a3-0aeefac08412';
+var KR_BASES={'walo-mcp':{version:'fec6935a-634e-457c-8905-685b32fe830d',sha:'c2c89cbb6132875c3ee6fde49b9e76ca4f2c1f5b9c9fa2e84749b43468cedd8d'},'localops-whatsapp-bridge':{version:'e0845984-a3b3-462f-860d-bed7d1ea6cf7',sha:'107cb5e80ec7e90f5bae51069b7a9ba52daae2fa77a9f9355d944230197ee402'}};
+async function krLedger(env,b){return wpLedger(env,{...b,rid:KR_RID});}
+async function krUpdate(env,patch,release=false){return krLedger(env,{action:'update',patch,release});}
+function krPublic(r){if(!r)return null;return {state:r.state,base_version:r.base_version,staged_version:r.staged_version||null,deployment_id:r.deployment_id||null,route_added:r.route_added===true,rollback_version:r.base_version,reason:r.failure||null,message_sent:false};}
+async function krSnapshot(env){
+ const all={};
+ for(const [script,pin]of Object.entries(KR_BASES)){
+  const active=await wdCurrent(env,script);wdAssert(arActive(active,pin.version),'Key repair Worker version drift');
+  const version=await wdVersion(env,script,pin.version),settings=await wdApi(env,script,'/settings');
+  const db=settings.bindings?.filter(b=>b.name==='DB'),vdb=version.resources?.bindings?.filter(b=>b.name==='DB');
+  wdAssert(db?.length===1&&db[0].type==='d1'&&(db[0].id||db[0].database_id)===KR_DB,'Key repair current DB identity mismatch');
+  wdAssert(vdb?.length===1&&vdb[0].type==='d1'&&(vdb[0].id||vdb[0].database_id)===KR_DB,'Key repair version DB identity mismatch');
+  wdAssert(!settings.migrations,'Key repair refuses migrations');
+  const body=await wdCode(env,script,version);wdAssert(body.main_module==='index.js','Key repair entrypoint mismatch');
+  wdAssert(await arHash(await body.modules.find(m=>m.name===body.main_module).blob.arrayBuffer())===pin.sha,'Key repair source drift');
+  const safe={base_version:pin.version,base_etag:version.resources.script.etag,main_module:body.main_module,settings_sha256:await arHash(arCanon(wdSettings(settings))),resources_sha256:await arHash(arCanon(wdResources(version))),expected_modules:await arModuleHashes(body)};
+  wdAssert(arActive(await wdCurrent(env,script),pin.version),'Concurrent key repair deployment');all[script]={safe,version,settings,body};
+ }
+ const binding=all['walo-mcp'].settings.bindings.filter(b=>b.name==='WA_RELAY_KEY');wdAssert(binding.length===1&&binding[0].type==='secret_text','Existing notification secret binding required');
+ const tenant=await wcQuery(env,"SELECT t.status,s.wa_phone_number_id FROM tenants t JOIN tenant_secrets s ON s.tenant_id=t.id WHERE t.id='1'");
+ wdAssert(tenant.length===1&&tenant[0].status==='active'&&tenant[0].wa_phone_number_id==='1399264479939553','Key repair tenant sender mismatch');
+ const rows=await wcQuery(env,"SELECT route_value FROM routes WHERE tenant_id='1' AND route_type='relay_key_hash' ORDER BY route_value");
+ wdAssert(rows.length===2&&rows.every(r=>/^[a-f0-9]{64}$/.test(r.route_value)),'Key repair tenant route baseline changed');
+ const safe={workers:Object.fromEntries(Object.entries(all).map(([k,v])=>[k,v.safe])),database_id:KR_DB,both_database_identities_verified:true,tenant_id:'1',sender_id:'1399264479939553',existing_tenant1_route_count:rows.length,tenant1_route_set_digest:await arHash(arCanon(rows))};
+ return {all,safe:{...safe,snapshot_sha256:await arHash(arCanon(safe))}};
+}
+async function krGuard(env,s){for(const [script,v]of Object.entries(s.all)){wdAssert(arActive(await wdCurrent(env,script),v.safe.base_version),'Concurrent key repair Worker change');wdAssert(await arHash(arCanon(wdSettings(await wdApi(env,script,'/settings'))))===v.safe.settings_sha256,'Key repair binding drift');}}
+async function runTenant1KeyRepair(args,env){
+ wdAssert(args.script==='walo-mcp','Key repair limited to notification Worker');
+ if(args.action==='key_inspect'){const s=await krSnapshot(env);return {...s.safe,production_changed:false};}
+ const record=(await krLedger(env,{action:'get'})).record;
+ if(args.action==='key_status')return {record:krPublic(record),active:await wdCurrent(env,'walo-mcp')};
+ wdAssert(args.action==='key_apply'&&args.confirm===true,'Explicit tenant1 key confirmation required');
+ if(record)return {already_handled:true,record:krPublic(record)};
+ const s=await krSnapshot(env);wdAssert(args.expected_snapshot_sha256===s.safe.snapshot_sha256,'Reviewed key repair snapshot changed');
+ const claim=await krLedger(env,{action:'claim',jti:KR_RID,sha:s.safe.snapshot_sha256,script:'walo-mcp',actor:'owner'});wdAssert(!claim.error,'Key repair lock refused');if(claim.existing)return{already_handled:true,record:krPublic(claim.existing)};
+ const w=s.all['walo-mcp'],rec={...w.safe,state:'claimed',route_added:false,bridge_version:KR_BASES['localops-whatsapp-bridge'].version};await krUpdate(env,rec);
+ let key=null,staged=null;
+ try{
+  await krGuard(env,s);
+  const random=crypto.getRandomValues(new Uint8Array(32));key=[...random].map(b=>b.toString(16).padStart(2,'0')).join('');random.fill(0);
+  const digest=await arHash(key);await krUpdate(env,{state:'registering_hash',key_hash:digest});
+  const inserted=await wcQuery(env,"INSERT INTO routes(route_type,route_value,tenant_id) SELECT 'relay_key_hash',?,'1' WHERE EXISTS(SELECT 1 FROM tenants t JOIN tenant_secrets s ON s.tenant_id=t.id WHERE t.id='1' AND t.status='active' AND s.wa_phone_number_id='1399264479939553') AND NOT EXISTS(SELECT 1 FROM routes WHERE route_type='relay_key_hash' AND route_value=?) RETURNING tenant_id",[digest,digest]);
+  wdAssert(inserted.length===1&&inserted[0].tenant_id==='1','Dedicated key registration not confirmed');await krUpdate(env,{state:'hash_registered',route_added:true});
+  const check=await wcQuery(env,"SELECT CASE WHEN tenant_id='1' THEN 1 ELSE 0 END AS is_tenant1 FROM routes WHERE route_type='relay_key_hash' AND route_value=?",[digest]);wdAssert(check.length===1&&check[0].is_tenant1===1,'Dedicated key tenant verification failed');
+  const metadata={...w.settings,main_module:w.body.main_module,exports:w.version.resources.script_runtime.exports,keep_assets:true,keep_bindings:['secret_text'],bindings:[...w.settings.bindings.filter(b=>b.type!=='secret_text'),{name:'WA_RELAY_KEY',type:'secret_text',text:key}],annotations:{'workers/message':'Owner-approved dedicated tenant1 notification relay credential'}};
+  const form=new FormData();form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}),'metadata.json');for(const m of w.body.modules)form.append(m.name,m.blob,m.name);
+  await krGuard(env,s);await krUpdate(env,{state:'secret_uploading'});
+  const next=await wdApi(env,'walo-mcp','/versions?bindings_inherit=strict',{method:'POST',headers:{'if-match':'"'+w.safe.base_etag+'"'},body:form});key=null;
+  wdAssert(typeof next.id==='string','Dedicated secret upload has no confirmed version');staged=next.id;await krUpdate(env,{state:'staged_verifying',staged_version:staged});
+  await wdVerify(env,'walo-mcp',{...rec,staged_version:staged});
+  wdAssert(arActive(await wdCurrent(env,'localops-whatsapp-bridge'),rec.bridge_version),'Bridge changed before key activation');
+  wdAssert(await arHash(arCanon(wdSettings(await wdApi(env,'localops-whatsapp-bridge','/settings'))))===s.all['localops-whatsapp-bridge'].safe.settings_sha256,'Bridge settings changed before key activation');
+  await krUpdate(env,{state:'activating'});
+  const deployed=await wdApi(env,'walo-mcp','/deployments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:staged,percentage:100}],annotations:{'workers/message':'Owner-approved tenant1 notification credential correction'}})});
+  await wdVerify(env,'walo-mcp',{...rec,staged_version:staged},false);
+  await krUpdate(env,{state:'live_verified',deployment_id:deployed.id},true);
+  return {state:'live_verified',version:staged,deployment_id:deployed.id,rollback_version:rec.base_version,tenant_id:'1',route_added:true,source_bindings_runtime_preserved:true,secret_values_returned:false,message_sent:false,requires_runtime_trace:true};
+ }catch(e){key=null;await krUpdate(env,{state:'failed_or_uncertain',failure:wdError(e)},true);return {error:'Dedicated key repair stopped',reason:wdError(e),record:krPublic((await krLedger(env,{action:'get'})).record),message_sent:false,do_not_retry:true};}
+}
+
+
+var NP_EDITS = [["var WALO_NOTIFICATION_TRACE_DEF = {name:\"walo_notification_trace\",description:\"Owner-only read-only notification configuration diagnostic. Returns only relay category, tenant-1 key match, sender ID and owner-destination match. No URL/key/hash/phone disclosure, HTTP requests, writes or messages.\",inputSchema:{type:\"object\",additionalProperties:false,properties:{}}};\nasync function traceNotificationConfiguration(env,scope){\n if(scope!==\"owner\"||!env.MCP_KEY)return {error:\"Existing owner authentication required\"};\n const out={relay_category:\"unconfigured\",key_maps_tenant1:null,sender_id:null,owner_destination_matches:null};\n if(env.WA_RELAY_URL)try{\n  const u=new URL(env.WA_RELAY_URL),known={\"api.walohq.com\":\"api_walohq\",\"whatsapp.paycovay.com\":\"whatsapp_paycovay\",\"localops-whatsapp-bridge.austinsdoors.workers.dev\":\"bridge_workers_dev\"};\n  out.relay_category=u.protocol===\"https:\"&&!u.port&&u.pathname===\"/send\"&&!u.username&&!u.password&&!u.search&&!u.hash&&Object.hasOwn(known,u.hostname)?known[u.hostname]:\"other\";\n }catch{out.relay_category=\"invalid\";}\n if(!env.WA_RELAY_KEY||!env.DB)return out;\n try{\n  const digest=await crypto.subtle.digest(\"SHA-256\",new TextEncoder().encode(String(env.WA_RELAY_KEY)));\n  const keyHash=[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,\"0\")).join(\"\");\n  const row=await env.DB.prepare(\"SELECT CASE WHEN tenant_id='1' THEN 1 ELSE 0 END AS is_tenant1 FROM routes WHERE route_type='relay_key_hash' AND route_value=? LIMIT 1\").bind(keyHash).first();\n  out.key_maps_tenant1=!!row&&row.is_tenant1===1;\n  if(!out.key_maps_tenant1)return out;\n  const t=await env.DB.prepare(\"SELECT t.status,s.wa_phone_number_id FROM tenants t LEFT JOIN tenant_secrets s ON s.tenant_id=t.id WHERE t.id='1'\").first();\n  out.sender_id=t?.status===\"active\"&&typeof t.wa_phone_number_id===\"string\"&&/^\\d{15,20}$/.test(t.wa_phone_number_id)?t.wa_phone_number_id:null;\n  const owner=String(env.WA_OWNER||\"\").replace(/\\D/g,\"\");\n  if(owner){const o=await env.DB.prepare(\"SELECT COUNT(*) AS matches FROM tenant_owners WHERE tenant_id='1' AND role='owner' AND replace(phone,'+','')=?\").bind(owner).first();out.owner_destination_matches=Number(o?.matches)>0;}\n }catch{out.key_maps_tenant1=null;out.sender_id=null;out.owner_destination_matches=null;}\n return out;\n}\n","var WALO_NOTIFICATION_TRACE_DEF = {name:\"walo_notification_trace\",description:\"Owner-only read-only notification configuration diagnostic. Returns only relay category, key classification (unmapped/tenant1/other), sender ID and owner-destination match. No URL/key/hash/phone disclosure, HTTP requests, writes or messages.\",inputSchema:{type:\"object\",additionalProperties:false,properties:{}}};\nasync function traceNotificationConfiguration(env,scope){\n if(scope!==\"owner\"||!env.MCP_KEY)return {error:\"Existing owner authentication required\"};\n const out={relay_category:\"unconfigured\",key_route:null,sender_id:null,owner_destination_matches:null};\n if(env.WA_RELAY_URL)try{\n  const u=new URL(env.WA_RELAY_URL),known={\"api.walohq.com\":\"api_walohq\",\"whatsapp.paycovay.com\":\"whatsapp_paycovay\",\"localops-whatsapp-bridge.austinsdoors.workers.dev\":\"bridge_workers_dev\"};\n  out.relay_category=u.protocol===\"https:\"&&!u.port&&u.pathname===\"/send\"&&!u.username&&!u.password&&!u.search&&!u.hash&&Object.hasOwn(known,u.hostname)?known[u.hostname]:\"other\";\n }catch{out.relay_category=\"invalid\";}\n if(!env.WA_RELAY_KEY||!env.DB)return out;\n try{\n  const digest=await crypto.subtle.digest(\"SHA-256\",new TextEncoder().encode(String(env.WA_RELAY_KEY)));\n  const keyHash=[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,\"0\")).join(\"\");\n  const row=await env.DB.prepare(\"SELECT CASE WHEN tenant_id='1' THEN 1 ELSE 0 END AS is_tenant1 FROM routes WHERE route_type='relay_key_hash' AND route_value=? LIMIT 1\").bind(keyHash).first();\n  out.key_route=!row?\"unmapped\":row.is_tenant1===1?\"tenant1\":\"other\";\n  if(out.key_route!==\"tenant1\")return out;\n  const t=await env.DB.prepare(\"SELECT t.status,s.wa_phone_number_id FROM tenants t LEFT JOIN tenant_secrets s ON s.tenant_id=t.id WHERE t.id='1'\").first();\n  out.sender_id=t?.status===\"active\"&&typeof t.wa_phone_number_id===\"string\"&&/^\\d{15,20}$/.test(t.wa_phone_number_id)?t.wa_phone_number_id:null;\n  const owner=String(env.WA_OWNER||\"\").replace(/\\D/g,\"\");\n  if(owner){const o=await env.DB.prepare(\"SELECT COUNT(*) AS matches FROM tenant_owners WHERE tenant_id='1' AND role='owner' AND replace(phone,'+','')=?\").bind(owner).first();out.owner_destination_matches=Number(o?.matches)>0;}\n }catch{out.key_route=null;out.sender_id=null;out.owner_destination_matches=null;}\n return out;\n}\n"]];
+// Fixed hostname metadata reads only. Existing owner authorizer runs before dispatch.
+async function npRelayTargets(env){
+ const account='1d5fae607a857fc56cd575763bf8f3bc';
+ wdAssert(typeof env.CLOUDFLARE_API_TOKEN_DOORS==='string'&&env.CLOUDFLARE_API_TOKEN_DOORS,'Doors binding required');
+ async function get(suffix){
+  const r=await fetch('https://api.cloudflare.com/client/v4'+suffix,{method:'GET',headers:{authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN_DOORS}});
+  const j=await r.json().catch(()=>null);wdAssert(r.ok&&j?.success,'Fixed relay metadata read failed');return j.result;
+ }
+ const rows=[];
+ for(const [hostname,zoneName]of [['api.walohq.com','walohq.com'],['whatsapp.paycovay.com','paycovay.com']]){
+  const domains=await get('/accounts/'+account+'/workers/domains?hostname='+encodeURIComponent(hostname));
+  wdAssert(Array.isArray(domains),'Unexpected hostname metadata');
+  const custom=domains.filter(d=>d.hostname===hostname).map(d=>({worker:d.service,enabled:typeof d.enabled==='boolean'?d.enabled:null}));
+  const zones=await get('/zones?name='+encodeURIComponent(zoneName)+'&account.id='+account);
+  wdAssert(Array.isArray(zones),'Unexpected zone metadata');
+  const zone=zones.filter(z=>z.name===zoneName&&z.account?.id===account);wdAssert(zone.length<=1,'Ambiguous relay zone');
+  let matches=[];
+  if(zone.length){wdAssert(/^[a-f0-9]{32}$/.test(zone[0].id),'Invalid relay zone identity');const routes=await get('/zones/'+zone[0].id+'/workers/routes');wdAssert(Array.isArray(routes),'Unexpected route metadata');matches=routes.filter(r=>npRouteMatches(r.pattern,hostname)).map(r=>({pattern:r.pattern,worker:r.script||null}));}
+  const scripts=[...new Set([...custom.filter(x=>x.enabled!==false).map(x=>x.worker),...matches.map(x=>x.worker)].filter(x=>typeof x==='string'))];
+  rows.push({hostname,zone_visible:zone.length===1,custom_domains:custom,matching_send_routes:matches,conflict:scripts.length>1,expected_bridge_claimed:scripts.includes('localops-whatsapp-bridge')});
+ }
+ return {targets:rows,read_only:true,message_sent:false};
+}
+function npRouteMatches(pattern,hostname){
+ if(typeof pattern!=='string')return false;
+ const escaped=pattern.split('*').map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('.*');
+ const target=pattern.includes('://')?'https://'+hostname+'/send':hostname+'/send';
+ try{return new RegExp('^'+escaped+'$','i').test(target);}catch{return false;}
+}
+
+// Fixed owner-approved read-only notification probe installation, limited to walo-mcp.
+var NP_SCRIPT='walo-mcp',NP_BASE='2d990542-53a8-4aad-9186-abf38f83cdfb',NP_RID='walo-notification-probe-classification-20261028-v2';
+async function npLedger(env,b){return wpLedger(env,{...b,rid:NP_RID});}
+async function npUpdate(env,patch,release=false){return npLedger(env,{action:'update',patch,release});}
+function npPatch(code){
+ for(const [find,replacement]of NP_EDITS){wdAssert(code.split(find).length===2,'Approved probe patch anchor mismatch');code=code.replace(find,()=>replacement);}
+ return code;
+}
+async function npSnapshot(env){
+ const active=await wdCurrent(env,NP_SCRIPT);wdAssert(arActive(active,NP_BASE),'Notification Worker changed from reviewed base');
+ const version=await wdVersion(env,NP_SCRIPT,NP_BASE),settings=await wdApi(env,NP_SCRIPT,'/settings'),body=await wdCode(env,NP_SCRIPT,version);
+ wdAssert(!settings.migrations&&body.main_module==='index.js','Unsupported migration or entrypoint');
+ const main=body.modules.find(m=>m.name===body.main_module),source=await main.blob.text();
+ wdAssert(await arHash(source)==='1ec09e32b618bae6177976a24f05960a7f077eee5cff3f9c006d65ba4d8cce42','Notification source differs from verified release');
+ const candidate=npPatch(source),safe={script:NP_SCRIPT,base_version:NP_BASE,base_etag:version.resources.script.etag,main_module:body.main_module,module_hashes:await arModuleHashes(body),settings_sha256:await arHash(arCanon(wdSettings(settings))),resources_sha256:await arHash(arCanon(wdResources(version))),candidate_sha256:await arHash(candidate)};
+ wdAssert(arCanon(active)===arCanon(await wdCurrent(env,NP_SCRIPT)),'Concurrent notification deployment');
+ return {safe:{...safe,snapshot_sha256:await arHash(arCanon(safe))},version,settings,body,candidate};
+}
+async function npRollback(env,rec){
+ const active=await wdCurrent(env,NP_SCRIPT);
+ if(arActive(active,NP_BASE))return {state:'already_at_original'};
+ wdAssert(arActive(active,rec.staged_version),'Concurrent version prevents rollback');
+ wdAssert(await arHash(arCanon(wdResources(await wdVersion(env,NP_SCRIPT,NP_BASE))))===rec.resources_sha256,'Rollback configuration differs');
+ await wdApi(env,NP_SCRIPT,'/deployments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:NP_BASE,percentage:100}]})});
+ wdAssert(arActive(await wdCurrent(env,NP_SCRIPT),NP_BASE),'Rollback outcome unconfirmed');
+ return {state:'rolled_back',version:NP_BASE};
+}
+async function runNotificationProbeRepair(args,env){
+ wdAssert(args.script===NP_SCRIPT,'Probe installation is limited to walo-mcp');
+ if(args.action==='probe_routes')return npRelayTargets(env);
+ if(args.action==='probe_inspect'){const s=await npSnapshot(env);return {...s.safe,production_changed:false};}
+ const record=(await npLedger(env,{action:'get'})).record;
+ if(args.action==='probe_status')return {record:record||null,active:await wdCurrent(env,NP_SCRIPT)};
+ wdAssert(args.confirm===true,'Explicit probe installation confirmation required');
+ if(args.action==='probe_stage'){
+  if(record)return {already_handled:true,record};
+  const s=await npSnapshot(env);wdAssert(args.expected_snapshot_sha256===s.safe.snapshot_sha256&&args.candidate_sha256===s.safe.candidate_sha256,'Reviewed probe snapshot drift');
+  const claim=await npLedger(env,{action:'claim',jti:NP_RID,sha:s.safe.candidate_sha256,script:NP_SCRIPT,actor:'owner'});
+  wdAssert(!claim.error,'Probe ledger refused claim');if(claim.existing)return {already_handled:true,record:claim.existing};
+  const form=new FormData(),expected=[];
+  const metadata={...s.settings,main_module:s.body.main_module,exports:s.version.resources.script_runtime.exports,keep_assets:true,keep_bindings:['secret_text'],bindings:s.settings.bindings.filter(b=>b.type!=='secret_text'),annotations:{'workers/message':'Approved owner-only read-only notification probe'}};
+  form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}),'metadata.json');
+  for(const m of s.body.modules){const blob=m.name===s.body.main_module?new Blob([s.candidate],{type:m.content_type}):m.blob;expected.push({name:m.name,type:m.content_type,bytes:blob.size,sha256:await arHash(await blob.arrayBuffer())});form.append(m.name,blob,m.name);}
+  expected.sort((a,b)=>a.name.localeCompare(b.name));const rec={...s.safe,state:'uploading',expected_modules:expected};await npUpdate(env,rec);
+  try{
+   wdAssert(arActive(await wdCurrent(env,NP_SCRIPT),NP_BASE),'Concurrent version before probe upload');
+   wdAssert(await arHash(arCanon(wdSettings(await wdApi(env,NP_SCRIPT,'/settings'))))===s.safe.settings_sha256,'Notification settings drift');
+   const next=await wdApi(env,NP_SCRIPT,'/versions?bindings_inherit=strict',{method:'POST',headers:{'if-match':'"'+s.safe.base_etag+'"'},body:form});wdAssert(typeof next.id==='string','Upload has no confirmed version');
+   await npUpdate(env,{state:'uploaded_verifying',staged_version:next.id});
+   const checked=await wdVerify(env,NP_SCRIPT,{...rec,staged_version:next.id});await npUpdate(env,{state:'staged_verified'},true);return {...checked,production_changed:false};
+  }catch(e){await npUpdate(env,{state:'staging_failed_or_uncertain',failure:wdError(e)},true);throw e;}
+ }
+ wdAssert(args.action==='probe_deploy'&&record?.state==='staged_verified'&&args.candidate_sha256===record.candidate_sha256,'Verified probe stage required');
+ await wdVerify(env,NP_SCRIPT,record);
+ const rid=NP_RID+'-activate',claim=await wpLedger(env,{action:'claim',rid,jti:rid,sha:record.candidate_sha256,script:NP_SCRIPT,actor:'owner'});
+ wdAssert(!claim.error,'Probe activation lock refused');if(claim.existing)return {already_handled:true,record};
+ await npUpdate(env,{state:'deploying'});
+ try{
+  wdAssert(arActive(await wdCurrent(env,NP_SCRIPT),NP_BASE),'Concurrent active version before probe activation');
+  const d=await wdApi(env,NP_SCRIPT,'/deployments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:record.staged_version,percentage:100}],annotations:{'workers/message':'Approved owner-only read-only notification probe'}})});
+  const checked=await wdVerify(env,NP_SCRIPT,record,false);await npUpdate(env,{state:'live_verified',deployment_id:d.id});await wpLedger(env,{action:'update',rid,patch:{state:'live_verified'},release:true});
+  return {...checked,deployment_id:d.id,rollback_version:NP_BASE,probe_run:false,message_sent:false};
+ }catch(e){
+  await wpLedger(env,{action:'update',rid,patch:{state:'failed_or_uncertain'},release:true});
+  let rollback;try{rollback=await npRollback(env,record);}catch{rollback={state:'unconfirmed_or_concurrent_drift'};}
+  await npUpdate(env,{state:'deployment_failed_or_uncertain',failure:wdError(e),rollback});return {error:'Probe activation failed',reason:wdError(e),rollback};
+ }
+}
+
+
+var WC_RESOLVER_HASHES = {"resolveTenant":"f2185ee7da530cba712e4247f8f9e1dd2fb5b5ff95830533b886e220b5f3a5ec","resolveTenantByRelayKey":"55dc279b9f88e54f3a268bd11ad570b6fbfc3227ed1092c611439a6a814282cc"};
+var WC_RESOLVE_SQL = "SELECT t.id,t.slug,t.business_name,t.status,t.plan,t.timezone,t.voice,\n              t.hours_json,t.config_json,\n              s.indexnow_host,s.indexnow_key,s.wa_phone_number_id,s.wa_display_number,\n              s.lead_token,s.relay_key_hash\n         FROM routes r\n         JOIN tenants t ON t.id = r.tenant_id\n         LEFT JOIN tenant_secrets s ON s.tenant_id = t.id\n        WHERE r.route_type = ? AND r.route_value = ? LIMIT 1";
+// Approved tenant-1-only sender-cache correction. No credentials, messages or arbitrary KV access.
+var WC_ACCOUNT='1d5fae607a857fc56cd575763bf8f3bc';
+var WC_DB='203fa727-30e1-4e07-b6a3-0aeefac08412';
+var WC_SCRIPT='localops-whatsapp-bridge';
+var WC_VERSION='e0845984-a3b3-462f-860d-bed7d1ea6cf7';
+var WC_OLD='1258784447309850',WC_NEW='1399264479939553';
+var WC_RID='walo-tenant1-sender-cache-20261028-v1';
+function wcIdentity(t,owners){return t&&String(t.id)==='1'&&Array.isArray(t.owners)&&Array.isArray(owners)&&owners.length>0&&arCanon([...new Set(t.owners.map(x=>String(x).replace(/\D/g,'')))].sort())===arCanon(owners)&&t.secrets&&typeof t.secrets==='object';}
+async function wcApi(env,path,init={},raw=false){
+ const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+WC_ACCOUNT+path,{...init,headers:{authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN_DOORS,...init.headers}});
+ if(raw&&r.status===404)return null;
+ if(raw&&r.ok){const text=await r.text();wdAssert(new TextEncoder().encode(text).length<=262144,'Target cache exceeds safe size');return text;}
+ const j=await r.json().catch(()=>null);
+ if(!r.ok||!j?.success){const e=new Error('Scoped cache provider operation failed');e.safe={status:r.status,codes:j?.errors?.map(x=>x.code).filter(Number.isSafeInteger)||[]};throw e;}
+ return j.result;
+}
+async function wcQuery(env,sql,params=[]){
+ const rows=await wcApi(env,'/d1/database/'+WC_DB+'/query',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sql,params})});
+ wdAssert(Array.isArray(rows)&&rows.length===1&&rows[0].success!==false&&Array.isArray(rows[0].results),'Tenant database query failed');
+ return rows[0].results;
+}
+async function wcBinding(env){
+ const active=await wdCurrent(env,WC_SCRIPT);wdAssert(arActive(active,WC_VERSION),'Bridge version changed; cache resolver must be reviewed');
+ const settings=await wdApi(env,WC_SCRIPT,'/settings');
+ const db=settings.bindings?.filter(b=>b.name==='DB'),chat=settings.bindings?.filter(b=>b.name==='CHAT');
+ wdAssert(db?.length===1&&db[0].type==='d1'&&(db[0].id||db[0].database_id)===WC_DB,'Live bridge DB binding differs from approved localops database');
+ wdAssert(chat?.length===1&&chat[0].type==='kv_namespace'&&/^[a-f0-9]{32}$/.test(chat[0].namespace_id),'Live CHAT binding is unavailable or ambiguous');
+ const version=await wdVersion(env,WC_SCRIPT,WC_VERSION),body=await wdCode(env,WC_SCRIPT,version);
+ wdAssert(body.main_module==='index.js','Unexpected bridge entrypoint');
+ const source=await body.modules.find(m=>m.name===body.main_module).blob.text();
+ wdAssert(await arHash(source)==='107cb5e80ec7e90f5bae51069b7a9ba52daae2fa77a9f9355d944230197ee402','Bridge source drift');
+ const resolver={};
+ for(const [name,expected]of Object.entries(WC_RESOLVER_HASHES)){
+  const start=source.indexOf('async function '+name+'('),end=source.indexOf('\n}\n',start);
+  wdAssert(start>=0&&end>start&&source.indexOf('async function '+name+'(',start+1)<0,'Resolver boundary changed');
+  const digest=await arHash(source.slice(start,end+2));resolver[name]=digest===expected;
+ }
+ wdAssert(Object.values(resolver).every(Boolean),'Live tenant resolution differs from reviewed source');
+ return {namespace:chat[0].namespace_id,active,settings_sha256:await arHash(arCanon(wdSettings(settings))),resolver_verified:true};
+}
+async function wcRoutes(env){
+ const t=await wcQuery(env,"SELECT t.id,t.status,s.wa_phone_number_id FROM tenants t JOIN tenant_secrets s ON s.tenant_id=t.id WHERE t.id='1'");
+ wdAssert(t.length===1&&t[0].status==='active'&&t[0].wa_phone_number_id===WC_NEW,'Authoritative tenant or replacement sender mismatch');
+ const ownerRows=await wcQuery(env,"SELECT phone FROM tenant_owners WHERE tenant_id='1' AND role='owner'");
+ const owners=[...new Set(ownerRows.map(x=>String(x.phone||'').replace(/\D/g,'')))].sort();wdAssert(owners.length>0&&owners.every(x=>/^\d{8,15}$/.test(x)),'Authoritative owner identity unavailable');
+ const routes=await wcQuery(env,"SELECT route_value FROM routes WHERE tenant_id='1' AND route_type='relay_key_hash' ORDER BY route_value");
+ wdAssert(routes.length===2&&routes.every(x=>/^[a-f0-9]{64}$/.test(x.route_value))&&new Set(routes.map(x=>x.route_value)).size===2,'Tenant relay route set changed');
+ const safeRows=[];
+ for(const r of routes){
+  const row=await wcQuery(env,WC_RESOLVE_SQL,['relay_key_hash',r.route_value]);
+  wdAssert(row.length===1&&String(row[0].id)==='1'&&row[0].status==='active'&&row[0].wa_phone_number_id===WC_NEW,'Live resolver query did not return the approved tenant and sender');
+  safeRows.push({tenant_id:'1',sender_id:row[0].wa_phone_number_id,active:true});
+ }
+ return {routes:routes.map(r=>r.route_value),owners,d1_resolution:safeRows};
+}
+async function wcRead(env,namespace,key,handle,kind,owners){
+ wdAssert(/^(tenant|tenantbak):relay_key_hash:[a-f0-9]{64}$/.test(key),'Invalid derived cache key');
+ const base='/storage/kv/namespaces/'+namespace,raw=await wcApi(env,base+'/values/'+encodeURIComponent(key),{},true);
+ if(raw===null)return {key,kind,handle,raw:null,safe:{handle,kind,exists:false}};
+ let value;try{value=JSON.parse(raw);}catch{wdAssert(false,'Target cache is not valid JSON');}
+ const t=kind==='backup'?value.t:value;wdAssert(wcIdentity(t,owners),'Target cache does not belong to the verified tenant owner');
+ wdAssert([WC_OLD,WC_NEW].includes(t.secrets.wa_phone_number_id),'Unexpected cached sender; no correction permitted');
+ const list=await wcApi(env,base+'/keys?prefix='+encodeURIComponent(key)+'&limit=2');
+ wdAssert(Array.isArray(list),'Cache expiration metadata unavailable');
+ const exact=list.filter(x=>x.name===key);wdAssert(exact.length===1,'Exact cache expiration metadata unavailable');
+ const expiration=exact[0].expiration===undefined?null:Number(exact[0].expiration);
+ wdAssert(expiration===null||Number.isSafeInteger(expiration),'Invalid cache expiration');
+ const metadata=await wcApi(env,base+'/metadata/'+encodeURIComponent(key));
+ return {key,kind,handle,raw,value,metadata,expiration,owners,safe:{handle,kind,exists:true,tenant_id:'1',owner_verified:true,sender_id:t.secrets.wa_phone_number_id,backup_timestamp:kind==='backup'&&Number.isSafeInteger(value.at)?value.at:null,expiration,content_sha256:await arHash(raw),metadata_sha256:await arHash(arCanon(metadata))}};
+}
+async function wcSnapshot(env){
+ const binding=await wcBinding(env),r=await wcRoutes(env),entries=[];
+ for(let i=0;i<r.routes.length;i++)for(const kind of ['current','backup']){
+  const key=(kind==='backup'?'tenantbak:':'tenant:')+'relay_key_hash:'+r.routes[i];
+  entries.push(await wcRead(env,binding.namespace,key,'relay-'+(i+1)+'/'+kind,kind,r.owners));
+ }
+ const safe={account:WC_ACCOUNT,script:WC_SCRIPT,tenant_id:'1',db_binding_verified:true,db_id:WC_DB,bridge_version:WC_VERSION,resolver_verified:true,d1_resolution:r.d1_resolution,settings_sha256:binding.settings_sha256,route_set_sha256:await arHash(arCanon(r.routes)),cache_entries:entries.map(e=>e.safe)};
+ wdAssert(arActive(await wdCurrent(env,WC_SCRIPT),WC_VERSION),'Bridge changed during cache inspection');
+ return {binding,entries,owners:r.owners,safe:{...safe,snapshot_sha256:await arHash(arCanon(safe)),stale_entries:entries.filter(e=>e.safe.sender_id===WC_OLD).map(e=>e.handle)}};
+}
+function wcReplace(entry){
+ wdAssert(entry.raw!==null&&entry.safe.sender_id===WC_OLD,'Only proven stale cache entries may change');
+ const pattern=new RegExp('("wa_phone_number_id"\\s*:\\s*")'+WC_OLD+'(")','g');
+ wdAssert([...entry.raw.matchAll(pattern)].length===1,'Sender field is not uniquely represented');
+ const next=entry.raw.replace(pattern,(_,a,b)=>a+WC_NEW+b),v=JSON.parse(next),t=entry.kind==='backup'?v.t:v;
+ wdAssert(wcIdentity(t,entry.owners)&&t.secrets.wa_phone_number_id===WC_NEW,'Corrected cache identity mismatch');
+ const reverted=next.replace(new RegExp('("wa_phone_number_id"\\s*:\\s*")'+WC_NEW+'(")'),(_,a,b)=>a+WC_OLD+b);
+ wdAssert(reverted===entry.raw,'Cache changes exceed the single sender field');
+ return next;
+}
+async function wcLedger(env,b){return wpLedger(env,{...b,rid:WC_RID});}
+async function wcRun(args,env){
+ wdAssert(args.script===WC_SCRIPT,'Sender cache repair is restricted to the bridge');
+ const record=(await wcLedger(env,{action:'get'})).record;
+ if(args.action==='sender_cache_inspect'){const s=await wcSnapshot(env);return {...s.safe,production_changed:false};}
+ if(args.action==='sender_cache_verify'){
+  const s=await wcSnapshot(env),done=(record?.changes||[]).every(c=>{
+   const e=s.entries.find(e=>e.handle===c.handle);
+   return e&&(c.action==='expired_cache_invalidation'?e.raw===null:e.safe.content_sha256===c.after_sha256||e.raw===null&&c.expiration!==null&&c.expiration<=Math.floor(Date.now()/1000));
+  });
+  return {state:record?.state||'not_applied',record:record||null,verified:!!record&&record.state==='applied'&&done,snapshot:s.safe,delivery_tested:false};
+ }
+ wdAssert(args.action==='sender_cache_apply'&&args.confirm===true&&args.expected_snapshot_sha256,'Confirmed inspection required');
+ if(record)return {already_handled:true,record};
+ const s=await wcSnapshot(env);wdAssert(s.safe.snapshot_sha256===args.expected_snapshot_sha256,'Target cache snapshot drift');
+ const stale=s.entries.filter(e=>e.safe.sender_id===WC_OLD);
+ if(!stale.length)return {state:'nothing_to_repair',snapshot:s.safe,production_changed:false};
+ const claim=await wcLedger(env,{action:'claim',jti:WC_RID,sha:s.safe.snapshot_sha256,script:WC_SCRIPT,actor:'owner'});
+ wdAssert(!claim.error,'Sender cache repair ledger refused claim');
+ if(claim.existing)return {already_handled:true,record:claim.existing};
+ const changes=[];await wcLedger(env,{action:'update',patch:{state:'applying',before:s.safe,changes}});
+ try{
+  for(const old of stale){
+   const fresh=await wcRead(env,s.binding.namespace,old.key,old.handle,old.kind,s.owners);
+   wdAssert(arCanon(fresh.safe)===arCanon(old.safe),'Cache changed before correction');
+   const after=wcReplace(fresh),expiresSoon=fresh.expiration!==null&&fresh.expiration<Math.floor(Date.now()/1000)+65;
+   const change={handle:fresh.handle,kind:fresh.kind,before_sha256:fresh.safe.content_sha256,after_sha256:expiresSoon?null:await arHash(after),old_sender:WC_OLD,new_sender:WC_NEW,expiration:fresh.expiration,metadata_sha256:fresh.safe.metadata_sha256,action:expiresSoon?'expired_cache_invalidation':'sender_field_replacement',state:'attempting'};
+   changes.push(change);await wcLedger(env,{action:'update',patch:{changes}});
+   const url='/storage/kv/namespaces/'+s.binding.namespace+'/values/'+encodeURIComponent(fresh.key);
+   if(expiresSoon)await wcApi(env,url,{method:'DELETE'});
+   else{
+    const form=new FormData();form.append('value',after);if(fresh.metadata!==null)form.append('metadata',JSON.stringify(fresh.metadata));
+    await wcApi(env,url+(fresh.expiration===null?'':'?expiration='+fresh.expiration),{method:'PUT',body:form});
+   }
+   change.state='provider_accepted';await wcLedger(env,{action:'update',patch:{changes}});
+  }
+  await wcLedger(env,{action:'update',patch:{state:'applied',changes,finished_at:new Date().toISOString()},release:true});
+  return {state:'applied',changes,credentials_and_other_fields_preserved:true,other_tenants_untouched:true,propagation_verification_pending:true,delivery_tested:false};
+ }catch(e){await wcLedger(env,{action:'update',patch:{state:'failed_or_uncertain',changes,failure:wdError(e)},release:true});return {error:'Scoped sender cache correction stopped',reason:wdError(e),changes,outcome:'check sender_cache_verify before any further action'};}
+}
+
+
+var WALO_DIAGNOSTIC_EDITS = {"walo-mcp":[["async function notifyAustin(env, text, template) {\n  if (!env.WA_RELAY_URL || !env.WA_RELAY_KEY)\n    return { sent: false, reason: \"WhatsApp relay not configured on this Worker\",\n      how_to_connect: [\"wrangler secret put WA_RELAY_URL --profile austinsdoors   # e.g. https://api.walohq.com/send\",\n                       \"wrangler secret put WA_RELAY_KEY --profile austinsdoors   # the bridge's X-Relay-Key\"] };\n  if (!env.WA_OWNER) return { sent: false, reason: \"WA_OWNER (destination number) not set in wrangler.toml [vars]\" };\n  // The bridge refuses free-form text and accepts only approved templates \u2014 which is\n  // correct, because free-form silently fails outside the 24-hour window. `text` is\n  // logged with the call for context; the wire carries a template.\n  let status, body;\n  try {\n    const r = await fetch(env.WA_RELAY_URL, {\n      method: \"POST\",\n      headers: { \"content-type\": \"application/json\", \"x-relay-key\": env.WA_RELAY_KEY },\n      body: JSON.stringify({ to: env.WA_OWNER, template: template || \"ping\" }),\n    });\n    status = r.status;\n    body = JSON.parse(scrub((await r.text()).slice(0, 2000), env.WA_RELAY_KEY) || \"{}\");\n  } catch (e) {\n    return { sent: false, reason: `relay unreachable: ${String((e && e.message) || e)}` };\n  }\n  if (status === 400 && body && body.allowed)\n    return { sent: false, reason: `template \"${template}\" is not approved`, allowed_templates: body.allowed };\n  const accepted = status >= 200 && status < 300 && body && body.ok === true;\n  return {\n    accepted, status, template: template || \"ping\", context: text || null,\n    message_id: (body && body.messageId) || null,\n    delivered: accepted ? \"unknown \u2014 a message id is not delivery\" : false,\n    caveat: \"As of 2026-09-10 the only live number is Meta's shared test line, which reaches allow-listed phones only (Austin, his dad). An approved template is the only thing that leaves the building outside the 24-hour window \u2014 the bridge enforces this by refusing free-form text.\",\n  };\n}","function safeRelayDiagnostics(body) {\n  const obj = body && typeof body === \"object\" && !Array.isArray(body) ? body : {};\n  let legacy = null;\n  if (typeof obj.detail === \"string\" && obj.detail.length <= 4096) {\n    try { legacy = JSON.parse(obj.detail); } catch {}\n  }\n  const err = legacy && typeof legacy.error === \"object\" ? legacy.error : {};\n  const number = (value, min, max) => {\n    if (!(typeof value === \"number\" || (typeof value === \"string\" && /^\\d{1,10}$/.test(value)))) return null;\n    const n = Number(value);\n    return Number.isSafeInteger(n) && n >= min && n <= max ? n : null;\n  };\n  return {\n    upstream_status: number(obj.upstream_status ?? obj.status, 100, 599),\n    upstream_code: number(obj.upstream_code ?? err.code, 0, 2147483647),\n    upstream_subcode: number(obj.upstream_subcode ?? err.error_subcode, 0, 2147483647),\n    sender_id: typeof obj.sender_id === \"string\" && /^\\d{15,20}$/.test(obj.sender_id) ? obj.sender_id : null,\n  };\n}\n\nasync function notifyAustin(env, text, template) {\n  if (!env.WA_RELAY_URL || !env.WA_RELAY_KEY)\n    return { sent: false, reason: \"WhatsApp relay not configured on this Worker\" };\n  if (!env.WA_OWNER) return { sent: false, reason: \"WhatsApp destination not configured\" };\n  // Preserve the existing request and credentials; return only allowlisted diagnostics.\n  let status, body = null;\n  try {\n    const r = await fetch(env.WA_RELAY_URL, {\n      method: \"POST\",\n      headers: { \"content-type\": \"application/json\", \"x-relay-key\": env.WA_RELAY_KEY },\n      body: JSON.stringify({ to: env.WA_OWNER, template: template || \"ping\" }),\n    });\n    status = r.status;\n    const raw = await r.text();\n    if (raw.length <= 65536) { try { body = JSON.parse(scrub(raw, env.WA_RELAY_KEY) || \"{}\"); } catch {} }\n  } catch {\n    return { sent: false, reason: \"relay unreachable\" };\n  }\n  const accepted = status >= 200 && status < 300 && body?.ok === true;\n  const messageId = body?.messageId;\n  return {\n    accepted, status,\n    template: [\"ping\", \"order_confirmed\", \"order_preparing\", \"order_ready\"].includes(template || \"ping\") ? template || \"ping\" : \"unrecognized\",\n    message_id: typeof messageId === \"string\" && /^wamid\\.[A-Za-z0-9+/=_-]{1,500}$/.test(messageId) ? messageId : null,\n    delivered: accepted ? \"unknown - a message id is not delivery\" : false,\n    ...safeRelayDiagnostics(body),\n    error_kind: accepted ? null : status === 400 && Array.isArray(body?.allowed) ? \"template_not_allowed\" : body?.error === \"graph error\" ? \"graph_error\" : \"relay_rejected\",\n    caveat: \"Meta acceptance does not confirm handset delivery. Confirm using a delivery receipt or the recipient.\",\n  };\n}"]],"localops-whatsapp-bridge":[["      console.error(\"relay /send graph fail\", res.status, text.slice(0, 200));\n      result = { ok: false, error: \"graph error\", status: res.status, detail: text.slice(0, 300) };\n      status = 502;","      let graphError = {};\n      try { graphError = JSON.parse(text)?.error || {}; } catch {}\n      const safeCode = (n) => Number.isSafeInteger(n) && n >= 0 && n <= 2147483647 ? n : null;\n      const senderId = /^\\d{15,20}$/.test(String(pnid)) ? String(pnid) : null;\n      result = { ok: false, error: \"graph error\", status: res.status,\n        upstream_status: res.status, upstream_code: safeCode(graphError.code),\n        upstream_subcode: safeCode(graphError.error_subcode), sender_id: senderId };\n      console.error(\"relay /send graph fail\", result.upstream_status, result.upstream_code, result.upstream_subcode, result.sender_id);\n      status = 502;"],["      result = { ok: true, to: normTo, template: b.template, messageId: data?.messages?.[0]?.id || null };","      result = { ok: true, to: normTo, template: b.template, messageId: data?.messages?.[0]?.id || null, sender_id: /^\\d{15,20}$/.test(String(pnid)) ? String(pnid) : null };"]]};
+var WALO_DIAGNOSTIC_PATCH_SHA = {"walo-mcp":"043e6866bf94552d0de734bfad36dc17c8128741a3fdd7cc17b7a95d55fc2e50","localops-whatsapp-bridge":"78278a930961ebb418b5a508e518f48c46122140ccdb932ecd2ed0a46bd24aa3"};
+// Owner-only, one-time WALO diagnostic repair. No arbitrary code, path, credentials or sends.
+var WALO_DIAGNOSTIC_ACCOUNT = '1d5fae607a857fc56cd575763bf8f3bc';
+var WALO_DIAGNOSTIC_TOOL_DEF = {name:'walo_diagnostic_repair',description:'Owner-only fixed diagnostic repair for walo-mcp and localops-whatsapp-bridge in Austin Doors. Inspect returns source/config hashes and rollback version without values or source. Stage uploads only embedded reviewed edits; deploy requires staged verification. Status and guarded rollback are limited to this one-time repair. Also permits the separately approved fixed tenant-1 sender-cache inspection/correction and fixed owner-only read-only notification probe installation. Does not send messages, change credentials, database routes or policies.',inputSchema:{type:'object',additionalProperties:false,required:['script','action','_approved'],properties:{script:{type:'string',enum:['walo-mcp','localops-whatsapp-bridge']},action:{type:'string',enum:['inspect','stage','verify','deploy','status','rollback','sender_cache_inspect','sender_cache_apply','sender_cache_verify','probe_inspect','probe_stage','probe_deploy','probe_status','probe_routes','key_inspect','key_apply','key_status']},expected_snapshot_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},candidate_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},confirm:{type:'boolean'},_approved:{type:'boolean'}}}};
+function wdAssert(ok,reason){if(!ok){const e=new Error(reason);e.wd=reason;throw e;}}
+function wdError(e){return e.safe||e.wd||'Unexpected failure; operation outcome may be uncertain';}
+function wdArgs(a){
+ wdAssert(a&&typeof a==='object'&&!Array.isArray(a),'Invalid arguments');
+ wdAssert(Object.keys(a).every(k=>['script','action','expected_snapshot_sha256','candidate_sha256','confirm','_approved'].includes(k)),'Unsupported argument');
+ wdAssert(Object.hasOwn(WALO_DIAGNOSTIC_EDITS,a.script),'Worker not allowed');
+ wdAssert(['inspect','stage','verify','deploy','status','rollback','sender_cache_inspect','sender_cache_apply','sender_cache_verify','probe_inspect','probe_stage','probe_deploy','probe_status','probe_routes','key_inspect','key_apply','key_status'].includes(a.action),'Invalid action');
+ wdAssert(a._approved===true,'Explicit scoped approval required');
+ for(const k of ['expected_snapshot_sha256','candidate_sha256'])if(a[k]!==undefined)wdAssert(typeof a[k]==='string'&&/^[a-f0-9]{64}$/.test(a[k]),'Invalid digest');
+ if(a.confirm!==undefined)wdAssert(typeof a.confirm==='boolean','Invalid confirmation');
+ if(['stage','deploy','rollback','sender_cache_apply','probe_stage','probe_deploy','key_apply'].includes(a.action))wdAssert(a.confirm===true,'Explicit mutation confirmation required');
+ return a.action;
+}
+function wdPatch(script,code){
+ wdAssert(!code.includes('function safeRelayDiagnostics(')&&!code.includes('upstream_subcode: safeCode(graphError.error_subcode)'),'Diagnostics already present; inspect current release');
+ const edits=WALO_DIAGNOSTIC_EDITS[script];
+ if(script==='walo-mcp'&&code.split(edits[0][0]).length===1){const fn=wdNotifyFunction(code);wdAssert(arCanon(wdTokens(fn))===arCanon(wdTokens(edits[0][0])),'Notification logic differs from reviewed patch');return code.replace(fn,()=>edits[0][1]);}
+ for(const [find,replacement]of edits){wdAssert(code.split(find).length===2,'Reviewed diagnostic patch anchor mismatch');code=code.replace(find,()=>replacement);}
+ return code;
+}
+function wdSettings(s){const r=arSettings(s);if(Array.isArray(r.bindings))r.bindings.sort((a,b)=>a.name.localeCompare(b.name));return r;}
+function wdResources(v){const r=arResources(v);if(Array.isArray(r.bindings))r.bindings.sort((a,b)=>a.name.localeCompare(b.name));return r;}
+function wdBase(script){wdAssert(Object.hasOwn(WALO_DIAGNOSTIC_EDITS,script),'Worker not allowed');return 'https://api.cloudflare.com/client/v4/accounts/'+WALO_DIAGNOSTIC_ACCOUNT+'/workers/scripts/'+script;}
+async function wdApi(env,script,path,init={}){
+ const r=await fetch(wdBase(script)+path,{...init,headers:{authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN_DOORS,...init.headers}});
+ const j=await r.json().catch(()=>null);
+ if(!r.ok||!j?.success){const e=new Error('WALO provider operation failed');e.safe={status:r.status,codes:j?.errors?.map(x=>x.code).filter(Number.isSafeInteger)||[]};throw e;}
+ return j.result;
+}
+async function wdCurrent(env,script){const d=(await wdApi(env,script,'/deployments'))?.deployments?.[0];wdAssert(d?.versions?.length===1&&d.versions[0].percentage===100,'Single active version required');return {id:d.id,versions:d.versions};}
+async function wdVersion(env,script,id){wdAssert(typeof id==='string'&&/^[a-f0-9-]{36}$/.test(id),'Invalid version');return wdApi(env,script,'/versions/'+id);}
+async function wdCode(env,script,v){
+ const r=await fetch(wdBase(script)+'/content/v2',{headers:{authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN_DOORS}});
+ wdAssert(r.ok&&r.headers.get('etag')?.replaceAll('"','')===v.resources?.script?.etag,'Latest uploaded source differs from selected version');
+ wdAssert((r.headers.get('content-type')||'').startsWith('multipart/form-data'),'Unexpected source format');
+ const main=r.headers.get('cf-entrypoint'),modules=[];
+ for(const [name,blob]of await r.formData()){wdAssert(blob instanceof Blob,'Unexpected source field');modules.push({name,content_type:blob.type,blob});}
+ wdAssert(main&&modules.length>0&&modules.length<=100&&modules.some(m=>m.name===main)&&new Set(modules.map(m=>m.name)).size===modules.length,'Unexpected module layout');
+ return {main_module:main,modules};
+}
+async function wdSnapshot(env,script,preview=false){
+ const active=await wdCurrent(env,script),id=active.versions[0].version_id,v=await wdVersion(env,script,id),settings=await wdApi(env,script,'/settings'),body=await wdCode(env,script,v);
+ wdAssert(!settings.migrations,'Migration changes not permitted');
+ const main=body.modules.find(m=>m.name===body.main_module),bytes=await main.blob.arrayBuffer(),code=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
+ wdAssert(await arHash(code)===await arHash(bytes),'Source encoding mismatch');
+ let candidate=null,comparison=null;try{candidate=await wdPatchCurrent(script,code);}catch(e){if(!preview||script!=='walo-mcp')throw e;comparison=await wdNotifyComparison(code);}
+ const modules=await arModuleHashes(body);
+ wdAssert(arCanon(await wdCurrent(env,script))===arCanon(active),'Concurrent deployment during inspection');
+ const settingsHash=await arHash(arCanon(wdSettings(settings))),resourcesHash=await arHash(arCanon(wdResources(v)));
+ const safe={account:WALO_DIAGNOSTIC_ACCOUNT,script,active,base_version:id,base_etag:v.resources.script.etag,main_module:body.main_module,module_hashes:modules,settings_sha256:settingsHash,resources_sha256:resourcesHash,candidate_sha256:candidate===null?null:await arHash(candidate),comparison,patch_sha256:WALO_DIAGNOSTIC_PATCH_SHA[script]};
+ return {safe:{...safe,snapshot_sha256:await arHash(arCanon(safe)),rollback_version:id,rollback_verified:true,bindings:(settings.bindings||[]).map(b=>({name:b.name,type:b.type})),edits:WALO_DIAGNOSTIC_EDITS[script].length},settings,version:v,body,candidate};
+}
+function wdRid(script){return 'walo-diagnostic-20261028-v1-'+script;}
+async function wdLedger(env,script,b){return wpLedger(env,{...b,rid:wdRid(script)});}
+async function wdUpdate(env,script,patch,release=false){return wdLedger(env,script,{action:'update',patch,release});}
+async function wdClaim(env,script,suffix,sha){
+ const rid=wdRid(script)+suffix,claim=await wpLedger(env,{action:'claim',rid,jti:rid,sha,script,actor:'owner'});
+ wdAssert(!claim.error,'Repair ledger refused claim');return claim;
+}
+async function wdVerify(env,script,rec,requireBase=true){
+ wdAssert(rec?.staged_version&&rec.base_version&&rec.expected_modules,'A recorded staged repair is required');
+ const base=await wdVersion(env,script,rec.base_version),next=await wdVersion(env,script,rec.staged_version);
+ wdAssert(await arHash(arCanon(wdResources(base)))===rec.resources_sha256&&arCanon(wdResources(base))===arCanon(wdResources(next)),'Runtime or binding configuration differs');
+ wdAssert(await arHash(arCanon(wdSettings(await wdApi(env,script,'/settings'))))===rec.settings_sha256,'Worker settings drift');
+ const body=await wdCode(env,script,next);
+ wdAssert(body.main_module===rec.main_module&&arCanon(await arModuleHashes(body))===arCanon(rec.expected_modules),'Uploaded modules differ');
+ const active=await wdCurrent(env,script);
+ wdAssert(arActive(active,requireBase?rec.base_version:rec.staged_version),'Concurrent active deployment');
+ return {state:requireBase?'staged_verified':'live_verified',staged_version:rec.staged_version,base_version:rec.base_version,candidate_sha256:rec.candidate_sha256,modules_verified:true,runtime_preserved:true,settings_preserved:true,active};
+}
+async function wdRollback(env,script,rec){
+ wdAssert(rec?.base_version&&rec.staged_version,'No rollback target recorded');
+ const active=await wdCurrent(env,script);
+ if(arActive(active,rec.base_version))return {state:'already_at_original',base_version:rec.base_version};
+ wdAssert(arActive(active,rec.staged_version),'Concurrent deployment prevents rollback');
+ const base=await wdVersion(env,script,rec.base_version);
+ wdAssert(await arHash(arCanon(wdResources(base)))===rec.resources_sha256,'Rollback configuration changed');
+ const claim=await wdClaim(env,script,'-rollback',rec.candidate_sha256);
+ if(claim.existing)return {state:'rollback_already_attempted_check_status'};
+ await wdApi(env,script,'/deployments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:rec.base_version,percentage:100}]})});
+ wdAssert(arActive(await wdCurrent(env,script),rec.base_version),'Rollback outcome unconfirmed');
+ await wpLedger(env,{action:'update',rid:wdRid(script)+'-rollback',patch:{state:'rolled_back'},release:true});
+ await wdUpdate(env,script,{state:'rolled_back'},false);return {state:'rolled_back',base_version:rec.base_version};
+}
+async function runWaloDiagnosticRepair(args,env,authContext){
+ if(authContext?.mode!=='admin'||authContext.caller==='walo'||authContext.connectionId)return {error:'WALO repair requires existing owner authorization'};
+ let action;try{action=wdArgs(args);}catch(e){return {error:wdError(e)};}
+ if(!env.CLOUDFLARE_API_TOKEN_DOORS||!env.RATE_LIMITER_DO)return {error:'Existing repair bindings unavailable; no fallback attempted'};
+ const script=args.script;
+ try{
+  if(action.startsWith('key_'))return await runTenant1KeyRepair(args,env);
+  if(action.startsWith('probe_'))return await runNotificationProbeRepair(args,env);
+  if(action.startsWith('sender_cache_'))return await wcRun(args,env);
+  if(action==='inspect'){const s=await wdSnapshot(env,script,true);return {...s.safe,production_changed:false};}
+  const record=(await wdLedger(env,script,{action:'get'})).record;
+  if(action==='status')return {script,record:record||null,active:await wdCurrent(env,script)};
+  if(action==='rollback')return await wdRollback(env,script,record);
+  if(action==='stage'){
+   if(record)return {already_handled:true,record};
+   wdAssert(args.expected_snapshot_sha256&&args.candidate_sha256,'Inspection and tested candidate digests required');
+   const s=await wdSnapshot(env,script);
+   wdAssert(s.safe.snapshot_sha256===args.expected_snapshot_sha256&&s.safe.candidate_sha256===args.candidate_sha256,'Inspection or candidate drift');
+   const claim=await wdClaim(env,script,'',s.safe.candidate_sha256);
+   if(claim.existing)return {already_handled:true,record:claim.existing};
+   const expected=[];const form=new FormData();
+   const metadata={...s.settings,main_module:s.body.main_module,exports:s.version.resources.script_runtime.exports,keep_assets:true,keep_bindings:['secret_text'],bindings:s.settings.bindings.filter(b=>b.type!=='secret_text'),annotations:{'workers/message':'Approved WALO sanitized notification diagnostics','workers/tag':'walo-diagnostic-20261028'}};
+   form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}),'metadata.json');
+   for(const m of s.body.modules){const blob=m.name===s.body.main_module?new Blob([s.candidate],{type:m.content_type}):m.blob;expected.push({name:m.name,type:m.content_type,bytes:blob.size,sha256:await arHash(await blob.arrayBuffer())});form.append(m.name,blob,m.name);}
+   expected.sort((a,b)=>a.name.localeCompare(b.name));
+   const rec={...s.safe,state:'uploading',expected_modules:expected};await wdUpdate(env,script,rec);
+   try{
+    wdAssert(arCanon(await wdCurrent(env,script))===arCanon(s.safe.active),'Concurrent deployment before upload');
+    wdAssert(await arHash(arCanon(wdSettings(await wdApi(env,script,'/settings'))))===s.safe.settings_sha256,'Worker settings drift before upload');
+    const next=await wdApi(env,script,'/versions?bindings_inherit=strict',{method:'POST',headers:{'if-match':'"'+s.safe.base_etag+'"'},body:form});
+    wdAssert(typeof next.id==='string','Upload outcome has no version');
+    await wdUpdate(env,script,{state:'uploaded_verifying',staged_version:next.id});
+    const verified=await wdVerify(env,script,{...rec,staged_version:next.id});
+    await wdUpdate(env,script,{state:'staged_verified'},true);return {...verified,production_changed:false};
+   }catch(e){await wdUpdate(env,script,{state:'staging_failed_or_uncertain',failure:wdError(e)},true);throw e;}
+  }
+  if(action==='verify'){
+   const result=await wdVerify(env,script,record);
+   wdAssert(['uploaded_verifying','staging_failed_or_uncertain','staged_verified'].includes(record.state),'Operation is not awaiting stage verification');
+   await wdUpdate(env,script,{state:'staged_verified',failure:null},true);return result;
+  }
+  wdAssert(record?.state==='staged_verified'&&args.candidate_sha256===record.candidate_sha256,'Verified staged repair and matching digest required');
+  await wdVerify(env,script,record);
+  const claim=await wdClaim(env,script,'-deploy',record.candidate_sha256);
+  if(claim.existing)return {state:'deployment_already_attempted_check_status'};
+  await wdUpdate(env,script,{state:'deploying'});
+  try{
+   wdAssert(arActive(await wdCurrent(env,script),record.base_version),'Concurrent deployment before activation');
+   const dep=await wdApi(env,script,'/deployments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:record.staged_version,percentage:100}],annotations:{'workers/message':'Approved WALO diagnostics; rollback '+record.base_version}})});
+   const result=await wdVerify(env,script,record,false);
+   await wpLedger(env,{action:'update',rid:wdRid(script)+'-deploy',patch:{state:'live_verified'},release:true});
+   await wdUpdate(env,script,{state:'live_verified',deployment_id:dep.id,finished_at:new Date().toISOString()});
+   return {...result,deployment_id:dep.id,rollback_version:record.base_version,delivery_tested:false};
+  }catch(e){
+   await wpLedger(env,{action:'update',rid:wdRid(script)+'-deploy',patch:{state:'failed_or_uncertain'},release:true});
+   let rollback;try{rollback=await wdRollback(env,script,record);}catch(re){rollback={state:'unconfirmed_or_concurrent_drift',reason:wdError(re)};}
+   await wdUpdate(env,script,{state:'deployment_failed_or_uncertain',failure:wdError(e),rollback});
+   return {error:'WALO diagnostic activation failed',reason:wdError(e),rollback};
+  }
+ }catch(e){return {error:'WALO repair stopped',reason:wdError(e)};}
+}
+
+function wdNotifyFunction(code){
+ const start=code.indexOf('async function notifyAustin('),end=code.indexOf('\n}\n',start);
+ wdAssert(start>=0&&end>start&&end-start<16000&&code.indexOf('async function notifyAustin(',start+1)<0,'Notification function boundary mismatch');
+ return code.slice(start,end+2);
+}
+function wdTokens(code){
+ const tokens=[];let i=0;
+ while(i<code.length){
+  const c=code[i];if(/\s/.test(c)){i++;continue;}
+  if(code.slice(i,i+2)==='//'){const end=code.indexOf('\n',i+2);i=end<0?code.length:end+1;continue;}
+  if(code.slice(i,i+2)==='/*'){const end=code.indexOf('*/',i+2);wdAssert(end>=0,'Unclosed comment');i=end+2;continue;}
+  if(c==='"'||c==="'"||c==='\x60'){let j=i+1;for(;j<code.length;j++){if(code[j]==='\\'){j++;continue;}if(code[j]===c)break;}wdAssert(j<code.length,'Unclosed source literal');tokens.push(code.slice(i,j+1));i=j+1;continue;}
+  const match=/^(?:[A-Za-z_$][\w$]*|\d+(?:\.\d+)?|===|!==|=>|==|!=|<=|>=|&&|\|\||\?\?|\?\.|\+\+|--|\*\*|\+=|-=|\*=|\/=|\.\.\.)/.exec(code.slice(i));
+  tokens.push(match?match[0]:c);i+=match?match[0].length:1;
+ }
+ return tokens;
+}
+async function wdNotifyComparison(code){
+ const fn=wdNotifyFunction(code),actual=wdTokens(fn),expected=wdTokens(WALO_DIAGNOSTIC_EDITS['walo-mcp'][0][0]),redact=async ts=>{
+  const out=[];for(const t of ts)out.push(/^["'\x60]/.test(t)||/^\d{7,}$/.test(t)?{literal_sha256:await arHash(t),bytes:new TextEncoder().encode(t).length}:t);return out;
+ };
+ let at=0;while(at<actual.length&&at<expected.length&&actual[at]===expected[at])at++;
+ return {function_sha256:await arHash(fn),same_tokens:arCanon(actual)===arCanon(expected),actual_token_count:actual.length,expected_token_count:expected.length,first_difference:at,actual_tokens:await redact(actual),expected_tokens:await redact(expected)};
+}
+
+async function wdPatchCurrent(script,code){
+ if(script==='walo-mcp'&&code.split(WALO_DIAGNOSTIC_EDITS['walo-mcp'][0][0]).length!==2){
+  const fn=wdNotifyFunction(code);
+  // Live source inspected through hashed-literal token comparison on 2026-10-28.
+  // Exact bundled function: unchanged relay URL/key/owner/template; compiler formatting,
+  // 2000 -> 2e3, redundant parentheses and escaped warning literals differ from source.
+  if(await arHash(fn)==='c593570f5e00d08fd43b965c4723e2c6c2b169c73278fa2d665466e5c1f147bf')
+   return code.replace(fn,()=>WALO_DIAGNOSTIC_EDITS['walo-mcp'][0][1]);
+ }
+ return wdPatch(script,code);
+}
+
+
+var APIARY_REPAIR_TOOL_DEF = {name:'apiary_cache_repair',description:'Owner-only, one-time fixed Apiary HEAD/empty-cache repair. snapshot returns a private gzip backup; stage uploads the embedded reviewed patch without deploying; deploy requires verified local-preview source hash; status/rollback are limited to this operation. No arbitrary code, account, resource, cache deletion or credential changes.',inputSchema:{type:'object',additionalProperties:false,properties:{action:{type:'string',enum:['inspect','snapshot','stage','restage','verify','deploy','status','rollback'],default:'snapshot'},expected_snapshot_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},backup_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},local_preview_source_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},confirm:{type:'boolean'},_approved:{type:'boolean'}}}};
+function arCanon(v){return JSON.stringify(v,(_,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.entries(x).sort(([a],[b])=>a.localeCompare(b))):x);}
+async function arHash(v){const b=typeof v==='string'?new TextEncoder().encode(v):v;return [...new Uint8Array(await crypto.subtle.digest('SHA-256',b))].map(x=>x.toString(16).padStart(2,'0')).join('');}
+function arB64(b){let s='';for(let n=0;n<b.length;n+=16384)s+=String.fromCharCode(...b.subarray(n,n+16384));return btoa(s);}
+function arBytes(s){const decoded=atob(s),bytes=new Uint8Array(decoded.length);for(let i=0;i<decoded.length;i++)bytes[i]=decoded.charCodeAt(i);return bytes;}
+function arAssert(ok,reason){if(!ok)throw new Error(reason);}
+function arActive(d,id){return d?.versions?.length===1&&d.versions[0].version_id===id&&d.versions[0].percentage===100;}
+function arSettings(s){const r=structuredClone(s);delete r.annotations;return r;}
+function arResources(v){const r=structuredClone(v.resources);delete r.script.etag;delete r.script.last_deployed_from;return r;}
+function arArgs(args){
+ arAssert(args&&typeof args==='object'&&!Array.isArray(args),'Invalid arguments');
+ const allowed=['action','expected_snapshot_sha256','backup_sha256','local_preview_source_sha256','confirm','_approved'];arAssert(Object.keys(args).every(k=>allowed.includes(k)),'Unsupported argument');
+ const action=args.action||'snapshot';arAssert(['inspect','snapshot','stage','restage','verify','deploy','status','rollback'].includes(action),'Invalid action');
+ for(const k of ['expected_snapshot_sha256','backup_sha256','local_preview_source_sha256'])if(args[k]!==undefined)arAssert(typeof args[k]==='string'&&/^[a-f0-9]{64}$/.test(args[k]),'Invalid digest');
+ for(const k of ['confirm','_approved'])if(args[k]!==undefined)arAssert(typeof args[k]==='boolean','Invalid confirmation');
+ if(['stage','restage','verify','deploy','rollback'].includes(action))arAssert(args.confirm===true,'Explicit repair confirmation required');
+ return action;
+}
+function arPatch(code){
+ arAssert(code.includes('PAGE_CACHE_REVISION = "20261011-reviewed-guides-final"'),'Cache revision mismatch');
+ const start=code.indexOf('var apiaryWorker = {'),end=code.indexOf('\nvar apiary_entry_default = withPageCounts(',start);
+ arAssert(start>=0&&end>start&&code.indexOf('var apiaryWorker = {',start+1)<0,'Apiary module boundary mismatch');
+ let block=code.slice(start,end);
+ const edits=[
+ ['    if (hit) {','    if (hit && (await hit.clone().arrayBuffer()).byteLength > 0) {'],
+ ['        if (obj) {','        if (obj && obj.size > 0) {'],
+ ['    const resp = await worker_default.fetch(request, env, ctx);','    const renderRequest = request.method === "HEAD" ? new Request(request, { method: "GET" }) : request;\n    const resp = await worker_default.fetch(renderRequest, env, ctx);'],
+ ['      ctx.waitUntil(cache.put(key, new Response(buf2, { status: 404, headers: h2 })));','      if (buf2.byteLength > 0) ctx.waitUntil(cache.put(key, new Response(buf2, { status: 404, headers: h2 })));'],
+ ['    ctx.waitUntil(cache.put(key, stored.clone()));','    if (buf.byteLength > 0) ctx.waitUntil(cache.put(key, stored.clone()));'],
+ ['    if (r2Key && env.READING_HTML) {\n      ctx.waitUntil(env.READING_HTML.put','    if (buf.byteLength > 0 && r2Key && env.READING_HTML) {\n      ctx.waitUntil(env.READING_HTML.put'],
+ ['return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers: h2 });','return new Response(request.method === "HEAD" ? null : resp.body, { status: resp.status, statusText: resp.statusText, headers: h2 });']
+ ];
+ for(const [find,replacement]of edits){arAssert(block.split(find).length===2,'Reviewed cache patch anchor mismatch');block=block.replace(find,()=>replacement);}
+ return {code:code.slice(0,start)+block+code.slice(end),edits:edits.length};
+}
+async function arApi(env,path,init={}){
+ const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+APIARY_READ_ACCOUNT+'/workers/'+path,{...init,headers:{authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN_DOORS,...init.headers}});
+ const j=await r.json().catch(()=>null);if(!r.ok||!j?.success){const e=new Error('Apiary provider operation failed');e.safe={status:r.status,codes:j?.errors?.map(x=>x.code).filter(x=>typeof x==='number')||[]};throw e;}return j.result;
+}
+async function arCurrent(env){const r=await arApi(env,'scripts/apiary-bee/deployments');arAssert(r?.deployments?.[0],'Active deployment unavailable');return r.deployments[0];}
+async function arVersion(env,id){arAssert(/^[a-f0-9-]{36}$/.test(id),'Invalid stored version');return arApi(env,'scripts/apiary-bee/versions/'+id);}
+async function arMetadata(env){
+ const active=await arCurrent(env);arAssert(arActive(active,APIARY_REPAIR_BASE),'Active version changed from approved base');const version=await arVersion(env,APIARY_REPAIR_BASE);arAssert(version.resources?.script?.etag===APIARY_REPAIR_ETAG,'Approved base ETag mismatch');
+ const settings=await arApi(env,'scripts/apiary-bee/settings'),beta=await arApi(env,'workers/apiary-bee/versions/'+APIARY_REPAIR_BASE);delete beta.modules;
+ return {account:APIARY_READ_ACCOUNT,script:'apiary-bee',active_version:APIARY_REPAIR_BASE,etag:APIARY_REPAIR_ETAG,settings,version,beta};
+}
+async function arContent(env,etag){const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+APIARY_READ_ACCOUNT+'/workers/scripts/apiary-bee/content/v2',{headers:{authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN_DOORS}});arAssert(r.ok&&r.headers.get('etag')?.replaceAll('"','')===etag,'Latest uploaded source differs from required version');arAssert((r.headers.get('content-type')||'').startsWith('multipart/form-data'),'Unexpected source format');return r;}
+async function arCode(env,id){const version=await arVersion(env,id);const r=await arContent(env,version.resources.script.etag),main=r.headers.get('cf-entrypoint');const form=await r.formData();const modules=[];for(const [name,blob]of form){arAssert(blob instanceof Blob,'Unexpected multipart text field');modules.push({name,content_type:blob.type,blob});}arAssert(main&&modules.length>0&&modules.length<=100&&modules.some(m=>m.name===main)&&new Set(modules.map(m=>m.name)).size===modules.length,'Unexpected Worker module layout');return{id,main_module:main,modules};}
+async function arModuleHashes(beta){const out=[];for(const m of beta.modules)out.push({name:m.name,type:m.content_type,bytes:m.blob.size,sha256:await arHash(await m.blob.arrayBuffer())});return out.sort((a,b)=>a.name.localeCompare(b.name));}
+async function arSnapshot(env){
+ const snapshot=await arMetadata(env),body=await arCode(env,APIARY_REPAIR_BASE);arAssert(body.main_module===snapshot.beta.main_module,'Main module mismatch');const patch=arPatch(await body.modules.find(m=>m.name===body.main_module).blob.text()),modules=await arModuleHashes(body);arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Concurrent deployment during snapshot');
+ return {snapshot,patch,modules,modulesBody:body.modules,snapshot_sha256:await arHash(arCanon(snapshot)),settings_sha256:await arHash(arCanon(arSettings(snapshot.settings))),candidate_sha256:await arHash(patch.code)};
+}
+async function arLedger(env,b){return wpLedger(env,{...b,rid:APIARY_REPAIR_RID});}
+async function arUpdate(env,patch,release=false){return arLedger(env,{action:'update',patch,release});}
+async function arChecks(){const result=[];for(const slug of ['biggie-medieval-manuscript-letters','wiki-zweistein','wiki-raether-limit']){const url='https://apiarybee.com/community/reading/'+slug;const h=await fetch(url,{method:'HEAD',redirect:'manual'});const headBytes=(await h.arrayBuffer()).byteLength;const r=await fetch(url,{redirect:'manual'});const html=await r.text();result.push({slug,head_status:h.status,head_bytes:headBytes,get_status:r.status,bytes:new TextEncoder().encode(html).length,ok:h.status===200&&headBytes===0&&r.status===200&&html.includes('<html')&&html.includes(url)});}return {ok:result.every(x=>x.ok),checks:result};}
+async function arRollback(env,record){const active=await arCurrent(env);if(arActive(active,APIARY_REPAIR_BASE))return {state:'already_at_original',active_version:APIARY_REPAIR_BASE};arAssert(arActive(active,record.staged_version),'Concurrent deployment prevents rollback');await arVersion(env,APIARY_REPAIR_BASE);await arApi(env,'scripts/apiary-bee/deployments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:APIARY_REPAIR_BASE,percentage:100}],annotations:{'workers/message':'Rollback approved Apiary cache repair'}})});arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Rollback outcome unconfirmed');await arUpdate(env,{state:'rolled_back',finished_at:new Date().toISOString()},true);return {state:'rolled_back',active_version:APIARY_REPAIR_BASE};}
+var APIARY_REPAIR_PRESERVED_MODULES = [{name:'apiary-entry.js.map',type:'application/source-map',bytes:21209889,sha256:'730bcb29a05d854d50c4d422cf05c6cfb20e8dbcd7d1d4ae642a01cfd785e9ad'}];
+async function arVerifyFixedBody(body,record){const hashes=await arModuleHashes(body);arAssert(body.main_module==='apiary-entry.js'&&hashes.find(m=>m.name===body.main_module)?.sha256===record.candidate_sha256,'Reviewed candidate body mismatch');arAssert(arCanon(hashes.filter(m=>m.name!==body.main_module))===arCanon(APIARY_REPAIR_PRESERVED_MODULES),'Preserved modules differ from verified backup');return hashes;}
+async function arRestage(env,args,record){
+ arAssert(record?.state==='staging_failed'&&record.failure==='Uploaded runtime configuration differs'&&record.staged_version,'No eligible failed stage');arAssert(args.local_preview_source_sha256===record.candidate_sha256&&args.backup_sha256===record.backup_sha256,'Verified backup and preview digests required');arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Concurrent deployment');
+ const original=await arVersion(env,APIARY_REPAIR_BASE),failed=await arVersion(env,record.staged_version),a=arResources(original),b=arResources(failed);arAssert(a.script_runtime.exports&&!b.script_runtime.exports,'Failure is not an omitted export declaration');delete a.script_runtime.exports;arAssert(arCanon(a)===arCanon(b),'Other runtime differences prevent retry');
+ const settings=await arApi(env,'scripts/apiary-bee/settings');arAssert(await arHash(arCanon(arSettings(settings)))===record.settings_sha256,'Worker settings drift');let body=await arCode(env,record.staged_version);const expected=await arVerifyFixedBody(body,record);
+ const rid=APIARY_REPAIR_RID+'-exports-retry',claim=await wpLedger(env,{action:'claim',rid,jti:rid,sha:record.candidate_sha256,script:'apiary-bee',actor:'owner'});arAssert(!claim.error,'Retry lock unavailable');if(claim.existing)return {already_handled:true,record};
+ await arUpdate(env,{state:'restaging',previous_staged_version:record.staged_version});
+ try{
+  const metadata={...settings,main_module:body.main_module,exports:original.resources.script_runtime.exports,keep_assets:true,keep_bindings:['secret_text'],bindings:settings.bindings.filter(x=>x.type!=='secret_text'),annotations:{'workers/message':'Approved Apiary cache repair; preserve existing exports','workers/tag':'apiary-cache-repair-20261028'}};
+  let form=new FormData();form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}),'metadata.json');for(const m of body.modules)form.append(m.name,m.blob,m.name);arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Concurrent deployment before restage');
+  const next=await arApi(env,'scripts/apiary-bee/versions?bindings_inherit=strict',{method:'POST',headers:{'if-match':'"'+failed.resources.script.etag+'"'},body:form});form=null;body=null;arAssert(typeof next.id==='string','Restage outcome has no version');await arUpdate(env,{state:'uploaded_verifying',staged_version:next.id});
+  const v=await arVersion(env,next.id);arAssert(arCanon(arResources(original))===arCanon(arResources(v)),'Restaged runtime configuration differs');arAssert(await arHash(arCanon(arSettings(await arApi(env,'scripts/apiary-bee/settings'))))===record.settings_sha256,'Settings changed during restage');const uploaded=await arCode(env,next.id);arAssert(arCanon(await arVerifyFixedBody(uploaded,record))===arCanon(expected),'Restaged code differs');arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Production changed during restage');
+  await arUpdate(env,{state:'staged_verified',module_hashes:expected,staged_etag:v.resources.script.etag,local_preview_source_sha256:args.local_preview_source_sha256,failure:null});await wpLedger(env,{action:'update',rid,patch:{state:'verified'},release:true});return {state:'staged_verified',staged_version:next.id,base_version:APIARY_REPAIR_BASE,production_changed:false,modules_verified:true,runtime_preserved:true,settings_preserved:true,exports_preserved:true,candidate_sha256:record.candidate_sha256};
+ }catch(e){await arUpdate(env,{state:'restaging_failed',failure:e.safe||e.message});await wpLedger(env,{action:'update',rid,patch:{state:'failed'},release:true});throw e;}
+}
+async function arVerifyStaged(env,args,record){
+ arAssert(record?.state==='restaging_failed'&&record.failure?.status===500&&arCanon(record.failure.codes)==='[10500]'&&record.staged_version,'No eligible interrupted verification');
+ arAssert(args.local_preview_source_sha256===record.candidate_sha256&&args.backup_sha256===record.backup_sha256,'Verified backup and preview digests required');arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Concurrent deployment');
+ const original=await arVersion(env,APIARY_REPAIR_BASE),v=await arVersion(env,record.staged_version);arAssert(arCanon(arResources(original))===arCanon(arResources(v)),'Staged runtime differs');
+ arAssert(await arHash(arCanon(arSettings(await arApi(env,'scripts/apiary-bee/settings'))))===record.settings_sha256,'Worker settings drift');
+ const hashes=await arVerifyFixedBody(await arCode(env,record.staged_version),record);arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Production changed during verification');
+ await arUpdate(env,{state:'staged_verified',module_hashes:hashes,staged_etag:v.resources.script.etag,local_preview_source_sha256:args.local_preview_source_sha256,failure:null});
+ return {state:'staged_verified',staged_version:record.staged_version,production_changed:false,modules_verified:true,runtime_preserved:true,settings_preserved:true,exports_preserved:true,candidate_sha256:record.candidate_sha256};
+}
+async function runApiaryRepair(args,env,authContext){
+ // Existing owner/admin keys only; exclude WALO's separate privileged integration.
+ if(authContext?.mode!=='admin'||authContext.caller==='walo'||authContext.connectionId)return {error:'Apiary repair requires existing owner authorization'};
+ let action;try{action=arArgs(args);}catch(e){return {error:e.message};}
+ if(!env.CLOUDFLARE_API_TOKEN_DOORS||!env.RATE_LIMITER_DO)return {error:'Existing repair bindings unavailable; no fallback attempted'};
+ try{
+  if(action==='inspect'){
+   const active=await arCurrent(env),v=await arVersion(env,APIARY_REPAIR_BASE);
+   const b=await arApi(env,'workers/apiary-bee/versions/'+APIARY_REPAIR_BASE);
+   const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+APIARY_READ_ACCOUNT+'/workers/scripts/apiary-bee/content/v2',{headers:{authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN_DOORS}});
+   const headers={status:r.status,content_type:r.headers.get('content-type'),content_length:r.headers.get('content-length'),etag:r.headers.get('etag'),'cf-entrypoint':r.headers.get('cf-entrypoint')};await r.body?.cancel();
+   return {active_version:active.versions,base_etag:v.resources.script.etag,main_module:b.main_module,beta_keys:Object.keys(b).filter(k=>k!=='bindings'),module_count:b.modules?.length,headers};
+  }
+  if(action==='snapshot'){
+   const snapshot=await arMetadata(env),r=await arContent(env,APIARY_REPAIR_ETAG),contentType=r.headers.get('content-type'),main=r.headers.get('cf-entrypoint');arAssert(main===snapshot.beta.main_module,'Main module mismatch');
+   const gzip=new Uint8Array(await new Response(r.body.pipeThrough(new CompressionStream('gzip'))).arrayBuffer());arAssert(gzip.length<16*1024*1024,'Compressed backup exceeds bounded size');arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Concurrent deployment during backup');
+   return {action,account:APIARY_READ_ACCOUNT,script:'apiary-bee',base_version:APIARY_REPAIR_BASE,base_etag:APIARY_REPAIR_ETAG,main_module:main,snapshot_sha256:await arHash(arCanon(snapshot)),private_metadata:snapshot,backup_sha256:await arHash(gzip),backup_encoding:'gzip+base64-multipart',backup_content_type:contentType,backup_bytes:gzip.length,backup_base64:arB64(gzip),edits:7,revision:'20261011-reviewed-guides-final',production_changed:false};
+  }
+  const record=(await arLedger(env,{action:'get'})).record;
+  if(action==='status'){
+   const out={record:record||null,active_deployment:await arCurrent(env)};
+   if(record?.staged_version){const a=arResources(await arVersion(env,APIARY_REPAIR_BASE)),b=arResources(await arVersion(env,record.staged_version));const paths=[];const walk=(x,y,p)=>{if(arCanon(x)===arCanon(y))return;if(x&&y&&typeof x==='object'&&typeof y==='object'&&!Array.isArray(x)&&!Array.isArray(y)){for(const k of new Set([...Object.keys(x),...Object.keys(y)]))walk(x[k],y[k],p+'.'+k);}else paths.push({path:p,before_type:Array.isArray(x)?'array':typeof x,after_type:Array.isArray(y)?'array':typeof y});};walk(a,b,'resources');const sortBindings=v=>Array.isArray(v)?[...v].sort((x,y)=>x.name.localeCompare(y.name)):v;out.configuration_differences=paths;out.binding_sets_identical=arCanon(sortBindings(a.bindings))===arCanon(sortBindings(b.bindings));out.runtime_keys={before:Object.keys(a.script_runtime||{}),after:Object.keys(b.script_runtime||{})};}
+   return out;
+  }
+  if(action==='restage')return await arRestage(env,args,record);
+  if(action==='verify')return await arVerifyStaged(env,args,record);
+  if(action==='rollback'){arAssert(record?.staged_version,'No repair version recorded');return await arRollback(env,record);}
+  if(action==='stage'){
+   if(record)return {already_handled:true,record};
+   arAssert(args.expected_snapshot_sha256&&args.backup_sha256&&args.local_preview_source_sha256,'Backup and local preview digests required');
+   const s=await arSnapshot(env);arAssert(s.snapshot_sha256===args.expected_snapshot_sha256,'Snapshot drift');arAssert(s.candidate_sha256===args.local_preview_source_sha256,'Previewed candidate differs');
+   // Owner confirms the locally verified streamed backup digest; source identity is independently pinned by immutable ETag and snapshot hash.
+   const claimed=await arLedger(env,{action:'claim',jti:APIARY_REPAIR_RID,sha:s.candidate_sha256,script:'apiary-bee',actor:'owner'});arAssert(!claimed.error,'Repair ledger refused claim');if(claimed.existing)return {already_handled:true,record:claimed.existing};
+   await arUpdate(env,{state:'uploading',base_version:APIARY_REPAIR_BASE,base_etag:APIARY_REPAIR_ETAG,snapshot_sha256:s.snapshot_sha256,backup_sha256:args.backup_sha256,candidate_sha256:s.candidate_sha256,settings_sha256:s.settings_sha256,revision:'20261011-reviewed-guides-final'});
+   try{
+    const metadata={...s.snapshot.settings,main_module:s.snapshot.beta.main_module,exports:s.snapshot.version.resources.script_runtime.exports,keep_assets:true,keep_bindings:['secret_text'],bindings:s.snapshot.settings.bindings.filter(b=>b.type!=='secret_text'),annotations:{'workers/message':'Approved Apiary HEAD and empty-cache fix; unchanged revision','workers/tag':'apiary-cache-repair-20261028'}};
+    let form=new FormData();form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}),'metadata.json');
+    const expected=[];for(const m of s.modulesBody){const blob=m.name===s.snapshot.beta.main_module?new Blob([s.patch.code],{type:m.content_type}):m.blob;expected.push({name:m.name,type:m.content_type,bytes:blob.size,sha256:await arHash(await blob.arrayBuffer())});form.append(m.name,blob,m.name);}
+    arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Concurrent deployment before upload');
+    const next=await arApi(env,'scripts/apiary-bee/versions?bindings_inherit=strict',{method:'POST',headers:{'if-match':'"'+APIARY_REPAIR_ETAG+'"'},body:form});arAssert(typeof next.id==='string','Upload outcome has no version');
+    form=null;s.modulesBody=null;s.patch=null;await arUpdate(env,{state:'uploaded_verifying',staged_version:next.id});
+    const version=await arVersion(env,next.id);arAssert(arCanon(arResources(s.snapshot.version))===arCanon(arResources(version)),'Uploaded runtime configuration differs');
+    const newSettings=await arApi(env,'scripts/apiary-bee/settings');arAssert(await arHash(arCanon(arSettings(newSettings)))===s.settings_sha256,'Worker settings changed on upload');
+    const beta=await arCode(env,next.id);arAssert(beta.main_module===s.snapshot.beta.main_module&&arCanon(await arModuleHashes(beta))===arCanon(expected.sort((a,b)=>a.name.localeCompare(b.name))),'Uploaded modules differ');
+    arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Production changed during staging');await arUpdate(env,{state:'staged_verified',module_hashes:expected,staged_etag:version.resources.script.etag,local_preview_source_sha256:args.local_preview_source_sha256});
+    return {state:'staged_verified',staged_version:next.id,base_version:APIARY_REPAIR_BASE,production_changed:false,modules_verified:true,runtime_preserved:true,settings_preserved:true,candidate_sha256:s.candidate_sha256};
+   }catch(e){await arUpdate(env,{state:'staging_failed',failure:e.safe||e.message},true);throw e;}
+  }
+  arAssert(record?.state==='staged_verified','A verified staged repair is required');arAssert(args.local_preview_source_sha256===record.candidate_sha256,'Local preview digest required');
+  const original=await arVersion(env,APIARY_REPAIR_BASE),staged=await arVersion(env,record.staged_version);arAssert(staged.resources.script.etag===record.staged_etag&&arCanon(arResources(original))===arCanon(arResources(staged)),'Staged immutable identity changed');
+  arAssert(await arHash(arCanon(arSettings(await arApi(env,'scripts/apiary-bee/settings'))))===record.settings_sha256,'Worker configuration drift');
+  arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Concurrent active deployment');
+  await arUpdate(env,{state:'deploying'});
+  try{
+   const dep=await arApi(env,'scripts/apiary-bee/deployments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:record.staged_version,percentage:100}],annotations:{'workers/message':'Approved Apiary cache fix; rollback '+APIARY_REPAIR_BASE}})});
+   arAssert(arActive(await arCurrent(env),record.staged_version),'Deployment outcome unconfirmed');await arUpdate(env,{state:'live_verifying',deployment_id:dep.id});
+   const checks=await arChecks();arAssert(checks.ok,'Live verification failed');const result={state:'live_verified',version:record.staged_version,rollback_version:APIARY_REPAIR_BASE,deployment_id:dep.id,checks,revision:'20261011-reviewed-guides-final',finished_at:new Date().toISOString()};await arUpdate(env,result,true);return result;
+  }catch(e){let rollback;try{rollback=await arRollback(env,record);}catch{rollback={state:'unconfirmed_or_concurrent_drift'};}await arUpdate(env,{state:'deployment_failed',failure:e.safe||e.message,rollback},true);return {error:'Apiary deployment failed',failure:e.safe||e.message,rollback};}
+ }catch(e){return {error:'Apiary repair stopped',reason:e.safe||e.message};}
+}
 var PAGES_DEPLOY_TOOLS = new Set(PAGES_DEPLOY_TOOL_DEFS.map((t) => t.name));
-// altClient(accountId) may return a client for another account (the owner's second Cloudflare login).
 async function runPagesDeployTool(name, args, client, altClient) {
   try {
-    if (altClient && args.account && name !== "wrangler_doctor") { const alt = altClient(pagesAccount(args.account)); if (alt) client = alt; }
+    if (altClient && args.account && name !== "wrangler_doctor") {
+      const alt = altClient(pagesAccount(args.account));
+      if (alt) client = alt;
+    }
     if (name === "pages_deploy") return await pagesDeploy(client, args);
     if (name === "pages_list_deployments") return await pagesListDeployments(client, args);
     if (name === "pages_get_deployment") return await pagesGetDeployment(client, args);
     if (name === "pages_rollback") return await pagesRollback(client, args);
     if (name === "wrangler_doctor") return await wranglerDoctor(client, args, altClient);
   } catch (e) {
-    return { error: String((e && e.message) || e).slice(0, 600) };
+    return { error: String(e && e.message || e).slice(0, 600) };
   }
   return { error: "unknown pages tool" };
 }
-
-
 var SERVER = {
   name: "cloudflare-ops-mcp",
   title: "AMH Walrus Tusk Cloudflare Ops MCP \u2014 SafeTry Agent Harness",
-  version: "0.14.0"
+  version: "0.15.0"
 };
 var INDEXNOW_KEY = "d4f02a51e05cfee056bc027685262a64";
 var MGMT_TOOL_DEFS = [
@@ -6640,24 +7616,49 @@ var TOOLS = [
       required: ["account_id", "project"]
     }
   },
+  WALO_DIAGNOSTIC_TOOL_DEF,
+  APIARY_REPAIR_TOOL_DEF,
+  ...APIARY_READ_TOOL_DEFS,
   ...PAGES_DEPLOY_TOOL_DEFS,
   ...PAGES_PATCH_TOOL_DEFS,
   ...GITHUB_TOOL_DEFS,
-  { name: "site_views", description: "READ-ONLY traffic for one of Austin's domains from Cloudflare analytics: requests, page views and unique visitors for today, the last 7 days or the last 30 days, plus the period before it to compare, and a per-day list. Counts include bots unless noted. Use it for 'how many views on X'.",
-    inputSchema: { type: "object", properties: { domain: { type: "string", description: "e.g. servicepricer.app or amhagentbook.com" }, period: { type: "string", enum: ["today", "week", "month"], description: "default week" } }, required: ["domain"] } },
-  { name: "pages_create_project", description: "Create a NEW Cloudflare Pages project (empty site at <name>.pages.dev). Dry-run unless apply=true. Then use pages_deploy to put files on it and pages_add_domain for a custom domain.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1)" }, name: { type: "string", description: "lowercase letters, digits, dashes" }, production_branch: { type: "string", description: "default main" }, apply: { type: "boolean" } }, required: ["account", "name"] } },
-  { name: "pages_add_domain", description: "Attach a custom domain (e.g. tacos.com or www.tacos.com) to a Pages project, or show the status of its domains. If the domain's zone is on the same Cloudflare account, Cloudflare sets up DNS itself; otherwise the result says what record to add. Dry-run unless apply=true.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1)" }, project: { type: "string" }, domain: { type: "string", description: "omit to just list the project's domains" }, apply: { type: "boolean" } }, required: ["account", "project"] } },
-  { name: "worker_deploy", description: "Deploy a small Cloudflare Worker (one ES-module file, export default { fetch }) next to a site, e.g. an AI chat endpoint or a form handler. Optional bindings: ai=true gives env.AI (Workers AI, e.g. env.AI.run('@cf/moonshotai/kimi-k2.6', {messages})), d1=[{binding, database_id}] gives env.<binding>, vars={NAME:'value'}. Publishes at <name>.<account>.workers.dev. Refuses to overwrite any Worker the hub didn't create (Austin's existing workers are safe). Dry-run unless apply=true. Remember the account's free AI allowance is shared: add a rate limit to anything public.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1)" }, name: { type: "string" }, code: { type: "string", description: "the module source" }, ai: { type: "boolean" }, d1: { type: "array", items: { type: "object", properties: { binding: { type: "string" }, database_id: { type: "string" } }, required: ["binding", "database_id"] } }, vars: { type: "object" }, compatibility_date: { type: "string" }, apply: { type: "boolean" } }, required: ["account", "name", "code"] } },
-  { name: "d1_create", description: "Create a new D1 database (or list existing ones when name is omitted). Dry-run unless apply=true.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1)" }, name: { type: "string" }, apply: { type: "boolean" } }, required: ["account"] } },
-  { name: "d1_query", description: "READ-ONLY SQL on a D1 database (SELECT / WITH / PRAGMA / EXPLAIN only). database = name or id. Returns rows.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1)" }, database: { type: "string" }, sql: { type: "string" }, params: { type: "array" } }, required: ["account", "database", "sql"] } },
-  { name: "d1_exec", description: "WRITE SQL on a D1 database (CREATE TABLE, INSERT, UPDATE, DELETE...). Dry-run unless apply=true; Austin must approve writes. DROP of a table needs force=true.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1) or doors (austinsdoors1)" }, database: { type: "string" }, sql: { type: "string" }, params: { type: "array" }, apply: { type: "boolean" }, force: { type: "boolean" } }, required: ["account", "database", "sql"] } },
+  {
+    name: "site_views",
+    description: "READ-ONLY traffic for one of Austin's domains from Cloudflare analytics: requests, page views and unique visitors for today, the last 7 days or the last 30 days, plus the period before it to compare, and a per-day list. Counts include bots unless noted. Use it for 'how many views on X'.",
+    inputSchema: { type: "object", properties: { domain: { type: "string", description: "e.g. servicepricer.app or amhagentbook.com" }, period: { type: "string", enum: ["today", "week", "month"], description: "default week" } }, required: ["domain"] }
+  },
+  {
+    name: "pages_create_project",
+    description: "Create a NEW Cloudflare Pages project (empty site at <name>.pages.dev). Dry-run unless apply=true. Then use pages_deploy to put files on it and pages_add_domain for a custom domain.",
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, name: { type: "string", description: "lowercase letters, digits, dashes" }, production_branch: { type: "string", description: "default main" }, apply: { type: "boolean" } }, required: ["account", "name"] }
+  },
+  {
+    name: "pages_add_domain",
+    description: "Attach a custom domain (e.g. tacos.com or www.tacos.com) to a Pages project, or show the status of its domains. If the domain's zone is on the same Cloudflare account, Cloudflare sets up DNS itself; otherwise the result says what record to add. Dry-run unless apply=true.",
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, project: { type: "string" }, domain: { type: "string", description: "omit to just list the project's domains" }, apply: { type: "boolean" } }, required: ["account", "project"] }
+  },
+  {
+    name: "worker_deploy",
+    description: "Deploy a small Cloudflare Worker (one ES-module file, export default { fetch }) next to a site, e.g. an AI chat endpoint or a form handler. Optional bindings: ai=true gives env.AI (Workers AI, e.g. env.AI.run('@cf/moonshotai/kimi-k2.6', {messages})), d1=[{binding, database_id}] gives env.<binding>, vars={NAME:'value'}. Publishes at <name>.<account>.workers.dev. Refuses to overwrite any Worker the hub didn't create (Austin's existing workers are safe). Dry-run unless apply=true. Remember the account's free AI allowance is shared: add a rate limit to anything public.",
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, name: { type: "string" }, code: { type: "string", description: "the module source" }, ai: { type: "boolean" }, d1: { type: "array", items: { type: "object", properties: { binding: { type: "string" }, database_id: { type: "string" } }, required: ["binding", "database_id"] } }, vars: { type: "object" }, compatibility_date: { type: "string" }, apply: { type: "boolean" } }, required: ["account", "name", "code"] }
+  },
+  {
+    name: "d1_create",
+    description: "Create a new D1 database (or list existing ones when name is omitted). Dry-run unless apply=true.",
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, name: { type: "string" }, apply: { type: "boolean" } }, required: ["account"] }
+  },
+  {
+    name: "d1_query",
+    description: "READ-ONLY SQL on a D1 database (SELECT / WITH / PRAGMA / EXPLAIN only). database = name or id. Returns rows.",
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, database: { type: "string" }, sql: { type: "string" }, params: { type: "array" } }, required: ["account", "database", "sql"] }
+  },
+  {
+    name: "d1_exec",
+    description: "WRITE SQL on a D1 database (CREATE TABLE, INSERT, UPDATE, DELETE...). Dry-run unless apply=true; Austin must approve writes. DROP of a table needs force=true.",
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, database: { type: "string" }, sql: { type: "string" }, params: { type: "array" }, apply: { type: "boolean" }, force: { type: "boolean" } }, required: ["account", "database", "sql"] }
+  },
   ...INBOX_TOOL_DEFS,
+  ...WP_TOOL_DEFS,
   ...EMAIL_TOOL_DEFS,
   {
     name: "token_audit_settings",
@@ -6750,6 +7751,9 @@ function pagesOwnerAccountClient(env, authContext, accountId) {
 }
 
 async function runTool(name, args, env, authContext) {
+  if (name === "walo_diagnostic_repair") return runWaloDiagnosticRepair(args, env, authContext);
+  if (name === "apiary_cache_repair") return runApiaryRepair(args, env, authContext);
+  if (APIARY_READ_TOOLS.has(name)) return runApiaryReadTool(name, args, env, authContext);
   if (HARNESS_TOOLS.has(name)) return runHarnessTool(name, args, env, authContext);
   if (name === "token_audit_settings") {
     const kv = env.CLOUDFLARE_OPS_OAUTH;
@@ -6770,7 +7774,6 @@ async function runTool(name, args, env, authContext) {
     };
   }
   const client = new CloudflareClient({ token });
-  // stale-catalog aliases: clients that cached the 0.6.3 tool list can still reach the new tools
   if (name === "pages_deploy" && (args.patch === true || Array.isArray(args.edits))) name = "pages_patch";
   if (name === "pages_get_deployment" && args.path) name = "pages_read_file";
   if (name === "pages_patch" || name === "pages_special_files" || name === "pages_read_file") {
@@ -6779,15 +7782,25 @@ async function runTool(name, args, env, authContext) {
       if (args.account) c = pagesOwnerAccountClient(env, authContext, pagesAccount(args.account)) || c;
       if (name === "pages_read_file") return await pagesReadFile(c, args);
       return name === "pages_patch" ? await pagesPatch(c, args, env, authContext?.connectionId || authContext?.mode) : await pagesSaveSpecial(c, args, env);
-    } catch (e) { return { error: String((e && e.message) || e).slice(0, 600) }; }
+    } catch (e) {
+      return { error: String(e && e.message || e).slice(0, 600) };
+    }
   }
   if (SITE_SETUP_TOOLS.has(name)) {
     if (authContext?.mode !== "admin") return { error: name + " is for the owner and agent keys" };
-    try { return await siteSetupTool(name, args, env); } catch (e) { return { error: String((e && e.message) || e).slice(0, 500) }; }
+    try {
+      return await siteSetupTool(name, args, env);
+    } catch (e) {
+      return { error: String(e && e.message || e).slice(0, 500) };
+    }
   }
   if (name === "site_views") {
     if (authContext?.mode !== "admin") return { error: "site_views is for the owner and agent keys" };
-    try { return await siteViews(env, args); } catch (e) { return { error: String((e && e.message) || e).slice(0, 400) }; }
+    try {
+      return await siteViews(env, args);
+    } catch (e) {
+      return { error: String(e && e.message || e).slice(0, 400) };
+    }
   }
   if (PAGES_DEPLOY_TOOLS.has(name)) return await runPagesDeployTool(name, args, client, (acct) => pagesOwnerAccountClient(env, authContext, acct));
   const domain = String(args.domain || "").trim();
@@ -6806,12 +7819,12 @@ async function runTool(name, args, env, authContext) {
       });
       if (minted && minted.apply === true && minted.id && env.CLOUDFLARE_OPS_OAUTH) {
         const zoneId = await resolveZone2(client, domain).then((z) => z && z.id).catch(() => null);
-        await env.CLOUDFLARE_OPS_OAUTH.put(`mintlog:${minted.id}`, JSON.stringify({ id: minted.id, domain: minted.domain, zone_id: zoneId, preset: minted.preset, expires_on: minted.expires_on, keep_days: Number(args.keep_days) >= 1 ? Math.min(365, Math.floor(Number(args.keep_days))) : null, at: new Date().toISOString(), actor: authContext?.connectionId || authContext?.mode || "unknown" }), { expirationTtl: 60 * 60 * 24 * 30 });
+        await env.CLOUDFLARE_OPS_OAUTH.put(`mintlog:${minted.id}`, JSON.stringify({ id: minted.id, domain: minted.domain, zone_id: zoneId, preset: minted.preset, expires_on: minted.expires_on, keep_days: Number(args.keep_days) >= 1 ? Math.min(365, Math.floor(Number(args.keep_days))) : null, at: (/* @__PURE__ */ new Date()).toISOString(), actor: authContext?.connectionId || authContext?.mode || "unknown" }), { expirationTtl: 60 * 60 * 24 * 30 });
       }
       return minted;
     }
     case "list_tokens":
-      return { tokens: await listTokens(client), presets: Object.keys(TOKEN_PRESETS), last_audit: env.CLOUDFLARE_OPS_OAUTH ? await env.CLOUDFLARE_OPS_OAUTH.get("audit:last", "json") : null, this_week: env.CLOUDFLARE_OPS_OAUTH ? await env.CLOUDFLARE_OPS_OAUTH.get(`digest:${new Date(Date.now() - ((new Date().getUTCDay() + 6) % 7) * 864e5).toISOString().slice(0, 10)}`, "json") : null };
+      return { tokens: await listTokens(client), presets: Object.keys(TOKEN_PRESETS), last_audit: env.CLOUDFLARE_OPS_OAUTH ? await env.CLOUDFLARE_OPS_OAUTH.get("audit:last", "json") : null, this_week: env.CLOUDFLARE_OPS_OAUTH ? await env.CLOUDFLARE_OPS_OAUTH.get(`digest:${new Date(Date.now() - ((/* @__PURE__ */ new Date()).getUTCDay() + 6) % 7 * 864e5).toISOString().slice(0, 10)}`, "json") : null };
     case "revoke_token":
       return await revokeToken(client, String(args.token_id || "").trim(), { apply: args.apply === true });
     case "who_serves_domain":
@@ -6954,7 +7967,6 @@ async function handleRpc(msg, env, authContext) {
       fed = [];
     }
     const isAdmin = authContext && authContext.mode === "admin";
-    // Connector apps (Grok) keep only the first ~45 tools, so the small, high-value upstreams go first.
     const FIRST = /^(cf|cfdoors)__/;
     return rpcResult(id, { tools: [...TOOLS, ...fed.filter((t) => FIRST.test(t.name)), ...isAdmin ? MGMT_TOOL_DEFS : [], ...fed.filter((t) => !FIRST.test(t.name))] });
   }
@@ -6982,12 +7994,18 @@ async function handleRpc(msg, env, authContext) {
         const outE = await runEmailTool(toolName, args, env, authContext.connectionId || "agent");
         return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(outE, null, 2) }], isError: !!(outE && outE.error) });
       }
+      if (WP_TOOLS.has(toolName)) {
+        if (!authContext || authContext.mode !== "admin") return rpcResult(id, { content: [{ type: "text", text: JSON.stringify({ error: toolName + " is for owner/agent keys" }) }], isError: true });
+        const outW = await runWorkerPatchTool(toolName, args, env, authContext.connectionId || "admin");
+        return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(outW, null, 2) }], isError: !!(outW && outW.error) });
+      }
       if (INBOX_TOOLS.has(toolName)) {
         if (!authContext || authContext.mode !== "admin") return rpcResult(id, { content: [{ type: "text", text: JSON.stringify({ error: "the agent inbox is for owner/agent keys" }) }], isError: true });
         const outI = await runInboxTool(toolName, args, env, null);
+        // an agent's own handoffs ("[hop n]") are woken by the runner itself
+        if (toolName === "post_task" && outI && outI.task && CLOUD_WAKE.includes(outI.task.to) && !/^[hop d+]/.test(String(args.text || ""))) await wakeCloudAgent(env, outI.task);
         return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(outI, null, 2) }], isError: !!(outI && outI.error) });
       }
-      // GitHub straight from the hub (no PC). pc__repo_* (the PC copies) route here too, so they work with the PC off.
       if (GITHUB_TOOLS.has(toolName) || /^pc__repo_(list|read|commit_push|open_pr)$/.test(toolName)) {
         if (!authContext || authContext.mode !== "admin") return rpcResult(id, { content: [{ type: "text", text: JSON.stringify({ error: "GitHub tools need an admin/agent key" }) }], isError: true });
         const out2 = await runGithubTool(toolName.replace(/^pc__/, ""), args, env, authContext.connectionId || authContext.mode);
@@ -7208,8 +8226,14 @@ async function fetchInner(request, env) {
   if (request.method === "GET" && url.pathname === "/walrus-tusk.md") return new Response(renderWalrusTuskMarkdown(url.origin), { headers: { "content-type": "text/markdown; charset=utf-8", "cache-control": "public, max-age=3600" } });
   if (request.method === "GET" && url.pathname === "/" + INDEXNOW_KEY + ".txt") return new Response(INDEXNOW_KEY, { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=86400" } });
   if (url.pathname === "/logo.svg") return new Response(renderLogoSvg(), { headers: { "content-type": "image/svg+xml", ...CORS } });
-  { const ibr = await inboxHandleHttp(request, env, url); if (ibr) return ibr; }
-  { const wtr = await wtuHandleHttp(request, env, url); if (wtr) return wtr; }
+  {
+    const ibr = await inboxHandleHttp(request, env, url);
+    if (ibr) return ibr;
+  }
+  {
+    const wtr = await wtuHandleHttp(request, env, url);
+    if (wtr) return wtr;
+  }
   if (url.pathname === "/oauth/cloudflare/start") return handleOAuthStart(request, env);
   if (url.pathname === "/oauth/cloudflare/callback") return handleOAuthCallback(request, env);
   if (url.pathname === "/oauth/cloudflare/status") return handleOAuthStatus(request, env);
@@ -7304,8 +8328,9 @@ var RateLimiterDO = class {
   }
   async fetch(request) {
     const url = new URL(request.url);
+    if (url.pathname === "/worker-patch") return wpLedgerFetch(request, this.state);
     if (url.pathname === "/task-board") return inboxBoardFetch(request, this.state, this.env);
-    if (await this.state.storage.get("board:meta")) return new Response("Wrong instance", {status:400});
+    if (await this.state.storage.get("board:meta")) return new Response("Wrong instance", { status: 400 });
     const limit = Number(url.searchParams.get("limit")) || 120;
     const period = Number(url.searchParams.get("period")) || 60;
     const now = Date.now();
@@ -7335,31 +8360,33 @@ var RateLimiterDO = class {
     this.hits = null;
   }
 };
-// Token-vending auditor (hourly cron). Revokes hub-minted ("cfops …") tokens that have no mint log,
-// reach beyond the one zone they were minted for, have no expiry, or are already expired.
-// Tokens not named "cfops …" (Austin's own) are never read past the name and never touched.
 async function auditMintedTokens(env) {
-  const report = { at: new Date().toISOString(), checked: 0, revoked: [], kept: 0, errors: [] };
+  const report = { at: (/* @__PURE__ */ new Date()).toISOString(), checked: 0, revoked: [], kept: 0, errors: [] };
   const token = env.CLOUDFLARE_API_TOKEN;
-  if (!token) { report.errors.push("no CLOUDFLARE_API_TOKEN"); return report; }
+  if (!token) {
+    report.errors.push("no CLOUDFLARE_API_TOKEN");
+    return report;
+  }
   const client = new CloudflareClient({ token });
   const unusedDays = Number(env.CLOUDFLARE_OPS_OAUTH && await env.CLOUDFLARE_OPS_OAUTH.get("cfg:unused_days")) || 7;
   report.unused_days = unusedDays;
   let list = [];
   try {
-    for (let page = 1; page <= 10; page++) {
-      const { result } = await client.request("GET", `/user/tokens?per_page=50&page=${page}`);
-      list.push(...(result || []));
+    for (let page2 = 1; page2 <= 10; page2++) {
+      const { result } = await client.request("GET", `/user/tokens?per_page=50&page=${page2}`);
+      list.push(...result || []);
       if (!result || result.length < 50) break;
     }
-  } catch (e) { report.errors.push("list: " + String(e.message || e).slice(0, 160)); }
+  } catch (e) {
+    report.errors.push("list: " + String(e.message || e).slice(0, 160));
+  }
   for (const t of list) {
     if (!/^cfops /.test(String(t.name || ""))) continue;
     report.checked++;
     let why = null;
     const log = env.CLOUDFLARE_OPS_OAUTH ? await env.CLOUDFLARE_OPS_OAUTH.get(`mintlog:${t.id}`, "json") : null;
-    const keep = (log && log.keep_days) || unusedDays;
-    if (t.status === "expired" || (t.expires_on && Date.parse(t.expires_on) < Date.now())) why = "expired";
+    const keep = log && log.keep_days || unusedDays;
+    if (t.status === "expired" || t.expires_on && Date.parse(t.expires_on) < Date.now()) why = "expired";
     else if (!t.expires_on) why = "no expiry";
     else if (Date.now() - Date.parse(t.last_used_on || t.issued_on || 0) > keep * 864e5) why = `unused ${keep} days`;
     else if (!log) why = "no mint log entry";
@@ -7367,20 +8394,27 @@ async function auditMintedTokens(env) {
       const res = (t.policies || []).flatMap((p) => Object.keys(p.resources || {}));
       if (!log.zone_id || res.some((r) => r !== `com.cloudflare.api.account.zone.${log.zone_id}`)) why = "scope beyond its zone";
     }
-    if (!why) { report.kept++; continue; }
-    try { await client.request("DELETE", `/user/tokens/${encodeURIComponent(t.id)}`); report.revoked.push({ id: t.id, name: t.name, why }); }
-    catch (e) { report.errors.push(`revoke ${t.id}: ${String(e.message || e).slice(0, 120)}`); }
+    if (!why) {
+      report.kept++;
+      continue;
+    }
+    try {
+      await client.request("DELETE", `/user/tokens/${encodeURIComponent(t.id)}`);
+      report.revoked.push({ id: t.id, name: t.name, why });
+    } catch (e) {
+      report.errors.push(`revoke ${t.id}: ${String(e.message || e).slice(0, 120)}`);
+    }
   }
   if (env.CLOUDFLARE_OPS_OAUTH) {
     await env.CLOUDFLARE_OPS_OAUTH.put("audit:last", JSON.stringify(report), { expirationTtl: 60 * 60 * 24 * 30 });
-    const d = new Date(), monday = new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 864e5).toISOString().slice(0, 10);
-    const key = `digest:${monday}`;
-    const dg = (await env.CLOUDFLARE_OPS_OAUTH.get(key, "json")) || { week_of: monday, audits: 0, revoked: [], tokens: {} };
+    const d = /* @__PURE__ */ new Date(), monday = new Date(d.getTime() - (d.getUTCDay() + 6) % 7 * 864e5).toISOString().slice(0, 10);
+    const key2 = `digest:${monday}`;
+    const dg = await env.CLOUDFLARE_OPS_OAUTH.get(key2, "json") || { week_of: monday, audits: 0, revoked: [], tokens: {} };
     dg.audits++;
     dg.revoked.push(...report.revoked.map((r) => ({ ...r, at: report.at })));
     for (const t of list) if (/^cfops /.test(String(t.name || ""))) dg.tokens[t.id] = { name: t.name, issued_on: t.issued_on, last_used_on: t.last_used_on || null, expires_on: t.expires_on || null };
     dg.revoked = dg.revoked.slice(-200);
-    await env.CLOUDFLARE_OPS_OAUTH.put(key, JSON.stringify(dg), { expirationTtl: 60 * 60 * 24 * 60 });
+    await env.CLOUDFLARE_OPS_OAUTH.put(key2, JSON.stringify(dg), { expirationTtl: 60 * 60 * 24 * 60 });
   }
   console.log(JSON.stringify({ event: "token_audit", ...report }));
   return report;
@@ -7391,11 +8425,16 @@ async function siteViews(env, args) {
   if (!domain) return { error: "domain is required" };
   const days = args.period === "today" ? 1 : args.period === "month" ? 30 : 7;
   const tokens = [["amh", env.CLOUDFLARE_API_TOKEN], ["doors", env.CLOUDFLARE_API_TOKEN_DOORS]].filter((t) => t[1]);
-  const cf = (tok, path, init = {}) => fetch("https://api.cloudflare.com/client/v4" + path, { ...init, headers: { Authorization: "Bearer " + tok, "content-type": "application/json" } }).then((r) => r.json());
+  const cf = (tok2, path, init = {}) => fetch("https://api.cloudflare.com/client/v4" + path, { ...init, headers: { Authorization: "Bearer " + tok2, "content-type": "application/json" } }).then((r) => r.json());
   let zone = null, tok = null, acct = null;
   for (const [name, t] of tokens) {
     const j = await cf(t, "/zones?name=" + encodeURIComponent(domain)).catch(() => null);
-    if (j && j.success && j.result && j.result[0]) { zone = j.result[0]; tok = t; acct = name; break; }
+    if (j && j.success && j.result && j.result[0]) {
+      zone = j.result[0];
+      tok = t;
+      acct = name;
+      break;
+    }
   }
   if (!zone) return { error: "Neither hub token can see the zone " + domain + ". It may be on another Cloudflare account." };
   const day = (n) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
@@ -7410,14 +8449,22 @@ async function siteViews(env, args) {
   const cut = day(days - 1);
   const sum = (arr) => arr.reduce((t, r) => ({ requests: t.requests + r.requests, pageViews: t.pageViews + r.pageViews, uniques: t.uniques + r.uniques }), { requests: 0, pageViews: 0, uniques: 0 });
   const now = sum(list.filter((r) => r.date >= cut)), before = sum(list.filter((r) => r.date < cut));
-  const pct = (a, b) => (b ? Math.round(((a - b) / b) * 100) + "%" : "n/a");
-  return { domain, account: acct, period: args.period || "week", since: cut, through: day(0),
-    totals: now, previous_period: before, change: { pageViews: pct(now.pageViews, before.pageViews), uniques: pct(now.uniques, before.uniques) },
+  const pct = (a, b) => b ? Math.round((a - b) / b * 100) + "%" : "n/a";
+  return {
+    domain,
+    account: acct,
+    period: args.period || "week",
+    since: cut,
+    through: day(0),
+    totals: now,
+    previous_period: before,
+    change: { pageViews: pct(now.pageViews, before.pageViews), uniques: pct(now.uniques, before.uniques) },
     per_day: list.filter((r) => r.date >= cut),
-    note: "Cloudflare zone analytics count every request, bots included; uniques are unique IPs per day summed across days." };
+    note: "Cloudflare zone analytics count every request, bots included; uniques are unique IPs per day summed across days."
+  };
 }
 __name(siteViews, "siteViews");
-var SITE_SETUP_TOOLS = new Set(["pages_create_project", "pages_add_domain", "worker_deploy", "d1_create", "d1_query", "d1_exec"]);
+var SITE_SETUP_TOOLS = /* @__PURE__ */ new Set(["pages_create_project", "pages_add_domain", "worker_deploy", "d1_create", "d1_query", "d1_exec"]);
 async function siteSetupTool(name, args, env) {
   const accountId = pagesAccount(args.account);
   // Additional owner credential is intentionally limited to dedicated Pages actions.
@@ -7429,7 +8476,7 @@ async function siteSetupTool(name, args, env) {
   if (!token) return { error: "no hub token for that account" };
   const base = "https://api.cloudflare.com/client/v4/accounts/" + accountId;
   const cf = async (path, init = {}) => {
-    const r = await fetch(base + path, { ...init, headers: { Authorization: "Bearer " + token, ...(init.body && typeof init.body === "string" ? { "content-type": "application/json" } : {}), ...(init.headers || {}) } });
+    const r = await fetch(base + path, { ...init, headers: { Authorization: "Bearer " + token, ...init.body && typeof init.body === "string" ? { "content-type": "application/json" } : {}, ...init.headers || {} } });
     const j = await r.json().catch(() => ({ success: false, errors: [{ message: "HTTP " + r.status }] }));
     if (!j.success) {
       const msg = (j.errors || []).map((e) => e.message).join("; ").slice(0, 400) || "HTTP " + r.status;
@@ -7510,8 +8557,8 @@ var index_default = {
     ctx.waitUntil(auditMintedTokens(env).catch((e) => console.log(JSON.stringify({ event: "token_audit_failed", error: String(e && e.message || e).slice(0, 200) }))));
   },
   async fetch(request, env, ctx) {
-    // No cron slot left on the free plan: audit at most hourly, piggybacked on real traffic.
-    if (ctx && env.CLOUDFLARE_OPS_OAUTH) ctx.waitUntil(env.CLOUDFLARE_OPS_OAUTH.get("audit:last", "json").then((r) => (!r || Date.now() - Date.parse(r.at) > 36e5) ? auditMintedTokens(env) : null).catch(() => {}));
+    if (ctx && env.CLOUDFLARE_OPS_OAUTH) ctx.waitUntil(env.CLOUDFLARE_OPS_OAUTH.get("audit:last", "json").then((r) => !r || Date.now() - Date.parse(r.at) > 36e5 ? auditMintedTokens(env) : null).catch(() => {
+    }));
     try {
       return harden(await fetchInner(request, env));
     } catch (e) {
@@ -7520,8 +8567,5 @@ var index_default = {
     }
   }
 };
-export {
-  RateLimiterDO,
-  index_default as default
-};
-//# sourceMappingURL=index.js.map
+
+export { RateLimiterDO, index_default as default };

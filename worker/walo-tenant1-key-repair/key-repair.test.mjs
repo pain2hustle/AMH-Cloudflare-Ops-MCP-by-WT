@@ -1,5 +1,5 @@
 import fs from 'node:fs';import vm from 'node:vm';import crypto from 'node:crypto';import test from 'node:test';import assert from 'node:assert/strict';
-const root=new URL('.',import.meta.url),bundle=fs.readFileSync(new URL('mcp-candidate.mjs',root),'utf8'),module=bundle.slice(bundle.indexOf('// One owner-approved credential correction.'),bundle.indexOf('var APIARY_REPAIR_TOOL_DEF = '));
+const root=new URL('.',import.meta.url),bundle=fs.readFileSync(new URL('../live/index.js',root),'utf8'),module=bundle.slice(bundle.indexOf('// One owner-approved credential correction.'),bundle.indexOf('var APIARY_REPAIR_TOOL_DEF = '));
 const helpers=bundle.slice(bundle.indexOf('function arCanon('),bundle.indexOf('function arArgs('))+bundle.slice(bundle.indexOf('async function arModuleHashes('),bundle.indexOf('async function arSnapshot('));
 const hash=v=>crypto.createHash('sha256').update(v).digest('hex'),base='fec6935a-634e-457c-8905-685b32fe830d',bridge='e0845984-a3b3-462f-860d-bed7d1ea6cf7',next='33333333-3333-4333-8333-333333333333',db='203fa727-30e1-4e07-b6a3-0aeefac08412';
 function harness(options={}){

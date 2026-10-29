@@ -1,8 +1,16 @@
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+const here=path.dirname(fileURLToPath(import.meta.url));
 const original=fs.readFileSync(new URL('./base-live.mjs',import.meta.url),'utf8');
+const parity=JSON.parse(fs.readFileSync(new URL('./source-parity.json',import.meta.url),'utf8'));
 if(!original.includes('async function authorizeConnector('))throw Error('Live auth helper missing');
+for(const marker of parity.required_markers)if(!original.includes(marker))throw Error('Recovered live source missing required feature: '+marker);
+if(original.includes('function createOAuthWorker('))throw Error('OAuth wrapper must not be nested in recovered legacy source');
 fs.writeFileSync(new URL('./legacy.mjs',import.meta.url),original+'\nexport { authorizeConnector };\n');
 fs.writeFileSync(new URL('./entry.mjs',import.meta.url),`import legacy, { authorizeConnector } from './legacy.mjs';\nimport { createOAuthWorker } from './mcp-oauth.mjs';\nexport { RateLimiterDO } from './legacy.mjs';\nexport default createOAuthWorker(legacy, authorizeConnector);\n`);
-await build({entryPoints:['entry.mjs'],outfile:'../live/index.js',bundle:true,format:'esm',platform:'browser',target:'es2022',external:['cloudflare:workers'],legalComments:'inline'});
-console.log('Built OAuth wrapper from recovered live Worker.');
+const argument=process.argv.find(x=>x.startsWith('--outfile='));
+const outfile=argument?path.resolve(argument.slice('--outfile='.length)):path.resolve(here,'../live/index.js');
+await build({absWorkingDir:here,entryPoints:['entry.mjs'],outfile,bundle:true,format:'esm',platform:'browser',target:'es2022',external:['cloudflare:workers'],legalComments:'inline'});
+console.log('Built OAuth wrapper from complete recovered live source.');

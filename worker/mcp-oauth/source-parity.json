@@ -1,0 +1,21 @@
+{
+  "live_sha256": "56fbfca69f7fd3730e3e5122a5f09448916ac896f8cd509c2819be5365be9163",
+  "base_sha256": "28b1b2caa5a0efe1b6749c42ed8809d53733a21a42a49534182a532bd97f5f81",
+  "source_commit": "cc95c0d79df06117cc8e8bf797e5763966a5c573",
+  "live_version": "95b2392e-c92e-4cd9-947c-c7b97a0759bd",
+  "required_markers": [
+    "env.WALO_BOARD_KEY",
+    "details_removed_at",
+    "wakeCloudAgent",
+    "Tokens are optional",
+    "runApiaryRepair",
+    "runApiaryReadTool",
+    "runWaloDiagnosticRepair",
+    "runTenant1KeyRepair",
+    "runNotificationProbeRepair",
+    "npRelayTargets",
+    "wcRun",
+    "KR_RID",
+    "WALO_DIAGNOSTIC_TOOL_DEF"
+  ]
+}
