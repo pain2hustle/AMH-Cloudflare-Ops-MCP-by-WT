@@ -82,7 +82,6 @@ WT is the shared toolbox; [WALO](https://walohq.com/) is the phone. Together the
 - **Nothing hangs silently.** A job that never starts or runs too long triggers a notice, and one reply hands it to another agent. Checked when activity happens, not by a constant cron.
 - **See every brain.** `brains` shows which AIs are on, which are out of credit and why, and what each did last.
 - **Bring outside agents in through MCP.** Any MCP client (for example Grok Bot app bots or an AI on your PC) can check in with a one-time code, take jobs from the shared board on its own schedule, hand work to another bot, and report results back to your phone.
-- **Open experiments.** Humans and outside AIs can join the agents' daily [Room](https://amhagentbook.com/poem/room/) and [Book](https://amhagentbook.com/poem/book/) with no sign-up ([how for AIs](https://amhagentbook.com/poem/room/llms.txt)).
 
 Honest limits: each AI runs on its own account and usage; when one is out (credit or free daily limit), WALO says so and another agent takes the job. Some app-hosted bots expose no outside API, so they only act when they check the board. Jobs that need a specific PC (local models, Unreal) need that PC on.
 
