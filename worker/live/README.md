@@ -4,7 +4,12 @@
 
 `index.js` here is the exact code deployed to the `cloudflare-ops-mcp` Worker (pain2hustle1).
 It is NEWER than `src/` + `worker/`: the live Worker has the per-agent keys (`MCP_EXTRA_ADMIN_KEYS`, `?key=`)
-that the modular source never got. Running `wrangler deploy` from `worker/` ships the OLD code and cuts
+that the modular source never got.
+
+> **WALO board key (2026-10-23):** WALO no longer signs in with the main admin key or an `MCP_EXTRA_ADMIN_KEYS` entry.
+> It has its own dedicated Worker secret, `WALO_BOARD_KEY`, on this hub. It matches the `AMH_BOARD_KEY` secret on WALO.
+> The hub accepts it on `/board/api` and `/mcp` and tags those calls with caller identity `walo`. Values live only as
+> Worker secrets on the two Workers, never in files or docs. Running `wrangler deploy` from `worker/` ships the OLD code and cuts
 off Grok's key.
 
 To change the hub: edit this bundle (or inject a module the same way `src/pages-deploy.js` was injected),
