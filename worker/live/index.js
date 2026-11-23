@@ -6410,7 +6410,7 @@ async function souljaDns(env, host, project, apply) {
   return { dns: "added", record: "CNAME " + host + " -> " + target + " (proxied)" };
 }
 async function runSouljaAccess(env, authContext, args = {}) {
-  const out = { checked_at: new Date().toISOString(), hub_version: "0.15.6", caller: { mode: authContext?.mode || null, caller: authContext?.caller || null }, account: { alias: "servicepricer", id: SOULJA_ACCOUNT } };
+  const out = { checked_at: new Date().toISOString(), hub_version: "0.15.7", caller: { mode: authContext?.mode || null, caller: authContext?.caller || null }, account: { alias: "servicepricer", id: SOULJA_ACCOUNT } };
   const v = await souljaCf(env, "/accounts/" + SOULJA_ACCOUNT + "/tokens/verify");
   out.credential = { source: "hub Worker secret CLOUDFLARE_API_TOKEN_SERVICEPRICER (value never returned)", status: v.ok ? v.result.status : "verify failed: " + v.errors };
   if (v.ok && v.result.id) {
@@ -7632,11 +7632,32 @@ async function runPagesDeployTool(name, args, client, altClient) {
 var SERVER = {
   name: "cloudflare-ops-mcp",
   title: "AMH Walrus Tusk Cloudflare Ops MCP \u2014 SafeTry Agent Harness",
-  version: "0.15.6",
+  version: "0.15.7",
   websiteUrl: "https://mcp.artificialmindhive.com/",
   icons: [{ src: "https://mcp.artificialmindhive.com/logo.svg", mimeType: "image/svg+xml", sizes: ["any"] }]
 };
 var PUBLIC_RPC = /* @__PURE__ */ new Set(["initialize", "ping", "tools/list"]);
+var ARG_DOCS = {"_approved":"Set true only after the owner approved this exact change. Without it the tool refuses or stays read-only.","_headers":"Full new contents of the Pages _headers file.","_redirects":"Full new contents of the Pages _redirects file.","account":"Cloudflare account alias to act on (for example amh, doors, servicepricer, kodak). Defaults to the hub's main account.","action":"Which step to run; see the allowed values. Inspect/status steps are read-only.","agent":"Name of the agent claiming or finishing the task.","ai":"Bind Workers AI to the Worker as env.AI.","apply":"false (default) returns a dry-run diff only; true makes the change.","around":"Line number to centre the returned excerpt on.","author":"Commit author shown in git history (name, not a credential).","backup_sha256":"SHA-256 of the backup taken by the snapshot step; must match before restore.","body":"Pull request description (Markdown).","branch":"Git branch name.","candidate_sha256":"SHA-256 of the staged candidate; must match before verify/deploy.","commit_hash":"Git commit hash recorded on the Pages deployment.","commit_message":"Message recorded on the deployment.","compatibility_date":"Workers compatibility date, YYYY-MM-DD.","confirm":"Must be true to run a step that changes anything.","cursor":"Pagination cursor returned by the previous call.","d1":"D1 bindings to attach: [{binding, database_id}].","database":"D1 database name or id.","deployment_id":"Cloudflare Pages deployment id.","domain":"Domain or zone name, for example example.com.","dry_run":"true returns what would change without applying it.","edits":"List of {path, old, new} text replacements to apply.","expected_snapshot_sha256":"SHA-256 of the snapshot you inspected; the call refuses if live has changed since.","failed":"true if the task could not be completed.","files":"Files to write: [{path, content}] (content as text or base64).","find":"Text to search for; returns the matching excerpt instead of the whole file.","force":"Skip the safety check that would otherwise refuse this call. Use with care.","grant":"Single-use grant id from worker_patch_grant.","id":"Task id.","include_done":"Also return finished tasks.","job_id":"Research job id returned by agent_research_start.","length":"Maximum number of characters or lines to return.","limit":"Maximum number of items to return.","local_preview_source_sha256":"SHA-256 of the locally previewed source; must match the staged copy.","message":"Commit message.","name":"Name of the Worker or database to create.","no_redirects":"Do not touch the _redirects file.","note":"Free-text note saved with the rollback in the audit log.","number":"Pull request number.","offset":"Start position (characters or lines) for paging through a file.","params":"Positional bind values for ? placeholders in the SQL.","path":"File path inside the repository or site.","per_page":"Items per page.","policy":"DMARC policy: none (monitor), quarantine or reject.","project":"Cloudflare Pages project name.","proxied":"Proxy the record through Cloudflare (orange cloud).","q":"Filter repositories by name.","query":"Search text.","reason":"Why the task is being cancelled.","ref":"Git branch, tag or commit to read from. Defaults to the default branch.","repo":"GitHub repository as owner/name.","request_id":"Patch request id returned by an earlier call.","result":"What was done, for the task record.","schedule":"Optional repeat schedule for the job, for example {every_minutes}.","script":"Name of the Worker script.","site":"Site to issue a gate pass for.","sql":"SQL statement to run.","status":"Filter tasks by status.","template_id":"Research template to run.","text":"Task text for the receiving agent.","title":"Pull request title.","to":"Agent the task is for.","vars":"Plain-text environment variables to set on the Worker.","version_id":"Worker version id."};
+var READ_ONLY_TOOLS = new Set(["scan_zone","plan_email_auth","verify_domain","list_tokens","who_serves_domain","account_doctor","pages_branch_check","apiary_worker_deployments","apiary_worker_version","apiary_r2_objects_list","pages_list_deployments","pages_get_deployment","wrangler_doctor","pages_read_file","repo_list","repo_read","repo_search","site_views","d1_query","my_tasks","list_tasks","worker_patch_status","agent_research_status","agent_research_list","agent_briefing","federation_list","policy_list"]);
+var DESTRUCTIVE_TOOLS = new Set(["delete_dns_record","revoke_token","pages_rollback","pages_cutover","d1_exec","repo_merge_pr","cancel_task","set_dmarc_policy","worker_deploy","worker_patch","pages_deploy","pages_patch","pages_special_files","apply_dns_record","federation_remove","agent_control"]);
+function documentTools(list) {
+  return list.map((t) => {
+    if (!t || typeof t !== "object") return t;
+    const out = { ...t };
+    const props = out.inputSchema && out.inputSchema.properties;
+    if (props) {
+      const np = {};
+      for (const [k, v] of Object.entries(props)) np[k] = v && typeof v === "object" && !v.description && ARG_DOCS[k] ? { ...v, description: ARG_DOCS[k] } : v;
+      out.inputSchema = { ...out.inputSchema, properties: np };
+    }
+    if (!out.annotations && !/__/.test(out.name || "")) {
+      const ro = READ_ONLY_TOOLS.has(out.name);
+      out.annotations = ro ? { readOnlyHint: true, openWorldHint: true } : { readOnlyHint: false, destructiveHint: DESTRUCTIVE_TOOLS.has(out.name), openWorldHint: true };
+    }
+    return out;
+  });
+}
+__name(documentTools, "documentTools");
 function isPublicRpc(body) {
   const list = Array.isArray(body) ? body : [body];
   return list.length > 0 && list.length <= 8 && list.every((m) => m && typeof m === "object" && typeof m.method === "string" && (PUBLIC_RPC.has(m.method) || m.method.startsWith("notifications/")));
@@ -8267,8 +8288,8 @@ async function handleRpc(msg, env, authContext) {
   }
   if (method === "ping") return rpcResult(id, {});
   if (method === "tools/list") {
-    if (authContext && authContext.mode === "public") return rpcResult(id, { tools: TOOLS });
-    if (authContext && authContext.mode === "user") return rpcResult(id, { tools: wtuToolDefs() });
+    if (authContext && authContext.mode === "public") return rpcResult(id, { tools: documentTools(TOOLS) });
+    if (authContext && authContext.mode === "user") return rpcResult(id, { tools: documentTools(wtuToolDefs()) });
     let fed = [];
     try {
       fed = await federatedTools(env);
@@ -8277,7 +8298,7 @@ async function handleRpc(msg, env, authContext) {
     }
     const isAdmin = authContext && authContext.mode === "admin";
     const FIRST = /^(cf|cfdoors)__/;
-    return rpcResult(id, { tools: [...TOOLS, ...fed.filter((t) => FIRST.test(t.name)), ...isAdmin ? MGMT_TOOL_DEFS : [], ...fed.filter((t) => !FIRST.test(t.name))] });
+    return rpcResult(id, { tools: documentTools([...TOOLS, ...fed.filter((t) => FIRST.test(t.name)), ...isAdmin ? MGMT_TOOL_DEFS : [], ...fed.filter((t) => !FIRST.test(t.name))]) });
   }
   if (method === "tools/call") {
     const toolName = params && params.name;
