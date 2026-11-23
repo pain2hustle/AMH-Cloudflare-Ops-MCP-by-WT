@@ -39,3 +39,11 @@ someone deployed since.
   - **`token_audit_settings {unused_days}`:** the auditor's default unused limit, stored in KV `cfg:unused_days` (default 7). Only admin keys can change it.
   - **`mint_scoped_token` `keep_days`:** a per-token override, stored in the mint log.
   - **Note:** `cf__execute` is the raw API, so the hub's artificialmindhive deploy guard does not apply to it. The landing guard and rollback are the safety net there.
+- 0.15.6 (2026-11-23): public discovery, via `inject-public-discovery.cjs` on the exact 0.15.5 live bundle.
+  - Token-less `initialize`, `ping`, `notifications/*` and `tools/list` answer 200 (the OAuth wrapper lets them through to legacy). A public `tools/list` returns the native TOOLS only, with no federated or owner tools.
+  - `tools/call` and every other method without a key still get the OAuth 401 with resource_metadata. A mixed batch gets 401 too.
+  - Public calls are rate limited per IP (`pub:<ip>`).
+  - `serverInfo` now has `websiteUrl` and `icons` (/logo.svg).
+  - Why: mcptry scores servers that are discoverable without sign-in, and the MCP spec allows it.
+  - Rollback version `8cf93c79-3758-4b38-bc6c-7cb23c135a10`.
+  - server.json is 0.15.6 and was republished to the registry. That moved the listing off the old cfops.nothingunseen.com 0.4.0 entry.

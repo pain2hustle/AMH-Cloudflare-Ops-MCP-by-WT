@@ -1,9 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.pain2hustle/cloudflare-ops-mcp",
-  "title": "AMH Walrus Tusk Cloudflare Ops MCP — SafeTry Agent Harness",
-  "description": "OAuth-isolated, approval-gated Cloudflare operations for DNS, email, Pages, cache, Turnstile, tokens, and account diagnostics, with an optional private SafeTry Agent Harness for bounded research, independent verification, deterministic health checks, schedules, audit, and verified deploy gates.",
-  "version": "0.5.3",
+  "title": "AMH Cloudflare Ops MCP by WT",
+  "description": "Approval-gated Cloudflare ops for agents: DNS, email auth, Pages, cache, Turnstile, tokens.",
+  "version": "0.15.6",
+  "websiteUrl": "https://mcp.artificialmindhive.com/",
+  "icons": [
+    {
+      "src": "https://mcp.artificialmindhive.com/logo.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": ["any"]
+    }
+  ],
   "repository": {
     "url": "https://github.com/pain2hustle/cloudflare-ops-mcp",
     "source": "github"
@@ -15,8 +23,8 @@
       "headers": [
         {
           "name": "Authorization",
-          "description": "Your one-user cfops_ connector key, issued after Cloudflare OAuth. This is not a Cloudflare API token.",
-          "isRequired": true,
+          "description": "Optional. initialize and tools/list are public; tool calls sign in with OAuth, or send Bearer <your WT connector key>. Not a Cloudflare API token.",
+          "isRequired": false,
           "isSecret": true
         }
       ]
