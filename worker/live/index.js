@@ -2058,7 +2058,7 @@ function getOAuthConfigStatus(env, origin = "") {
   };
 }
 __name(getOAuthConfigStatus, "getOAuthConfigStatus");
-var PAGES_ACCOUNT_ALIASES = { amh: "0ebf6d65d7a9ddccd41cba0b8bd1414c", doors: "1d5fae607a857fc56cd575763bf8f3bc", artificialmindhive: "a08783a0d3715df907ed5ccad38f0dcf" };
+var PAGES_ACCOUNT_ALIASES = { amh: "0ebf6d65d7a9ddccd41cba0b8bd1414c", doors: "1d5fae607a857fc56cd575763bf8f3bc", artificialmindhive: "a08783a0d3715df907ed5ccad38f0dcf", servicepricer: "068a8123b10b7a9fcdcb49e6763969e9", kodak: "3573003179750b6bec7f4549ca695675" };
 var PAGES_PROTECTED = /* @__PURE__ */ new Set(["artificialmindhive"]);
 var PAGES_MAX_FILES = 2e3;
 var PAGES_MAX_BYTES = 60 * 1024 * 1024;
@@ -2067,7 +2067,7 @@ var PAGES_TYPES = { html: "text/html", htm: "text/html", css: "text/css", js: "a
 function pagesAccount(a) {
   const s = String(a || "").trim().toLowerCase();
   const id = PAGES_ACCOUNT_ALIASES[s] || s;
-  if (!/^[a-f0-9]{32}$/.test(id)) throw new Error("account must be amh, doors, artificialmindhive, or a 32-hex account id");
+  if (!/^[a-f0-9]{32}$/.test(id)) throw new Error("account must be amh, doors, artificialmindhive, servicepricer, kodak, or a 32-hex account id");
   return id;
 }
 function pagesProject(p) {
@@ -2243,7 +2243,7 @@ var PAGES_DEPLOY_TOOL_DEFS = [
     name: "pages_deploy",
     description: "Deploy a COMPLETE built static site to a Cloudflare Pages project through the API (like `wrangler pages deploy`, no PC needed). Dry-run by default; apply=true uploads and deploys. branch = production branch goes LIVE; any other branch is a preview URL. A deploy replaces the whole site, so send every file. To change only a few files on a live site use pages_patch (or pass patch=true with edits [{path,find,replace}] here). Static only (no functions/). artificialmindhive production is refused.",
     inputSchema: { type: "object", properties: {
-      account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), artificialmindhive, or an account id" },
+      account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), artificialmindhive, servicepricer (souljaboy.app), kodak (kodakblack.app), or an account id" },
       project: { type: "string" },
       branch: { type: "string", description: "default = production branch" },
       files: { type: "array", items: { type: "object", properties: { path: { type: "string" }, content: { type: "string", description: "text file contents" }, content_base64: { type: "string", description: "binary file contents" } }, required: ["path"] } },
@@ -2354,13 +2354,29 @@ async function pagesReadFile(client, args) {
   const offset = Math.max(Number(args.offset) || 0, 0), length = Math.min(Math.max(Number(args.length) || 2e4, 1), 6e4);
   return { ...out, offset, length, more: offset + length < text.length, content: text.slice(offset, offset + length) };
 }
+// Resolve an existing branch; never seed a preview patch from production.
+async function pagesPatchBase(client, account, project, p, branch) {
+  if (branch === p.production_branch) {
+    if (!p.canonical_deployment?.id) throw new Error("project has no live production deployment to patch onto");
+    return p.canonical_deployment;
+  }
+  for (let page = 1; page <= 80; page++) {
+    const { result } = await client.request("GET", `/accounts/${account}/pages/projects/${project}/deployments?per_page=25&page=${page}`);
+    if (!Array.isArray(result)) throw new Error("invalid preview deployment list");
+    const found = result.find(d => d.environment === "preview" && d.deployment_trigger?.metadata?.branch === branch && d.latest_stage?.status === "success" && Array.isArray(d.aliases) && d.aliases.length > 0);
+    if (found) return found;
+    if (result.length < 25) break;
+  }
+  throw new Error(`no successful aliased deployment found for preview branch ${branch}; production will not be used`);
+}
+
 async function pagesPatch(client, args, env, actor) {
   const account = pagesAccount(args.account), project = pagesProject(args.project);
   const p = await pagesGetProject(client, account, project);
   const branch = String(args.branch || p.production_branch || "main").trim();
   if (!/^[A-Za-z0-9._/-]{1,80}$/.test(branch)) throw new Error("bad branch");
   const production = branch === p.production_branch;
-  const live = p.canonical_deployment;
+  const live = await pagesPatchBase(client, account, project, p, branch);
   if (!live || !live.id) return { error: "project has no live production deployment to patch onto" };
   const { result: base } = await client.request("GET", `/accounts/${account}/pages/projects/${project}/deployments/${live.id}`);
   let worker = null;
@@ -2370,6 +2386,7 @@ async function pagesPatch(client, args, env, actor) {
     const known = [worker.for_deployment, ...worker.deployments || []];
     if (!known.includes(live.id)) return { error: `${project} live deployment (${live.id.slice(0, 8)}) is not the one the saved worker bundle belongs to (${String(worker.for_deployment).slice(0, 8)}). Someone deployed outside the hub; the owner must refresh it (npm run deploy in amh-hive). Nothing deployed.` };
   }
+  if (!production && (base.environment !== "preview" || base.deployment_trigger?.metadata?.branch !== branch)) throw new Error("preview base identity mismatch");
   const manifest = { ...base.files || {} };
   if (!Object.keys(manifest).length) return { error: "Cloudflare returned an empty file list for the live deployment; refusing to patch" };
   const files = Array.isArray(args.files) ? args.files.slice() : [];
@@ -2412,7 +2429,7 @@ async function pagesPatch(client, args, env, actor) {
   const deletes = (Array.isArray(args.delete) ? args.delete : []).map(pagesPath);
   if (!files.length && !deletes.length) throw new Error("give edits [{path, find, replace}] (best) or files [{path, content}] with ONLY the changed files");
   if (files.length > PATCH_MAX_FILES) throw new Error(`too many files for a patch (max ${PATCH_MAX_FILES}); use pages_deploy for a full site`);
-  const stored = await pagesSpecialGet(env, account, project);
+  const stored = production ? await pagesSpecialGet(env, account, project) : null;
   const special = {};
   for (const k of ["_redirects", "_headers", "_routes.json"]) if (stored && typeof stored[k] === "string") special[k] = stored[k];
   let specialFromArgs = false;
@@ -2453,7 +2470,7 @@ async function pagesPatch(client, args, env, actor) {
     delete_not_found: missingDeletes,
     special_files: Object.keys(special),
     special_source: specialFromArgs ? "sent in this call" : "hub saved copy",
-    rollback_hint: { tool: "pages_rollback", deployment_id: live.id }
+    rollback_hint: production ? { tool: "pages_rollback", deployment_id: live.id } : { deployment_id: live.id, url: base.url, note: "Preview snapshots remain available; production rollback is not applicable." }
   };
   if (args.apply !== true) return { dry_run: true, ...plan, warning: production ? "PRODUCTION: only the files above change on " + (p.domains || []).join(", ") : "preview branch only", next: "call again with apply=true" };
   for (const e of entries) manifest[e.path] = e.hash;
@@ -2474,6 +2491,10 @@ async function pagesPatch(client, args, env, actor) {
     if (batch.length) await assets("upload", batch);
     await assets("upsert-hashes", { hashes: unique.map((e) => e.hash) });
   }
+  if (!production) {
+    const current = await pagesPatchBase(client, account, project, await pagesGetProject(client, account, project), branch);
+    if (current.id !== live.id) throw new Error("preview changed while preparing patch; retry from its current deployment");
+  }
   const form = new FormData();
   form.append("manifest", JSON.stringify(manifest));
   form.append("branch", branch);
@@ -2492,7 +2513,7 @@ async function pagesPatch(client, args, env, actor) {
   const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/pages/projects/${project}/deployments`, { method: "POST", headers: { authorization: `Bearer ${client._token}` }, body: form });
   const j = await r.json().catch(() => ({}));
   if (!j.success) throw new Error(`create deployment failed: ${j.errors && j.errors[0] && j.errors[0].message || r.status}`);
-  if (specialFromArgs) await pagesSpecialPut(env, account, project, special);
+  if (specialFromArgs && production) await pagesSpecialPut(env, account, project, special);
   if (worker && production) {
     const health = await pagesHealth(j.result.url, worker);
     if (!health.ok) {
@@ -2553,7 +2574,7 @@ var PAGES_PATCH_TOOL_DEFS = [
     name: "pages_patch",
     description: "Change ONLY a few files on a live Pages site (no PC, no full file set). Best: edits [{path, find, replace}] \u2014 the hub fetches the live file, replaces the exact text (must match once), and deploys. Or files [{path, content}] for whole changed files. The hub copies the live deployment's file list, swaps in the changes (and removes any in delete), keeps _redirects/_headers, and deploys. Every other file stays exactly as live. Dry-run by default; apply=true deploys. branch = production branch goes LIVE, any other = preview. Returns rollback_hint. Sites with server code (artificialmindhive) re-attach the owner-saved worker bundle and get a title + API health check after deploy, with automatic rollback on failure.",
     inputSchema: { type: "object", properties: {
-      account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" },
+      account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), artificialmindhive, servicepricer (souljaboy.app), or kodak (kodakblack.app)" },
       project: { type: "string" },
       branch: { type: "string", description: "default = production branch (LIVE)" },
       edits: { type: "array", description: "exact find/replace on live files", items: { type: "object", properties: { path: { type: "string" }, find: { type: "string" }, replace: { type: "string" }, count: { type: "number", description: "expected matches, default 1" } }, required: ["path", "find", "replace"] } },
@@ -5970,7 +5991,7 @@ code,.mono{font-family:ui-monospace,Consolas,monospace;font-size:13px;word-break
 <div class="card"><h2>How it works</h2><ol><li>Get a key here.</li><li>Add the MCP link to Grok, Claude or ChatGPT.</li><li>Optional, when you want your AI to edit your own sites: add a Cloudflare or GitHub token on the <a href="${origin}/setup">setup page</a>.</li><li>Say \u201Clist my sites\u201D, then \u201Cchange \u2026 on my homepage\u201D. It reads the live page, shows a dry run, and deploys only the changed file.</li></ol></div>
 <script>document.getElementById('go').onclick=async()=>{const b=document.getElementById('go');b.disabled=true;b.textContent='\u2026';const r=await fetch('/join',{method:'POST',headers:{'content-type':'application/json'},body:'{}'});const j=await r.json();const o=document.getElementById('res');
 if(!r.ok){o.innerHTML='<span class=bad>'+(j.error||'failed')+'</span>';b.disabled=false;b.textContent='Get my key';return}
-b.style.display='none';o.innerHTML='<b class=ok>Your key (save it now, shown once):</b><div class="key mono">'+j.key+'</div><b>MCP link for your AI app:</b><div class="key mono">'+j.mcp_url+'</div><p class="sub">Paste that link into Grok, Claude or ChatGPT as an MCP connector and you're in. No token needed for this.</p><a href="/setup#'+j.key+'">Later, to let your AI edit your own sites: add a token (optional) \u2192</a>';try{localStorage.setItem('wtu',j.key)}catch(e){}}<\/script></main><footer class="wt-foot"><a class="amh" href="https://artificialmindhive.com" style="margin:0 auto;justify-content:center"><span class="badge"><i class="ufo a"></i><i class="ufo b"></i><b>AMH</b></span></a><nav><a href="https://artificialmindhive.com/WT/">Walrus Tusk</a><a href="https://walohq.com/board/">Agent Board</a><a href="https://walohq.com/">WALO</a><a href="https://amhagentbook.com/">Agent Book</a><a href="https://artificialmindhive.com">Artificial Mind Hive</a></nav><div>Walrus Tusk by Artificial Mind Hive \xB7 your tokens stay encrypted and only touch your own accounts</div></footer></body></html>`;
+b.style.display='none';o.innerHTML='<b class=ok>Your key (save it now, shown once):</b><div class="key mono">'+j.key+'</div><b>MCP link for your AI app:</b><div class="key mono">'+j.mcp_url+'</div><p class="sub">Paste that link into Grok, Claude or ChatGPT as an MCP connector and you’re in. No token needed for this.</p><a href="/setup#'+j.key+'">Later, to let your AI edit your own sites: add a token (optional) \u2192</a>';try{localStorage.setItem('wtu',j.key)}catch(e){}}<\/script></main><footer class="wt-foot"><a class="amh" href="https://artificialmindhive.com" style="margin:0 auto;justify-content:center"><span class="badge"><i class="ufo a"></i><i class="ufo b"></i><b>AMH</b></span></a><nav><a href="https://artificialmindhive.com/WT/">Walrus Tusk</a><a href="https://walohq.com/board/">Agent Board</a><a href="https://walohq.com/">WALO</a><a href="https://amhagentbook.com/">Agent Book</a><a href="https://artificialmindhive.com">Artificial Mind Hive</a></nav><div>Walrus Tusk by Artificial Mind Hive \xB7 your tokens stay encrypted and only touch your own accounts</div></footer></body></html>`;
   return head("Setup") + `
 <div class="hero"><img src="https://walohq.com/board/walrus-tusk.webp" alt="Walrus Tusk"><div><h1>Walrus <b>Tusk</b> setup</h1><p class="sub" style="margin:0">Tokens are optional. Your key already connects; a token only lets your AI edit and deploy <b>your own</b> sites.</p></div></div><p class="sub">Your tokens are encrypted and only ever used for your own accounts. You can delete them any time.</p>
 <div class="card"><h2>Connect your AI now</h2><p class="sub" style="margin:0 0 6px">Paste this into Grok, Claude or ChatGPT as an MCP connector. No token needed.</p><div id="mcp" class="key mono">Put your key in the box at the bottom.</div></div>
@@ -6329,6 +6350,132 @@ var WP_SCRIPTS = {
     live: "https://wp-test.pain2hustle1.workers.dev", previewChecks: [["/", "wp-test"]], liveChecks: [["/", "wp-test"]] },
 };
 var WP_GRANT_TTL = 600;
+// Password-gated sites: the hub holds the gate code (Worker secret) so agents can get past the gate.
+var GATE_SITES = { souljaboy: { secret: "SB_GATE_CODE", origin: "https://souljaboy.app", cookie: "sod_gate", salt: "sod-gate-v1" } };
+var GATE_TOOL_DEFS = [
+  { name: "site_gate_pass", description: "Owner/agent: get past a password-gated site (" + Object.keys(GATE_SITES).join(", ") + "). Returns the gate code to type in a browser and a Cookie header for fetches. With path, fetches that page behind the gate and returns status, title and text.",
+    inputSchema: { type: "object", properties: { site: { type: "string", enum: Object.keys(GATE_SITES) }, path: { type: "string", description: "optional, e.g. / or /rapper-university/" } }, required: ["site"] } },
+];
+var GATE_TOOLS = new Set(GATE_TOOL_DEFS.map((t) => t.name));
+// souljaboy.app artist hostnames (2026-11-21, Austin): the only souljaboy.app names the hub may bind or add DNS for.
+// Apex, e40 and every other existing name are untouched; DNS is one proxied CNAME per name, never overwritten.
+var SOULJA_ACCOUNT = "068a8123b10b7a9fcdcb49e6763969e9", SOULJA_ZONE = "souljaboy.app";
+var SOULJA_ARTISTS = {
+  "42dugg.souljaboy.app": "42dugg-souljaboy",
+  "babyfaceray.souljaboy.app": "babyfaceray-souljaboy",
+  "icewearvezzo.souljaboy.app": "icewearvezzo-souljaboy",
+  "future.souljaboy.app": "future-souljaboy",
+  "guccimane.souljaboy.app": "guccimane-souljaboy"
+};
+// 0.15.5: any NEW single-label name follows the same rule, <name>.souljaboy.app -> Pages project <name>-souljaboy.
+// Names already in use stay protected twice: this reserved list, and a live check for another binding or record.
+var SOULJA_RESERVED = new Set(["www", "e40", "40water", "artist", "thizzler", "atmosphere", "stones-throw", "hieroglyphics", "sari", "site1", "mail", "api", "mcp", "admin"]);
+function souljaProjectFor(host) {
+  const m = /^([a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?)\.souljaboy\.app$/.exec(String(host || ""));
+  if (!m || SOULJA_RESERVED.has(m[1])) return null;
+  return m[1] + "-souljaboy";
+}
+var SOULJA_RULE = "<name>.souljaboy.app -> Pages project <name>-souljaboy (one label; not apex or reserved: " + [...SOULJA_RESERVED].join(", ") + "; never a name bound to another project or with a different DNS record)";
+var SOULJA_TOOL_DEFS = [
+  { name: "soulja_artist_access", description: "Owner/agent, read-only: receipt for souljaboy.app artist sites. Rule: " + SOULJA_RULE + ". Confirms the account that owns the zone, the hub credential's Pages/DNS permissions, the mapping and state (project, binding, DNS) of the first five artists plus any hostname you pass, and the exact deploy calls. Changes nothing.",
+    inputSchema: { type: "object", properties: { hostname: { type: "string", description: "optional extra hostname to check, e.g. mozzy.souljaboy.app" } } } },
+];
+var SOULJA_TOOLS = new Set(SOULJA_TOOL_DEFS.map((t) => t.name));
+async function souljaCf(env, path, init = {}) {
+  const token = env.CLOUDFLARE_API_TOKEN_SERVICEPRICER;
+  if (!token) throw new Error("Servicepricer Pages credential is not configured");
+  const r = await fetch("https://api.cloudflare.com/client/v4" + path, { ...init, headers: { Authorization: "Bearer " + token, ...init.body ? { "content-type": "application/json" } : {} } });
+  const j = await r.json().catch(() => ({ success: false, errors: [{ message: "HTTP " + r.status }] }));
+  return { status: r.status, ok: !!j.success, result: j.result, errors: (j.errors || []).map((e) => (e.code ? e.code + " " : "") + e.message).join("; ").slice(0, 300) };
+}
+async function souljaZoneId(env) {
+  const z = await souljaCf(env, "/zones?name=" + SOULJA_ZONE + "&account.id=" + SOULJA_ACCOUNT);
+  const zone = z.ok && (z.result || []).find((x) => x.name === SOULJA_ZONE && x.account && x.account.id === SOULJA_ACCOUNT);
+  if (!zone) throw new Error("souljaboy.app zone is not visible in the servicepricer account (" + (z.errors || "no match") + ")");
+  return zone;
+}
+async function souljaDns(env, host, project, apply) {
+  const zone = await souljaZoneId(env);
+  const target = project + ".pages.dev";
+  const found = await souljaCf(env, "/zones/" + zone.id + "/dns_records?name=" + host);
+  if (!found.ok) throw new Error("DNS read refused: " + found.errors);
+  const recs = found.result || [];
+  if (recs.length) {
+    const same = recs.length === 1 && recs[0].type === "CNAME" && recs[0].content === target;
+    return same ? { dns: "already set", record: "CNAME " + host + " -> " + target } : { dns: "refused", reason: "a different record already exists for " + host + " (" + recs.map((r) => r.type + " " + r.content).join(", ") + "); not overwriting" };
+  }
+  if (!apply) return { dns: "would add", record: "CNAME " + host + " -> " + target + " (proxied)" };
+  const add = await souljaCf(env, "/zones/" + zone.id + "/dns_records", { method: "POST", body: JSON.stringify({ type: "CNAME", name: host, content: target, proxied: true, ttl: 1, comment: "hub soulja_artist " + project }) });
+  if (!add.ok) throw new Error("DNS add refused: " + add.errors);
+  return { dns: "added", record: "CNAME " + host + " -> " + target + " (proxied)" };
+}
+async function runSouljaAccess(env, authContext, args = {}) {
+  const out = { checked_at: new Date().toISOString(), hub_version: "0.15.6", caller: { mode: authContext?.mode || null, caller: authContext?.caller || null }, account: { alias: "servicepricer", id: SOULJA_ACCOUNT } };
+  const v = await souljaCf(env, "/accounts/" + SOULJA_ACCOUNT + "/tokens/verify");
+  out.credential = { source: "hub Worker secret CLOUDFLARE_API_TOKEN_SERVICEPRICER (value never returned)", status: v.ok ? v.result.status : "verify failed: " + v.errors };
+  if (v.ok && v.result.id) {
+    const d = await souljaCf(env, "/accounts/" + SOULJA_ACCOUNT + "/tokens/" + v.result.id);
+    if (d.ok) {
+      const pol = (d.result.policies || []).filter((p) => p.effect === "allow");
+      // account-scoped grants only (zone permissions sit nested under the same account key)
+      const has = (name) => pol.some((p) => p.permission_groups.some((g) => g.name === name) && Object.keys(p.resources || {}).some((k) => k === "com.cloudflare.api.account." + SOULJA_ACCOUNT || k === "com.cloudflare.api.account.*"));
+      out.credential.permissions = { "Pages Read": has("Pages Read"), "Pages Write": has("Pages Write"), "Zone Read": has("Zone Read"), "DNS Read": has("DNS Read"), "DNS Write": has("DNS Write") };
+      out.credential.expires_on = d.result.expires_on || "never";
+    } else out.credential.permissions = "could not read token policies: " + d.errors;
+  }
+  try {
+    const zone = await souljaZoneId(env);
+    out.zone = { name: zone.name, id: zone.id, status: zone.status, owner_account: zone.account.id, name_servers: zone.name_servers };
+  } catch (e) { out.zone = { error: String(e.message || e) }; }
+  const pr = await souljaCf(env, "/accounts/" + SOULJA_ACCOUNT + "/pages/projects");
+  out.pages_read = pr.ok ? "ok (" + (pr.result || []).length + " projects listed)" : "refused: " + pr.errors;
+  const boundTo = {};
+  for (const p of pr.ok ? pr.result || [] : []) for (const d of p.domains || []) boundTo[d] = p.name;
+  out.rule = SOULJA_RULE;
+  out.mappings = [];
+  const check = { ...SOULJA_ARTISTS };
+  if (args.hostname) {
+    const h = String(args.hostname).trim().toLowerCase(), p = souljaProjectFor(h);
+    if (!p) out.extra_hostname = { hostname: h, allowed: false, why: "not a single-label souljaboy.app name, or reserved" };
+    else check[h] = p;
+  }
+  for (const [host, project] of Object.entries(check)) {
+    const row = { hostname: host, project, project_exists: (pr.result || []).some((p) => p.name === project), hostname_bound_to: boundTo[host] || null };
+    if (out.zone && out.zone.id) {
+      const d = await souljaCf(env, "/zones/" + out.zone.id + "/dns_records?name=" + host);
+      row.dns = d.ok ? (d.result || []).map((r) => r.type + " " + r.content + (r.proxied ? " (proxied)" : "")) : "refused: " + d.errors;
+    }
+    row.next = !row.project_exists ? "pages_create_project" : !row.hostname_bound_to ? "pages_deploy, then pages_add_domain" : row.hostname_bound_to === project ? "bound; deploy updates go to pages_deploy" : "CONFLICT: bound to another project";
+    out.mappings.push(row);
+  }
+  out.entry_points = {
+    create: { tool: "pages_create_project", args: { account: "servicepricer", name: "<project>", apply: true } },
+    deploy: { tool: "pages_deploy", args: { account: "servicepricer", project: "<project>", files: "[every file of the build]", apply: true } },
+    bind: { tool: "pages_add_domain", args: { account: "servicepricer", project: "<project>", domain: "<hostname>", apply: true }, note: "any new name that follows the rule; adds the one proxied CNAME if none exists, never overwrites" },
+    rollback: { tool: "pages_rollback", args: { account: "servicepricer", project: "<project>" } }
+  };
+  out.write_proof = "This receipt proves read access and that the credential's policies grant Pages Write and DNS Write. Cloudflare has no write dry run: the first real write (pages_create_project apply=true for 42dugg-souljaboy) is the remaining check.";
+  return out;
+}
+async function runGateTool(args, env) {
+  const s = GATE_SITES[String(args.site || "")];
+  if (!s) return { error: "site must be one of " + Object.keys(GATE_SITES).join(", ") };
+  const code = String(env[s.secret] || "");
+  if (!code) return { error: s.secret + " is not set on the hub" };
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(code), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(s.salt));
+  const cookie = s.cookie + "=" + [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const out = { site: args.site, origin: s.origin, code, cookie, how: "Type the code at the gate in a browser, or send header Cookie: " + cookie + " on fetches." };
+  if (args.path) {
+    const u = new URL(String(args.path), s.origin);
+    if (u.origin !== s.origin) return { error: "path must stay on " + s.origin };
+    const r = await fetch(u.toString(), { headers: { cookie, accept: "text/html" }, redirect: "follow" });
+    const body = await r.text();
+    out.page = { url: u.toString(), status: r.status, title: (body.match(/<title>([^<]*)/i) || [])[1] || null,
+      text: body.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 3000) };
+  }
+  return out;
+}
 var WP_TOOL_DEFS = [
   { name: "worker_patch_grant", description: "Step 1 of landing server code on an allow-listed Worker (" + Object.keys(WP_SCRIPTS).join(", ") + "): get a single-use grant for this exact patch (expires in 10 min). Same script/edits/request_id go to worker_patch.",
     inputSchema: { type: "object", properties: { script: { type: "string" }, request_id: { type: "string", description: "unique, a-z0-9-, 8-80" }, edits: { type: "array", items: { type: "object", properties: { find: { type: "string" }, replace: { type: "string" }, count: { type: "number" } }, required: ["find", "replace"] } } }, required: ["script", "request_id", "edits"] } },
@@ -6620,6 +6767,851 @@ async function boardPublicFeed(env) {
   const day = new Date(Date.now() - 864e5).toISOString();
   return { tasks, today: { jobs: tasks.filter((t) => t.created > day).length, done: tasks.filter((t) => t.created > day && t.status === "done").length, working: tasks.filter((t) => t.status === "claimed").length } };
 }
+// Proposal only: fixed-resource, GET-only Apiary diagnostics. No deployment/writes.
+var APIARY_READ_ACCOUNT = '1d5fae607a857fc56cd575763bf8f3bc';
+var APIARY_READ_SCRIPT = 'apiary-bee';
+var APIARY_READ_BUCKET = 'apiary-reading-html';
+var APIARY_READ_PREFIX = 'community/reading/';
+var APIARY_READ_TOOL_DEFS = [
+  { name: 'apiary_worker_deployments', description: 'Read active deployment and recent deployment history for apiary-bee on Austin Doors. First item serves traffic. Past versions are rollback candidates, not validated rollbacks.', inputSchema: { type: 'object', additionalProperties: false, properties: { _approved: {type:'boolean'} } } },
+  { name: 'apiary_worker_version', description: 'Read only version identity, script etag, runtime compatibility and binding names/types for one apiary-bee version. Never returns values, source code or secrets.', inputSchema: { type: 'object', additionalProperties: false, properties: { version_id: {type:'string',pattern:'^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$'}, _approved:{type:'boolean'} }, required:['version_id'] } },
+  { name: 'apiary_r2_objects_list', description: 'One metadata-only page from apiary-reading-html, fixed community/reading/ prefix. Follow every next_cursor until page_exhausted; this call never proves the entire inventory complete.', inputSchema: { type:'object', additionalProperties:false, properties: {cursor:{type:'string',maxLength:8192},per_page:{type:'integer',minimum:1,maximum:1000,default:1000},_approved:{type:'boolean'}} } }
+];
+var APIARY_READ_TOOLS = new Set(APIARY_READ_TOOL_DEFS.map(t=>t.name));
+function apiaryReadArgs(name, args) {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) throw new Error('invalid arguments');
+  const allowed = name === 'apiary_worker_version' ? ['version_id','_approved'] : name === 'apiary_r2_objects_list' ? ['cursor','per_page','_approved'] : ['_approved'];
+  if(Object.keys(args).some(k=>!allowed.includes(k))) throw new Error('unsupported argument');
+  if(args._approved !== undefined && typeof args._approved !== 'boolean') throw new Error('invalid approval flag');
+  if(name === 'apiary_worker_version' && (typeof args.version_id !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(args.version_id))) throw new Error('invalid version id');
+  if(name === 'apiary_r2_objects_list') {
+    if(args.cursor !== undefined && (typeof args.cursor !== 'string' || args.cursor.length > 8192 || /[\u0000-\u001f\u007f]/.test(args.cursor))) throw new Error('invalid cursor');
+    if(args.per_page !== undefined && (!Number.isInteger(args.per_page) || args.per_page < 1 || args.per_page > 1000)) throw new Error('invalid per_page');
+  }
+}
+function apiaryReadText(value) { return typeof value === 'string' ? value : null; }
+async function runApiaryReadTool(name, args, env, authContext) {
+  if(!APIARY_READ_TOOLS.has(name)) return {error:'unknown Apiary read tool'};
+  if(authContext?.mode !== 'admin') return {error:'Apiary diagnostics require the existing owner/agent authorization'};
+  try { apiaryReadArgs(name, args); } catch { return {error:'Invalid arguments for the fixed Apiary read scope'}; }
+  // Deliberately no default-account, Pages-only or federated-execute fallback.
+  if(!env.CLOUDFLARE_API_TOKEN_DOORS) return {error:'Existing Doors credential is unavailable; no fallback attempted'};
+  const client = new CloudflareClient({token:env.CLOUDFLARE_API_TOKEN_DOORS});
+  const root = `/accounts/${APIARY_READ_ACCOUNT}`;
+  const identity = {account:APIARY_READ_ACCOUNT,script:APIARY_READ_SCRIPT};
+  try {
+    if(name === 'apiary_worker_deployments') {
+      const {result} = await client.request('GET', `${root}/workers/scripts/${APIARY_READ_SCRIPT}/deployments`);
+      if(!Array.isArray(result?.deployments)) return {error:'Unexpected deployments response; active deployment unverified'};
+      const deployments = result.deployments.slice(0,50).map(d=>({id:apiaryReadText(d.id),created_on:apiaryReadText(d.created_on),source:apiaryReadText(d.source),strategy:apiaryReadText(d.strategy),versions:Array.isArray(d.versions)?d.versions.map(v=>({version_id:apiaryReadText(v.version_id),percentage:typeof v.percentage==='number'?v.percentage:null})):null}));
+      return {...identity,active_deployment:deployments[0]||null,deployments,history_truncated:result.deployments.length>50,rollback_validated:false};
+    }
+    if(name === 'apiary_worker_version') {
+      const {result:v} = await client.request('GET', `${root}/workers/scripts/${APIARY_READ_SCRIPT}/versions/${args.version_id}`);
+      if(v?.id !== args.version_id) return {error:'Version identity mismatch; metadata unverified'};
+      const b=v.resources?.bindings, rt=v.resources?.script_runtime;
+      return {...identity,version_id:v.id,number:typeof v.number==='number'?v.number:null,created_on:apiaryReadText(v.metadata?.created_on),script_etag:apiaryReadText(v.resources?.script?.etag),compatibility_date:apiaryReadText(rt?.compatibility_date),compatibility_flags:Array.isArray(rt?.compatibility_flags)?rt.compatibility_flags.filter(x=>typeof x==='string'):null,bindings:Array.isArray(b)?b.map(x=>({name:apiaryReadText(x.name),type:apiaryReadText(x.type),...(x.type==='r2_bucket'?{bucket_name:apiaryReadText(x.bucket_name)}:{})})):null,rollback_validated:false};
+    }
+    const q=new URLSearchParams({prefix:APIARY_READ_PREFIX,per_page:String(args.per_page??1000)});
+    if(args.cursor) q.set('cursor',args.cursor);
+    const {result, result_info:rawInfo} = await client.request('GET', `${root}/r2/buckets/${APIARY_READ_BUCKET}/objects?${q}`);
+    let info = rawInfo;
+    // The REST API omits optional result_info on its terminal short page.
+    // Confirm the boundary with a fixed-prefix start_after probe before ending.
+    if (!info && Array.isArray(result) && result.length < (args.per_page ?? 1000)) {
+      if(result.some(x=>typeof x.key!=='string' || !x.key.startsWith(APIARY_READ_PREFIX) || !Number.isSafeInteger(x.size) || x.size<0)) return {error:'Unexpected terminal object metadata; inventory unverified'};
+      if(result.length) {
+        const last = result.map(x=>x.key).sort().at(-1);
+        const terminalQuery = new URLSearchParams({prefix:APIARY_READ_PREFIX,per_page:'1',start_after:last});
+        const terminal = await client.request('GET', `${root}/r2/buckets/${APIARY_READ_BUCKET}/objects?${terminalQuery}`);
+        if(!Array.isArray(terminal.result) || terminal.result.length || (terminal.result_info && (terminal.result_info.is_truncated !== false || terminal.result_info.delimited?.length))) return {error:'Terminal boundary probe did not confirm exhaustion; inventory incomplete'};
+      }
+      info = {is_truncated:false};
+    }
+    if(!Array.isArray(result) || typeof info?.is_truncated !== 'boolean' || (info.delimited?.length)) return {error:'Incomplete or grouped pagination metadata; inventory completeness unverified',shape:{result_is_array:Array.isArray(result),object_count:Array.isArray(result)?result.length:null,info_present:!!info,truncated_type:typeof info?.is_truncated,truncated:typeof info?.is_truncated==='boolean'?info.is_truncated:null,cursor_present:typeof info?.cursor==='string'&&!!info.cursor,delimited_type:typeof info?.delimited,delimited_count:Array.isArray(info?.delimited)?info.delimited.length:null}};
+    if(info.is_truncated && (typeof info.cursor !== 'string' || !info.cursor || info.cursor===args.cursor)) return {error:'Missing or repeated continuation cursor; inventory incomplete'};
+    if(result.some(x=>typeof x.key!=='string' || !x.key.startsWith(APIARY_READ_PREFIX) || !Number.isSafeInteger(x.size) || x.size<0)) return {error:'Unexpected object metadata; inventory unverified'};
+    return {account:APIARY_READ_ACCOUNT,bucket:APIARY_READ_BUCKET,prefix:APIARY_READ_PREFIX,objects:result.map(x=>({key:x.key,size:x.size,etag:apiaryReadText(x.etag),last_modified:apiaryReadText(x.last_modified),content_type:apiaryReadText(x.http_metadata?.contentType)})),next_cursor:info.is_truncated?info.cursor:null,page_exhausted:!info.is_truncated,inventory_complete:false};
+  } catch(e) {
+    // Never echo provider error text, credentials, raw headers, or arbitrary metadata.
+    return {error:'Apiary metadata read failed',status:Number.isInteger(e?.status)?e.status:null,code:Number.isInteger(e?.code)?e.code:null};
+  }
+}
+
+// One-time, owner-only repair of the already-approved Apiary cache defect.
+var APIARY_REPAIR_BASE = '0a4b44d7-f34b-4ca1-9637-248373c80de3';
+var APIARY_REPAIR_ETAG = '1c78e284070450cd7bd56bf8700b06f9451e62c60b339fcd568e912ffde92a9d';
+var APIARY_REPAIR_RID = 'apiary-head-cache-20261028-v1';
+// One owner-approved credential correction. Plaintext exists only in request memory and the Worker secret.
+var KR_RID='walo-tenant1-relay-key-20261029-v1',KR_DB='203fa727-30e1-4e07-b6a3-0aeefac08412';
+var KR_BASES={'walo-mcp':{version:'fec6935a-634e-457c-8905-685b32fe830d',sha:'c2c89cbb6132875c3ee6fde49b9e76ca4f2c1f5b9c9fa2e84749b43468cedd8d'},'localops-whatsapp-bridge':{version:'e0845984-a3b3-462f-860d-bed7d1ea6cf7',sha:'107cb5e80ec7e90f5bae51069b7a9ba52daae2fa77a9f9355d944230197ee402'}};
+async function krLedger(env,b){return wpLedger(env,{...b,rid:KR_RID});}
+async function krUpdate(env,patch,release=false){return krLedger(env,{action:'update',patch,release});}
+function krPublic(r){if(!r)return null;return {state:r.state,base_version:r.base_version,staged_version:r.staged_version||null,deployment_id:r.deployment_id||null,route_added:r.route_added===true,rollback_version:r.base_version,reason:r.failure||null,message_sent:false};}
+async function krSnapshot(env){
+ const all={};
+ for(const [script,pin]of Object.entries(KR_BASES)){
+  const active=await wdCurrent(env,script);wdAssert(arActive(active,pin.version),'Key repair Worker version drift');
+  const version=await wdVersion(env,script,pin.version),settings=await wdApi(env,script,'/settings');
+  const db=settings.bindings?.filter(b=>b.name==='DB'),vdb=version.resources?.bindings?.filter(b=>b.name==='DB');
+  wdAssert(db?.length===1&&db[0].type==='d1'&&(db[0].id||db[0].database_id)===KR_DB,'Key repair current DB identity mismatch');
+  wdAssert(vdb?.length===1&&vdb[0].type==='d1'&&(vdb[0].id||vdb[0].database_id)===KR_DB,'Key repair version DB identity mismatch');
+  wdAssert(!settings.migrations,'Key repair refuses migrations');
+  const body=await wdCode(env,script,version);wdAssert(body.main_module==='index.js','Key repair entrypoint mismatch');
+  wdAssert(await arHash(await body.modules.find(m=>m.name===body.main_module).blob.arrayBuffer())===pin.sha,'Key repair source drift');
+  const safe={base_version:pin.version,base_etag:version.resources.script.etag,main_module:body.main_module,settings_sha256:await arHash(arCanon(wdSettings(settings))),resources_sha256:await arHash(arCanon(wdResources(version))),expected_modules:await arModuleHashes(body)};
+  wdAssert(arActive(await wdCurrent(env,script),pin.version),'Concurrent key repair deployment');all[script]={safe,version,settings,body};
+ }
+ const binding=all['walo-mcp'].settings.bindings.filter(b=>b.name==='WA_RELAY_KEY');wdAssert(binding.length===1&&binding[0].type==='secret_text','Existing notification secret binding required');
+ const tenant=await wcQuery(env,"SELECT t.status,s.wa_phone_number_id FROM tenants t JOIN tenant_secrets s ON s.tenant_id=t.id WHERE t.id='1'");
+ wdAssert(tenant.length===1&&tenant[0].status==='active'&&tenant[0].wa_phone_number_id==='1399264479939553','Key repair tenant sender mismatch');
+ const rows=await wcQuery(env,"SELECT route_value FROM routes WHERE tenant_id='1' AND route_type='relay_key_hash' ORDER BY route_value");
+ wdAssert(rows.length===2&&rows.every(r=>/^[a-f0-9]{64}$/.test(r.route_value)),'Key repair tenant route baseline changed');
+ const safe={workers:Object.fromEntries(Object.entries(all).map(([k,v])=>[k,v.safe])),database_id:KR_DB,both_database_identities_verified:true,tenant_id:'1',sender_id:'1399264479939553',existing_tenant1_route_count:rows.length,tenant1_route_set_digest:await arHash(arCanon(rows))};
+ return {all,safe:{...safe,snapshot_sha256:await arHash(arCanon(safe))}};
+}
+async function krGuard(env,s){for(const [script,v]of Object.entries(s.all)){wdAssert(arActive(await wdCurrent(env,script),v.safe.base_version),'Concurrent key repair Worker change');wdAssert(await arHash(arCanon(wdSettings(await wdApi(env,script,'/settings'))))===v.safe.settings_sha256,'Key repair binding drift');}}
+async function runTenant1KeyRepair(args,env){
+ wdAssert(args.script==='walo-mcp','Key repair limited to notification Worker');
+ if(args.action==='key_inspect'){const s=await krSnapshot(env);return {...s.safe,production_changed:false};}
+ const record=(await krLedger(env,{action:'get'})).record;
+ if(args.action==='key_status')return {record:krPublic(record),active:await wdCurrent(env,'walo-mcp')};
+ wdAssert(args.action==='key_apply'&&args.confirm===true,'Explicit tenant1 key confirmation required');
+ if(record)return {already_handled:true,record:krPublic(record)};
+ const s=await krSnapshot(env);wdAssert(args.expected_snapshot_sha256===s.safe.snapshot_sha256,'Reviewed key repair snapshot changed');
+ const claim=await krLedger(env,{action:'claim',jti:KR_RID,sha:s.safe.snapshot_sha256,script:'walo-mcp',actor:'owner'});wdAssert(!claim.error,'Key repair lock refused');if(claim.existing)return{already_handled:true,record:krPublic(claim.existing)};
+ const w=s.all['walo-mcp'],rec={...w.safe,state:'claimed',route_added:false,bridge_version:KR_BASES['localops-whatsapp-bridge'].version};await krUpdate(env,rec);
+ let key=null,staged=null;
+ try{
+  await krGuard(env,s);
+  const random=crypto.getRandomValues(new Uint8Array(32));key=[...random].map(b=>b.toString(16).padStart(2,'0')).join('');random.fill(0);
+  const digest=await arHash(key);await krUpdate(env,{state:'registering_hash',key_hash:digest});
+  const inserted=await wcQuery(env,"INSERT INTO routes(route_type,route_value,tenant_id) SELECT 'relay_key_hash',?,'1' WHERE EXISTS(SELECT 1 FROM tenants t JOIN tenant_secrets s ON s.tenant_id=t.id WHERE t.id='1' AND t.status='active' AND s.wa_phone_number_id='1399264479939553') AND NOT EXISTS(SELECT 1 FROM routes WHERE route_type='relay_key_hash' AND route_value=?) RETURNING tenant_id",[digest,digest]);
+  wdAssert(inserted.length===1&&inserted[0].tenant_id==='1','Dedicated key registration not confirmed');await krUpdate(env,{state:'hash_registered',route_added:true});
+  const check=await wcQuery(env,"SELECT CASE WHEN tenant_id='1' THEN 1 ELSE 0 END AS is_tenant1 FROM routes WHERE route_type='relay_key_hash' AND route_value=?",[digest]);wdAssert(check.length===1&&check[0].is_tenant1===1,'Dedicated key tenant verification failed');
+  const metadata={...w.settings,main_module:w.body.main_module,exports:w.version.resources.script_runtime.exports,keep_assets:true,keep_bindings:['secret_text'],bindings:[...w.settings.bindings.filter(b=>b.type!=='secret_text'),{name:'WA_RELAY_KEY',type:'secret_text',text:key}],annotations:{'workers/message':'Owner-approved dedicated tenant1 notification relay credential'}};
+  const form=new FormData();form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}),'metadata.json');for(const m of w.body.modules)form.append(m.name,m.blob,m.name);
+  await krGuard(env,s);await krUpdate(env,{state:'secret_uploading'});
+  const next=await wdApi(env,'walo-mcp','/versions?bindings_inherit=strict',{method:'POST',headers:{'if-match':'"'+w.safe.base_etag+'"'},body:form});key=null;
+  wdAssert(typeof next.id==='string','Dedicated secret upload has no confirmed version');staged=next.id;await krUpdate(env,{state:'staged_verifying',staged_version:staged});
+  await wdVerify(env,'walo-mcp',{...rec,staged_version:staged});
+  wdAssert(arActive(await wdCurrent(env,'localops-whatsapp-bridge'),rec.bridge_version),'Bridge changed before key activation');
+  wdAssert(await arHash(arCanon(wdSettings(await wdApi(env,'localops-whatsapp-bridge','/settings'))))===s.all['localops-whatsapp-bridge'].safe.settings_sha256,'Bridge settings changed before key activation');
+  await krUpdate(env,{state:'activating'});
+  const deployed=await wdApi(env,'walo-mcp','/deployments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:staged,percentage:100}],annotations:{'workers/message':'Owner-approved tenant1 notification credential correction'}})});
+  await wdVerify(env,'walo-mcp',{...rec,staged_version:staged},false);
+  await krUpdate(env,{state:'live_verified',deployment_id:deployed.id},true);
+  return {state:'live_verified',version:staged,deployment_id:deployed.id,rollback_version:rec.base_version,tenant_id:'1',route_added:true,source_bindings_runtime_preserved:true,secret_values_returned:false,message_sent:false,requires_runtime_trace:true};
+ }catch(e){key=null;await krUpdate(env,{state:'failed_or_uncertain',failure:wdError(e)},true);return {error:'Dedicated key repair stopped',reason:wdError(e),record:krPublic((await krLedger(env,{action:'get'})).record),message_sent:false,do_not_retry:true};}
+}
+
+
+var NP_EDITS = [["var WALO_NOTIFICATION_TRACE_DEF = {name:\"walo_notification_trace\",description:\"Owner-only read-only notification configuration diagnostic. Returns only relay category, tenant-1 key match, sender ID and owner-destination match. No URL/key/hash/phone disclosure, HTTP requests, writes or messages.\",inputSchema:{type:\"object\",additionalProperties:false,properties:{}}};\nasync function traceNotificationConfiguration(env,scope){\n if(scope!==\"owner\"||!env.MCP_KEY)return {error:\"Existing owner authentication required\"};\n const out={relay_category:\"unconfigured\",key_maps_tenant1:null,sender_id:null,owner_destination_matches:null};\n if(env.WA_RELAY_URL)try{\n  const u=new URL(env.WA_RELAY_URL),known={\"api.walohq.com\":\"api_walohq\",\"whatsapp.paycovay.com\":\"whatsapp_paycovay\",\"localops-whatsapp-bridge.austinsdoors.workers.dev\":\"bridge_workers_dev\"};\n  out.relay_category=u.protocol===\"https:\"&&!u.port&&u.pathname===\"/send\"&&!u.username&&!u.password&&!u.search&&!u.hash&&Object.hasOwn(known,u.hostname)?known[u.hostname]:\"other\";\n }catch{out.relay_category=\"invalid\";}\n if(!env.WA_RELAY_KEY||!env.DB)return out;\n try{\n  const digest=await crypto.subtle.digest(\"SHA-256\",new TextEncoder().encode(String(env.WA_RELAY_KEY)));\n  const keyHash=[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,\"0\")).join(\"\");\n  const row=await env.DB.prepare(\"SELECT CASE WHEN tenant_id='1' THEN 1 ELSE 0 END AS is_tenant1 FROM routes WHERE route_type='relay_key_hash' AND route_value=? LIMIT 1\").bind(keyHash).first();\n  out.key_maps_tenant1=!!row&&row.is_tenant1===1;\n  if(!out.key_maps_tenant1)return out;\n  const t=await env.DB.prepare(\"SELECT t.status,s.wa_phone_number_id FROM tenants t LEFT JOIN tenant_secrets s ON s.tenant_id=t.id WHERE t.id='1'\").first();\n  out.sender_id=t?.status===\"active\"&&typeof t.wa_phone_number_id===\"string\"&&/^\\d{15,20}$/.test(t.wa_phone_number_id)?t.wa_phone_number_id:null;\n  const owner=String(env.WA_OWNER||\"\").replace(/\\D/g,\"\");\n  if(owner){const o=await env.DB.prepare(\"SELECT COUNT(*) AS matches FROM tenant_owners WHERE tenant_id='1' AND role='owner' AND replace(phone,'+','')=?\").bind(owner).first();out.owner_destination_matches=Number(o?.matches)>0;}\n }catch{out.key_maps_tenant1=null;out.sender_id=null;out.owner_destination_matches=null;}\n return out;\n}\n","var WALO_NOTIFICATION_TRACE_DEF = {name:\"walo_notification_trace\",description:\"Owner-only read-only notification configuration diagnostic. Returns only relay category, key classification (unmapped/tenant1/other), sender ID and owner-destination match. No URL/key/hash/phone disclosure, HTTP requests, writes or messages.\",inputSchema:{type:\"object\",additionalProperties:false,properties:{}}};\nasync function traceNotificationConfiguration(env,scope){\n if(scope!==\"owner\"||!env.MCP_KEY)return {error:\"Existing owner authentication required\"};\n const out={relay_category:\"unconfigured\",key_route:null,sender_id:null,owner_destination_matches:null};\n if(env.WA_RELAY_URL)try{\n  const u=new URL(env.WA_RELAY_URL),known={\"api.walohq.com\":\"api_walohq\",\"whatsapp.paycovay.com\":\"whatsapp_paycovay\",\"localops-whatsapp-bridge.austinsdoors.workers.dev\":\"bridge_workers_dev\"};\n  out.relay_category=u.protocol===\"https:\"&&!u.port&&u.pathname===\"/send\"&&!u.username&&!u.password&&!u.search&&!u.hash&&Object.hasOwn(known,u.hostname)?known[u.hostname]:\"other\";\n }catch{out.relay_category=\"invalid\";}\n if(!env.WA_RELAY_KEY||!env.DB)return out;\n try{\n  const digest=await crypto.subtle.digest(\"SHA-256\",new TextEncoder().encode(String(env.WA_RELAY_KEY)));\n  const keyHash=[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,\"0\")).join(\"\");\n  const row=await env.DB.prepare(\"SELECT CASE WHEN tenant_id='1' THEN 1 ELSE 0 END AS is_tenant1 FROM routes WHERE route_type='relay_key_hash' AND route_value=? LIMIT 1\").bind(keyHash).first();\n  out.key_route=!row?\"unmapped\":row.is_tenant1===1?\"tenant1\":\"other\";\n  if(out.key_route!==\"tenant1\")return out;\n  const t=await env.DB.prepare(\"SELECT t.status,s.wa_phone_number_id FROM tenants t LEFT JOIN tenant_secrets s ON s.tenant_id=t.id WHERE t.id='1'\").first();\n  out.sender_id=t?.status===\"active\"&&typeof t.wa_phone_number_id===\"string\"&&/^\\d{15,20}$/.test(t.wa_phone_number_id)?t.wa_phone_number_id:null;\n  const owner=String(env.WA_OWNER||\"\").replace(/\\D/g,\"\");\n  if(owner){const o=await env.DB.prepare(\"SELECT COUNT(*) AS matches FROM tenant_owners WHERE tenant_id='1' AND role='owner' AND replace(phone,'+','')=?\").bind(owner).first();out.owner_destination_matches=Number(o?.matches)>0;}\n }catch{out.key_route=null;out.sender_id=null;out.owner_destination_matches=null;}\n return out;\n}\n"]];
+// Fixed hostname metadata reads only. Existing owner authorizer runs before dispatch.
+async function npRelayTargets(env){
+ const account='1d5fae607a857fc56cd575763bf8f3bc';
+ wdAssert(typeof env.CLOUDFLARE_API_TOKEN_DOORS==='string'&&env.CLOUDFLARE_API_TOKEN_DOORS,'Doors binding required');
+ async function get(suffix){
+  const r=await fetch('https://api.cloudflare.com/client/v4'+suffix,{method:'GET',headers:{authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN_DOORS}});
+  const j=await r.json().catch(()=>null);wdAssert(r.ok&&j?.success,'Fixed relay metadata read failed');return j.result;
+ }
+ const rows=[];
+ for(const [hostname,zoneName]of [['api.walohq.com','walohq.com'],['whatsapp.paycovay.com','paycovay.com']]){
+  const domains=await get('/accounts/'+account+'/workers/domains?hostname='+encodeURIComponent(hostname));
+  wdAssert(Array.isArray(domains),'Unexpected hostname metadata');
+  const custom=domains.filter(d=>d.hostname===hostname).map(d=>({worker:d.service,enabled:typeof d.enabled==='boolean'?d.enabled:null}));
+  const zones=await get('/zones?name='+encodeURIComponent(zoneName)+'&account.id='+account);
+  wdAssert(Array.isArray(zones),'Unexpected zone metadata');
+  const zone=zones.filter(z=>z.name===zoneName&&z.account?.id===account);wdAssert(zone.length<=1,'Ambiguous relay zone');
+  let matches=[];
+  if(zone.length){wdAssert(/^[a-f0-9]{32}$/.test(zone[0].id),'Invalid relay zone identity');const routes=await get('/zones/'+zone[0].id+'/workers/routes');wdAssert(Array.isArray(routes),'Unexpected route metadata');matches=routes.filter(r=>npRouteMatches(r.pattern,hostname)).map(r=>({pattern:r.pattern,worker:r.script||null}));}
+  const scripts=[...new Set([...custom.filter(x=>x.enabled!==false).map(x=>x.worker),...matches.map(x=>x.worker)].filter(x=>typeof x==='string'))];
+  rows.push({hostname,zone_visible:zone.length===1,custom_domains:custom,matching_send_routes:matches,conflict:scripts.length>1,expected_bridge_claimed:scripts.includes('localops-whatsapp-bridge')});
+ }
+ return {targets:rows,read_only:true,message_sent:false};
+}
+function npRouteMatches(pattern,hostname){
+ if(typeof pattern!=='string')return false;
+ const escaped=pattern.split('*').map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('.*');
+ const target=pattern.includes('://')?'https://'+hostname+'/send':hostname+'/send';
+ try{return new RegExp('^'+escaped+'$','i').test(target);}catch{return false;}
+}
+
+// Fixed owner-approved read-only notification probe installation, limited to walo-mcp.
+var NP_SCRIPT='walo-mcp',NP_BASE='2d990542-53a8-4aad-9186-abf38f83cdfb',NP_RID='walo-notification-probe-classification-20261028-v2';
+async function npLedger(env,b){return wpLedger(env,{...b,rid:NP_RID});}
+async function npUpdate(env,patch,release=false){return npLedger(env,{action:'update',patch,release});}
+function npPatch(code){
+ for(const [find,replacement]of NP_EDITS){wdAssert(code.split(find).length===2,'Approved probe patch anchor mismatch');code=code.replace(find,()=>replacement);}
+ return code;
+}
+async function npSnapshot(env){
+ const active=await wdCurrent(env,NP_SCRIPT);wdAssert(arActive(active,NP_BASE),'Notification Worker changed from reviewed base');
+ const version=await wdVersion(env,NP_SCRIPT,NP_BASE),settings=await wdApi(env,NP_SCRIPT,'/settings'),body=await wdCode(env,NP_SCRIPT,version);
+ wdAssert(!settings.migrations&&body.main_module==='index.js','Unsupported migration or entrypoint');
+ const main=body.modules.find(m=>m.name===body.main_module),source=await main.blob.text();
+ wdAssert(await arHash(source)==='1ec09e32b618bae6177976a24f05960a7f077eee5cff3f9c006d65ba4d8cce42','Notification source differs from verified release');
+ const candidate=npPatch(source),safe={script:NP_SCRIPT,base_version:NP_BASE,base_etag:version.resources.script.etag,main_module:body.main_module,module_hashes:await arModuleHashes(body),settings_sha256:await arHash(arCanon(wdSettings(settings))),resources_sha256:await arHash(arCanon(wdResources(version))),candidate_sha256:await arHash(candidate)};
+ wdAssert(arCanon(active)===arCanon(await wdCurrent(env,NP_SCRIPT)),'Concurrent notification deployment');
+ return {safe:{...safe,snapshot_sha256:await arHash(arCanon(safe))},version,settings,body,candidate};
+}
+async function npRollback(env,rec){
+ const active=await wdCurrent(env,NP_SCRIPT);
+ if(arActive(active,NP_BASE))return {state:'already_at_original'};
+ wdAssert(arActive(active,rec.staged_version),'Concurrent version prevents rollback');
+ wdAssert(await arHash(arCanon(wdResources(await wdVersion(env,NP_SCRIPT,NP_BASE))))===rec.resources_sha256,'Rollback configuration differs');
+ await wdApi(env,NP_SCRIPT,'/deployments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:NP_BASE,percentage:100}]})});
+ wdAssert(arActive(await wdCurrent(env,NP_SCRIPT),NP_BASE),'Rollback outcome unconfirmed');
+ return {state:'rolled_back',version:NP_BASE};
+}
+async function runNotificationProbeRepair(args,env){
+ wdAssert(args.script===NP_SCRIPT,'Probe installation is limited to walo-mcp');
+ if(args.action==='probe_routes')return npRelayTargets(env);
+ if(args.action==='probe_inspect'){const s=await npSnapshot(env);return {...s.safe,production_changed:false};}
+ const record=(await npLedger(env,{action:'get'})).record;
+ if(args.action==='probe_status')return {record:record||null,active:await wdCurrent(env,NP_SCRIPT)};
+ wdAssert(args.confirm===true,'Explicit probe installation confirmation required');
+ if(args.action==='probe_stage'){
+  if(record)return {already_handled:true,record};
+  const s=await npSnapshot(env);wdAssert(args.expected_snapshot_sha256===s.safe.snapshot_sha256&&args.candidate_sha256===s.safe.candidate_sha256,'Reviewed probe snapshot drift');
+  const claim=await npLedger(env,{action:'claim',jti:NP_RID,sha:s.safe.candidate_sha256,script:NP_SCRIPT,actor:'owner'});
+  wdAssert(!claim.error,'Probe ledger refused claim');if(claim.existing)return {already_handled:true,record:claim.existing};
+  const form=new FormData(),expected=[];
+  const metadata={...s.settings,main_module:s.body.main_module,exports:s.version.resources.script_runtime.exports,keep_assets:true,keep_bindings:['secret_text'],bindings:s.settings.bindings.filter(b=>b.type!=='secret_text'),annotations:{'workers/message':'Approved owner-only read-only notification probe'}};
+  form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}),'metadata.json');
+  for(const m of s.body.modules){const blob=m.name===s.body.main_module?new Blob([s.candidate],{type:m.content_type}):m.blob;expected.push({name:m.name,type:m.content_type,bytes:blob.size,sha256:await arHash(await blob.arrayBuffer())});form.append(m.name,blob,m.name);}
+  expected.sort((a,b)=>a.name.localeCompare(b.name));const rec={...s.safe,state:'uploading',expected_modules:expected};await npUpdate(env,rec);
+  try{
+   wdAssert(arActive(await wdCurrent(env,NP_SCRIPT),NP_BASE),'Concurrent version before probe upload');
+   wdAssert(await arHash(arCanon(wdSettings(await wdApi(env,NP_SCRIPT,'/settings'))))===s.safe.settings_sha256,'Notification settings drift');
+   const next=await wdApi(env,NP_SCRIPT,'/versions?bindings_inherit=strict',{method:'POST',headers:{'if-match':'"'+s.safe.base_etag+'"'},body:form});wdAssert(typeof next.id==='string','Upload has no confirmed version');
+   await npUpdate(env,{state:'uploaded_verifying',staged_version:next.id});
+   const checked=await wdVerify(env,NP_SCRIPT,{...rec,staged_version:next.id});await npUpdate(env,{state:'staged_verified'},true);return {...checked,production_changed:false};
+  }catch(e){await npUpdate(env,{state:'staging_failed_or_uncertain',failure:wdError(e)},true);throw e;}
+ }
+ wdAssert(args.action==='probe_deploy'&&record?.state==='staged_verified'&&args.candidate_sha256===record.candidate_sha256,'Verified probe stage required');
+ await wdVerify(env,NP_SCRIPT,record);
+ const rid=NP_RID+'-activate',claim=await wpLedger(env,{action:'claim',rid,jti:rid,sha:record.candidate_sha256,script:NP_SCRIPT,actor:'owner'});
+ wdAssert(!claim.error,'Probe activation lock refused');if(claim.existing)return {already_handled:true,record};
+ await npUpdate(env,{state:'deploying'});
+ try{
+  wdAssert(arActive(await wdCurrent(env,NP_SCRIPT),NP_BASE),'Concurrent active version before probe activation');
+  const d=await wdApi(env,NP_SCRIPT,'/deployments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:record.staged_version,percentage:100}],annotations:{'workers/message':'Approved owner-only read-only notification probe'}})});
+  const checked=await wdVerify(env,NP_SCRIPT,record,false);await npUpdate(env,{state:'live_verified',deployment_id:d.id});await wpLedger(env,{action:'update',rid,patch:{state:'live_verified'},release:true});
+  return {...checked,deployment_id:d.id,rollback_version:NP_BASE,probe_run:false,message_sent:false};
+ }catch(e){
+  await wpLedger(env,{action:'update',rid,patch:{state:'failed_or_uncertain'},release:true});
+  let rollback;try{rollback=await npRollback(env,record);}catch{rollback={state:'unconfirmed_or_concurrent_drift'};}
+  await npUpdate(env,{state:'deployment_failed_or_uncertain',failure:wdError(e),rollback});return {error:'Probe activation failed',reason:wdError(e),rollback};
+ }
+}
+
+
+var WC_RESOLVER_HASHES = {"resolveTenant":"f2185ee7da530cba712e4247f8f9e1dd2fb5b5ff95830533b886e220b5f3a5ec","resolveTenantByRelayKey":"55dc279b9f88e54f3a268bd11ad570b6fbfc3227ed1092c611439a6a814282cc"};
+var WC_RESOLVE_SQL = "SELECT t.id,t.slug,t.business_name,t.status,t.plan,t.timezone,t.voice,\n              t.hours_json,t.config_json,\n              s.indexnow_host,s.indexnow_key,s.wa_phone_number_id,s.wa_display_number,\n              s.lead_token,s.relay_key_hash\n         FROM routes r\n         JOIN tenants t ON t.id = r.tenant_id\n         LEFT JOIN tenant_secrets s ON s.tenant_id = t.id\n        WHERE r.route_type = ? AND r.route_value = ? LIMIT 1";
+// Approved tenant-1-only sender-cache correction. No credentials, messages or arbitrary KV access.
+var WC_ACCOUNT='1d5fae607a857fc56cd575763bf8f3bc';
+var WC_DB='203fa727-30e1-4e07-b6a3-0aeefac08412';
+var WC_SCRIPT='localops-whatsapp-bridge';
+var WC_VERSION='e0845984-a3b3-462f-860d-bed7d1ea6cf7';
+var WC_OLD='1258784447309850',WC_NEW='1399264479939553';
+var WC_RID='walo-tenant1-sender-cache-20261028-v1';
+function wcIdentity(t,owners){return t&&String(t.id)==='1'&&Array.isArray(t.owners)&&Array.isArray(owners)&&owners.length>0&&arCanon([...new Set(t.owners.map(x=>String(x).replace(/\D/g,'')))].sort())===arCanon(owners)&&t.secrets&&typeof t.secrets==='object';}
+async function wcApi(env,path,init={},raw=false){
+ const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+WC_ACCOUNT+path,{...init,headers:{authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN_DOORS,...init.headers}});
+ if(raw&&r.status===404)return null;
+ if(raw&&r.ok){const text=await r.text();wdAssert(new TextEncoder().encode(text).length<=262144,'Target cache exceeds safe size');return text;}
+ const j=await r.json().catch(()=>null);
+ if(!r.ok||!j?.success){const e=new Error('Scoped cache provider operation failed');e.safe={status:r.status,codes:j?.errors?.map(x=>x.code).filter(Number.isSafeInteger)||[]};throw e;}
+ return j.result;
+}
+async function wcQuery(env,sql,params=[]){
+ const rows=await wcApi(env,'/d1/database/'+WC_DB+'/query',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sql,params})});
+ wdAssert(Array.isArray(rows)&&rows.length===1&&rows[0].success!==false&&Array.isArray(rows[0].results),'Tenant database query failed');
+ return rows[0].results;
+}
+async function wcBinding(env){
+ const active=await wdCurrent(env,WC_SCRIPT);wdAssert(arActive(active,WC_VERSION),'Bridge version changed; cache resolver must be reviewed');
+ const settings=await wdApi(env,WC_SCRIPT,'/settings');
+ const db=settings.bindings?.filter(b=>b.name==='DB'),chat=settings.bindings?.filter(b=>b.name==='CHAT');
+ wdAssert(db?.length===1&&db[0].type==='d1'&&(db[0].id||db[0].database_id)===WC_DB,'Live bridge DB binding differs from approved localops database');
+ wdAssert(chat?.length===1&&chat[0].type==='kv_namespace'&&/^[a-f0-9]{32}$/.test(chat[0].namespace_id),'Live CHAT binding is unavailable or ambiguous');
+ const version=await wdVersion(env,WC_SCRIPT,WC_VERSION),body=await wdCode(env,WC_SCRIPT,version);
+ wdAssert(body.main_module==='index.js','Unexpected bridge entrypoint');
+ const source=await body.modules.find(m=>m.name===body.main_module).blob.text();
+ wdAssert(await arHash(source)==='107cb5e80ec7e90f5bae51069b7a9ba52daae2fa77a9f9355d944230197ee402','Bridge source drift');
+ const resolver={};
+ for(const [name,expected]of Object.entries(WC_RESOLVER_HASHES)){
+  const start=source.indexOf('async function '+name+'('),end=source.indexOf('\n}\n',start);
+  wdAssert(start>=0&&end>start&&source.indexOf('async function '+name+'(',start+1)<0,'Resolver boundary changed');
+  const digest=await arHash(source.slice(start,end+2));resolver[name]=digest===expected;
+ }
+ wdAssert(Object.values(resolver).every(Boolean),'Live tenant resolution differs from reviewed source');
+ return {namespace:chat[0].namespace_id,active,settings_sha256:await arHash(arCanon(wdSettings(settings))),resolver_verified:true};
+}
+async function wcRoutes(env){
+ const t=await wcQuery(env,"SELECT t.id,t.status,s.wa_phone_number_id FROM tenants t JOIN tenant_secrets s ON s.tenant_id=t.id WHERE t.id='1'");
+ wdAssert(t.length===1&&t[0].status==='active'&&t[0].wa_phone_number_id===WC_NEW,'Authoritative tenant or replacement sender mismatch');
+ const ownerRows=await wcQuery(env,"SELECT phone FROM tenant_owners WHERE tenant_id='1' AND role='owner'");
+ const owners=[...new Set(ownerRows.map(x=>String(x.phone||'').replace(/\D/g,'')))].sort();wdAssert(owners.length>0&&owners.every(x=>/^\d{8,15}$/.test(x)),'Authoritative owner identity unavailable');
+ const routes=await wcQuery(env,"SELECT route_value FROM routes WHERE tenant_id='1' AND route_type='relay_key_hash' ORDER BY route_value");
+ wdAssert(routes.length===2&&routes.every(x=>/^[a-f0-9]{64}$/.test(x.route_value))&&new Set(routes.map(x=>x.route_value)).size===2,'Tenant relay route set changed');
+ const safeRows=[];
+ for(const r of routes){
+  const row=await wcQuery(env,WC_RESOLVE_SQL,['relay_key_hash',r.route_value]);
+  wdAssert(row.length===1&&String(row[0].id)==='1'&&row[0].status==='active'&&row[0].wa_phone_number_id===WC_NEW,'Live resolver query did not return the approved tenant and sender');
+  safeRows.push({tenant_id:'1',sender_id:row[0].wa_phone_number_id,active:true});
+ }
+ return {routes:routes.map(r=>r.route_value),owners,d1_resolution:safeRows};
+}
+async function wcRead(env,namespace,key,handle,kind,owners){
+ wdAssert(/^(tenant|tenantbak):relay_key_hash:[a-f0-9]{64}$/.test(key),'Invalid derived cache key');
+ const base='/storage/kv/namespaces/'+namespace,raw=await wcApi(env,base+'/values/'+encodeURIComponent(key),{},true);
+ if(raw===null)return {key,kind,handle,raw:null,safe:{handle,kind,exists:false}};
+ let value;try{value=JSON.parse(raw);}catch{wdAssert(false,'Target cache is not valid JSON');}
+ const t=kind==='backup'?value.t:value;wdAssert(wcIdentity(t,owners),'Target cache does not belong to the verified tenant owner');
+ wdAssert([WC_OLD,WC_NEW].includes(t.secrets.wa_phone_number_id),'Unexpected cached sender; no correction permitted');
+ const list=await wcApi(env,base+'/keys?prefix='+encodeURIComponent(key)+'&limit=2');
+ wdAssert(Array.isArray(list),'Cache expiration metadata unavailable');
+ const exact=list.filter(x=>x.name===key);wdAssert(exact.length===1,'Exact cache expiration metadata unavailable');
+ const expiration=exact[0].expiration===undefined?null:Number(exact[0].expiration);
+ wdAssert(expiration===null||Number.isSafeInteger(expiration),'Invalid cache expiration');
+ const metadata=await wcApi(env,base+'/metadata/'+encodeURIComponent(key));
+ return {key,kind,handle,raw,value,metadata,expiration,owners,safe:{handle,kind,exists:true,tenant_id:'1',owner_verified:true,sender_id:t.secrets.wa_phone_number_id,backup_timestamp:kind==='backup'&&Number.isSafeInteger(value.at)?value.at:null,expiration,content_sha256:await arHash(raw),metadata_sha256:await arHash(arCanon(metadata))}};
+}
+async function wcSnapshot(env){
+ const binding=await wcBinding(env),r=await wcRoutes(env),entries=[];
+ for(let i=0;i<r.routes.length;i++)for(const kind of ['current','backup']){
+  const key=(kind==='backup'?'tenantbak:':'tenant:')+'relay_key_hash:'+r.routes[i];
+  entries.push(await wcRead(env,binding.namespace,key,'relay-'+(i+1)+'/'+kind,kind,r.owners));
+ }
+ const safe={account:WC_ACCOUNT,script:WC_SCRIPT,tenant_id:'1',db_binding_verified:true,db_id:WC_DB,bridge_version:WC_VERSION,resolver_verified:true,d1_resolution:r.d1_resolution,settings_sha256:binding.settings_sha256,route_set_sha256:await arHash(arCanon(r.routes)),cache_entries:entries.map(e=>e.safe)};
+ wdAssert(arActive(await wdCurrent(env,WC_SCRIPT),WC_VERSION),'Bridge changed during cache inspection');
+ return {binding,entries,owners:r.owners,safe:{...safe,snapshot_sha256:await arHash(arCanon(safe)),stale_entries:entries.filter(e=>e.safe.sender_id===WC_OLD).map(e=>e.handle)}};
+}
+function wcReplace(entry){
+ wdAssert(entry.raw!==null&&entry.safe.sender_id===WC_OLD,'Only proven stale cache entries may change');
+ const pattern=new RegExp('("wa_phone_number_id"\\s*:\\s*")'+WC_OLD+'(")','g');
+ wdAssert([...entry.raw.matchAll(pattern)].length===1,'Sender field is not uniquely represented');
+ const next=entry.raw.replace(pattern,(_,a,b)=>a+WC_NEW+b),v=JSON.parse(next),t=entry.kind==='backup'?v.t:v;
+ wdAssert(wcIdentity(t,entry.owners)&&t.secrets.wa_phone_number_id===WC_NEW,'Corrected cache identity mismatch');
+ const reverted=next.replace(new RegExp('("wa_phone_number_id"\\s*:\\s*")'+WC_NEW+'(")'),(_,a,b)=>a+WC_OLD+b);
+ wdAssert(reverted===entry.raw,'Cache changes exceed the single sender field');
+ return next;
+}
+async function wcLedger(env,b){return wpLedger(env,{...b,rid:WC_RID});}
+async function wcRun(args,env){
+ wdAssert(args.script===WC_SCRIPT,'Sender cache repair is restricted to the bridge');
+ const record=(await wcLedger(env,{action:'get'})).record;
+ if(args.action==='sender_cache_inspect'){const s=await wcSnapshot(env);return {...s.safe,production_changed:false};}
+ if(args.action==='sender_cache_verify'){
+  const s=await wcSnapshot(env),done=(record?.changes||[]).every(c=>{
+   const e=s.entries.find(e=>e.handle===c.handle);
+   return e&&(c.action==='expired_cache_invalidation'?e.raw===null:e.safe.content_sha256===c.after_sha256||e.raw===null&&c.expiration!==null&&c.expiration<=Math.floor(Date.now()/1000));
+  });
+  return {state:record?.state||'not_applied',record:record||null,verified:!!record&&record.state==='applied'&&done,snapshot:s.safe,delivery_tested:false};
+ }
+ wdAssert(args.action==='sender_cache_apply'&&args.confirm===true&&args.expected_snapshot_sha256,'Confirmed inspection required');
+ if(record)return {already_handled:true,record};
+ const s=await wcSnapshot(env);wdAssert(s.safe.snapshot_sha256===args.expected_snapshot_sha256,'Target cache snapshot drift');
+ const stale=s.entries.filter(e=>e.safe.sender_id===WC_OLD);
+ if(!stale.length)return {state:'nothing_to_repair',snapshot:s.safe,production_changed:false};
+ const claim=await wcLedger(env,{action:'claim',jti:WC_RID,sha:s.safe.snapshot_sha256,script:WC_SCRIPT,actor:'owner'});
+ wdAssert(!claim.error,'Sender cache repair ledger refused claim');
+ if(claim.existing)return {already_handled:true,record:claim.existing};
+ const changes=[];await wcLedger(env,{action:'update',patch:{state:'applying',before:s.safe,changes}});
+ try{
+  for(const old of stale){
+   const fresh=await wcRead(env,s.binding.namespace,old.key,old.handle,old.kind,s.owners);
+   wdAssert(arCanon(fresh.safe)===arCanon(old.safe),'Cache changed before correction');
+   const after=wcReplace(fresh),expiresSoon=fresh.expiration!==null&&fresh.expiration<Math.floor(Date.now()/1000)+65;
+   const change={handle:fresh.handle,kind:fresh.kind,before_sha256:fresh.safe.content_sha256,after_sha256:expiresSoon?null:await arHash(after),old_sender:WC_OLD,new_sender:WC_NEW,expiration:fresh.expiration,metadata_sha256:fresh.safe.metadata_sha256,action:expiresSoon?'expired_cache_invalidation':'sender_field_replacement',state:'attempting'};
+   changes.push(change);await wcLedger(env,{action:'update',patch:{changes}});
+   const url='/storage/kv/namespaces/'+s.binding.namespace+'/values/'+encodeURIComponent(fresh.key);
+   if(expiresSoon)await wcApi(env,url,{method:'DELETE'});
+   else{
+    const form=new FormData();form.append('value',after);if(fresh.metadata!==null)form.append('metadata',JSON.stringify(fresh.metadata));
+    await wcApi(env,url+(fresh.expiration===null?'':'?expiration='+fresh.expiration),{method:'PUT',body:form});
+   }
+   change.state='provider_accepted';await wcLedger(env,{action:'update',patch:{changes}});
+  }
+  await wcLedger(env,{action:'update',patch:{state:'applied',changes,finished_at:new Date().toISOString()},release:true});
+  return {state:'applied',changes,credentials_and_other_fields_preserved:true,other_tenants_untouched:true,propagation_verification_pending:true,delivery_tested:false};
+ }catch(e){await wcLedger(env,{action:'update',patch:{state:'failed_or_uncertain',changes,failure:wdError(e)},release:true});return {error:'Scoped sender cache correction stopped',reason:wdError(e),changes,outcome:'check sender_cache_verify before any further action'};}
+}
+
+
+var WALO_DIAGNOSTIC_EDITS = {"walo-mcp":[["async function notifyAustin(env, text, template) {\n  if (!env.WA_RELAY_URL || !env.WA_RELAY_KEY)\n    return { sent: false, reason: \"WhatsApp relay not configured on this Worker\",\n      how_to_connect: [\"wrangler secret put WA_RELAY_URL --profile austinsdoors   # e.g. https://api.walohq.com/send\",\n                       \"wrangler secret put WA_RELAY_KEY --profile austinsdoors   # the bridge's X-Relay-Key\"] };\n  if (!env.WA_OWNER) return { sent: false, reason: \"WA_OWNER (destination number) not set in wrangler.toml [vars]\" };\n  // The bridge refuses free-form text and accepts only approved templates \u2014 which is\n  // correct, because free-form silently fails outside the 24-hour window. `text` is\n  // logged with the call for context; the wire carries a template.\n  let status, body;\n  try {\n    const r = await fetch(env.WA_RELAY_URL, {\n      method: \"POST\",\n      headers: { \"content-type\": \"application/json\", \"x-relay-key\": env.WA_RELAY_KEY },\n      body: JSON.stringify({ to: env.WA_OWNER, template: template || \"ping\" }),\n    });\n    status = r.status;\n    body = JSON.parse(scrub((await r.text()).slice(0, 2000), env.WA_RELAY_KEY) || \"{}\");\n  } catch (e) {\n    return { sent: false, reason: `relay unreachable: ${String((e && e.message) || e)}` };\n  }\n  if (status === 400 && body && body.allowed)\n    return { sent: false, reason: `template \"${template}\" is not approved`, allowed_templates: body.allowed };\n  const accepted = status >= 200 && status < 300 && body && body.ok === true;\n  return {\n    accepted, status, template: template || \"ping\", context: text || null,\n    message_id: (body && body.messageId) || null,\n    delivered: accepted ? \"unknown \u2014 a message id is not delivery\" : false,\n    caveat: \"As of 2026-09-10 the only live number is Meta's shared test line, which reaches allow-listed phones only (Austin, his dad). An approved template is the only thing that leaves the building outside the 24-hour window \u2014 the bridge enforces this by refusing free-form text.\",\n  };\n}","function safeRelayDiagnostics(body) {\n  const obj = body && typeof body === \"object\" && !Array.isArray(body) ? body : {};\n  let legacy = null;\n  if (typeof obj.detail === \"string\" && obj.detail.length <= 4096) {\n    try { legacy = JSON.parse(obj.detail); } catch {}\n  }\n  const err = legacy && typeof legacy.error === \"object\" ? legacy.error : {};\n  const number = (value, min, max) => {\n    if (!(typeof value === \"number\" || (typeof value === \"string\" && /^\\d{1,10}$/.test(value)))) return null;\n    const n = Number(value);\n    return Number.isSafeInteger(n) && n >= min && n <= max ? n : null;\n  };\n  return {\n    upstream_status: number(obj.upstream_status ?? obj.status, 100, 599),\n    upstream_code: number(obj.upstream_code ?? err.code, 0, 2147483647),\n    upstream_subcode: number(obj.upstream_subcode ?? err.error_subcode, 0, 2147483647),\n    sender_id: typeof obj.sender_id === \"string\" && /^\\d{15,20}$/.test(obj.sender_id) ? obj.sender_id : null,\n  };\n}\n\nasync function notifyAustin(env, text, template) {\n  if (!env.WA_RELAY_URL || !env.WA_RELAY_KEY)\n    return { sent: false, reason: \"WhatsApp relay not configured on this Worker\" };\n  if (!env.WA_OWNER) return { sent: false, reason: \"WhatsApp destination not configured\" };\n  // Preserve the existing request and credentials; return only allowlisted diagnostics.\n  let status, body = null;\n  try {\n    const r = await fetch(env.WA_RELAY_URL, {\n      method: \"POST\",\n      headers: { \"content-type\": \"application/json\", \"x-relay-key\": env.WA_RELAY_KEY },\n      body: JSON.stringify({ to: env.WA_OWNER, template: template || \"ping\" }),\n    });\n    status = r.status;\n    const raw = await r.text();\n    if (raw.length <= 65536) { try { body = JSON.parse(scrub(raw, env.WA_RELAY_KEY) || \"{}\"); } catch {} }\n  } catch {\n    return { sent: false, reason: \"relay unreachable\" };\n  }\n  const accepted = status >= 200 && status < 300 && body?.ok === true;\n  const messageId = body?.messageId;\n  return {\n    accepted, status,\n    template: [\"ping\", \"order_confirmed\", \"order_preparing\", \"order_ready\"].includes(template || \"ping\") ? template || \"ping\" : \"unrecognized\",\n    message_id: typeof messageId === \"string\" && /^wamid\\.[A-Za-z0-9+/=_-]{1,500}$/.test(messageId) ? messageId : null,\n    delivered: accepted ? \"unknown - a message id is not delivery\" : false,\n    ...safeRelayDiagnostics(body),\n    error_kind: accepted ? null : status === 400 && Array.isArray(body?.allowed) ? \"template_not_allowed\" : body?.error === \"graph error\" ? \"graph_error\" : \"relay_rejected\",\n    caveat: \"Meta acceptance does not confirm handset delivery. Confirm using a delivery receipt or the recipient.\",\n  };\n}"]],"localops-whatsapp-bridge":[["      console.error(\"relay /send graph fail\", res.status, text.slice(0, 200));\n      result = { ok: false, error: \"graph error\", status: res.status, detail: text.slice(0, 300) };\n      status = 502;","      let graphError = {};\n      try { graphError = JSON.parse(text)?.error || {}; } catch {}\n      const safeCode = (n) => Number.isSafeInteger(n) && n >= 0 && n <= 2147483647 ? n : null;\n      const senderId = /^\\d{15,20}$/.test(String(pnid)) ? String(pnid) : null;\n      result = { ok: false, error: \"graph error\", status: res.status,\n        upstream_status: res.status, upstream_code: safeCode(graphError.code),\n        upstream_subcode: safeCode(graphError.error_subcode), sender_id: senderId };\n      console.error(\"relay /send graph fail\", result.upstream_status, result.upstream_code, result.upstream_subcode, result.sender_id);\n      status = 502;"],["      result = { ok: true, to: normTo, template: b.template, messageId: data?.messages?.[0]?.id || null };","      result = { ok: true, to: normTo, template: b.template, messageId: data?.messages?.[0]?.id || null, sender_id: /^\\d{15,20}$/.test(String(pnid)) ? String(pnid) : null };"]]};
+var WALO_DIAGNOSTIC_PATCH_SHA = {"walo-mcp":"043e6866bf94552d0de734bfad36dc17c8128741a3fdd7cc17b7a95d55fc2e50","localops-whatsapp-bridge":"78278a930961ebb418b5a508e518f48c46122140ccdb932ecd2ed0a46bd24aa3"};
+// Owner-only, one-time WALO diagnostic repair. No arbitrary code, path, credentials or sends.
+var WALO_DIAGNOSTIC_ACCOUNT = '1d5fae607a857fc56cd575763bf8f3bc';
+var WALO_DIAGNOSTIC_TOOL_DEF = {name:'walo_diagnostic_repair',description:'Owner-only fixed diagnostic repair for walo-mcp and localops-whatsapp-bridge in Austin Doors. Inspect returns source/config hashes and rollback version without values or source. Stage uploads only embedded reviewed edits; deploy requires staged verification. Status and guarded rollback are limited to this one-time repair. Also permits the separately approved fixed tenant-1 sender-cache inspection/correction and fixed owner-only read-only notification probe installation. Includes the fixed seven-day tenant-1-owner session-receipt revision and bounded read of its sanitized records. No arbitrary source, generic execution, new credentials, database routes or messages.',inputSchema:{type:'object',additionalProperties:false,required:['script','action','_approved'],properties:{script:{type:'string',enum:['walo-mcp','localops-whatsapp-bridge']},action:{type:'string',enum:['inspect','stage','verify','deploy','status','rollback','sender_cache_inspect','sender_cache_apply','sender_cache_verify','probe_inspect','probe_stage','probe_deploy','probe_status','probe_routes','key_inspect','key_apply','key_status','receipt_inspect','receipt_stage','receipt_verify','receipt_deploy','receipt_status','receipt_rollback','receipt_read']},expected_snapshot_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},candidate_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},confirm:{type:'boolean'},_approved:{type:'boolean'}}}};
+function wdAssert(ok,reason){if(!ok){const e=new Error(reason);e.wd=reason;throw e;}}
+function wdError(e){return e.safe||e.wd||'Unexpected failure; operation outcome may be uncertain';}
+function wdArgs(a){
+ wdAssert(a&&typeof a==='object'&&!Array.isArray(a),'Invalid arguments');
+ wdAssert(Object.keys(a).every(k=>['script','action','expected_snapshot_sha256','candidate_sha256','confirm','_approved'].includes(k)),'Unsupported argument');
+ wdAssert(Object.hasOwn(WALO_DIAGNOSTIC_EDITS,a.script),'Worker not allowed');
+ wdAssert(['inspect','stage','verify','deploy','status','rollback','sender_cache_inspect','sender_cache_apply','sender_cache_verify','probe_inspect','probe_stage','probe_deploy','probe_status','probe_routes','key_inspect','key_apply','key_status','receipt_inspect','receipt_stage','receipt_verify','receipt_deploy','receipt_status','receipt_rollback','receipt_read'].includes(a.action),'Invalid action');
+ wdAssert(a._approved===true,'Explicit scoped approval required');
+ for(const k of ['expected_snapshot_sha256','candidate_sha256'])if(a[k]!==undefined)wdAssert(typeof a[k]==='string'&&/^[a-f0-9]{64}$/.test(a[k]),'Invalid digest');
+ if(a.confirm!==undefined)wdAssert(typeof a.confirm==='boolean','Invalid confirmation');
+ if(['stage','deploy','rollback','sender_cache_apply','probe_stage','probe_deploy','key_apply','receipt_stage','receipt_verify','receipt_deploy','receipt_rollback'].includes(a.action))wdAssert(a.confirm===true,'Explicit mutation confirmation required');
+ return a.action;
+}
+function wdPatch(script,code){
+ wdAssert(!code.includes('function safeRelayDiagnostics(')&&!code.includes('upstream_subcode: safeCode(graphError.error_subcode)'),'Diagnostics already present; inspect current release');
+ const edits=WALO_DIAGNOSTIC_EDITS[script];
+ if(script==='walo-mcp'&&code.split(edits[0][0]).length===1){const fn=wdNotifyFunction(code);wdAssert(arCanon(wdTokens(fn))===arCanon(wdTokens(edits[0][0])),'Notification logic differs from reviewed patch');return code.replace(fn,()=>edits[0][1]);}
+ for(const [find,replacement]of edits){wdAssert(code.split(find).length===2,'Reviewed diagnostic patch anchor mismatch');code=code.replace(find,()=>replacement);}
+ return code;
+}
+function wdSettings(s){const r=arSettings(s);if(Array.isArray(r.bindings))r.bindings.sort((a,b)=>a.name.localeCompare(b.name));return r;}
+function wdResources(v){const r=arResources(v);if(Array.isArray(r.bindings))r.bindings.sort((a,b)=>a.name.localeCompare(b.name));return r;}
+function wdBase(script){wdAssert(Object.hasOwn(WALO_DIAGNOSTIC_EDITS,script),'Worker not allowed');return 'https://api.cloudflare.com/client/v4/accounts/'+WALO_DIAGNOSTIC_ACCOUNT+'/workers/scripts/'+script;}
+async function wdApi(env,script,path,init={}){
+ const r=await fetch(wdBase(script)+path,{...init,headers:{authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN_DOORS,...init.headers}});
+ const j=await r.json().catch(()=>null);
+ if(!r.ok||!j?.success){const e=new Error('WALO provider operation failed');e.safe={status:r.status,codes:j?.errors?.map(x=>x.code).filter(Number.isSafeInteger)||[]};throw e;}
+ return j.result;
+}
+async function wdCurrent(env,script){const d=(await wdApi(env,script,'/deployments'))?.deployments?.[0];wdAssert(d?.versions?.length===1&&d.versions[0].percentage===100,'Single active version required');return {id:d.id,versions:d.versions};}
+async function wdVersion(env,script,id){wdAssert(typeof id==='string'&&/^[a-f0-9-]{36}$/.test(id),'Invalid version');return wdApi(env,script,'/versions/'+id);}
+async function wdCode(env,script,v){
+ const r=await fetch(wdBase(script)+'/content/v2',{headers:{authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN_DOORS}});
+ wdAssert(r.ok&&r.headers.get('etag')?.replaceAll('"','')===v.resources?.script?.etag,'Latest uploaded source differs from selected version');
+ wdAssert((r.headers.get('content-type')||'').startsWith('multipart/form-data'),'Unexpected source format');
+ const main=r.headers.get('cf-entrypoint'),modules=[];
+ for(const [name,blob]of await r.formData()){wdAssert(blob instanceof Blob,'Unexpected source field');modules.push({name,content_type:blob.type,blob});}
+ wdAssert(main&&modules.length>0&&modules.length<=100&&modules.some(m=>m.name===main)&&new Set(modules.map(m=>m.name)).size===modules.length,'Unexpected module layout');
+ return {main_module:main,modules};
+}
+async function wdSnapshot(env,script,preview=false){
+ const active=await wdCurrent(env,script),id=active.versions[0].version_id,v=await wdVersion(env,script,id),settings=await wdApi(env,script,'/settings'),body=await wdCode(env,script,v);
+ wdAssert(!settings.migrations,'Migration changes not permitted');
+ const main=body.modules.find(m=>m.name===body.main_module),bytes=await main.blob.arrayBuffer(),code=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
+ wdAssert(await arHash(code)===await arHash(bytes),'Source encoding mismatch');
+ let candidate=null,comparison=null;try{candidate=await wdPatchCurrent(script,code);}catch(e){if(!preview||script!=='walo-mcp')throw e;comparison=await wdNotifyComparison(code);}
+ const modules=await arModuleHashes(body);
+ wdAssert(arCanon(await wdCurrent(env,script))===arCanon(active),'Concurrent deployment during inspection');
+ const settingsHash=await arHash(arCanon(wdSettings(settings))),resourcesHash=await arHash(arCanon(wdResources(v)));
+ const safe={account:WALO_DIAGNOSTIC_ACCOUNT,script,active,base_version:id,base_etag:v.resources.script.etag,main_module:body.main_module,module_hashes:modules,settings_sha256:settingsHash,resources_sha256:resourcesHash,candidate_sha256:candidate===null?null:await arHash(candidate),comparison,patch_sha256:WALO_DIAGNOSTIC_PATCH_SHA[script]};
+ return {safe:{...safe,snapshot_sha256:await arHash(arCanon(safe)),rollback_version:id,rollback_verified:true,bindings:(settings.bindings||[]).map(b=>({name:b.name,type:b.type})),edits:WALO_DIAGNOSTIC_EDITS[script].length},settings,version:v,body,candidate};
+}
+function wdRid(script){return 'walo-diagnostic-20261028-v1-'+script;}
+async function wdLedger(env,script,b){return wpLedger(env,{...b,rid:wdRid(script)});}
+async function wdUpdate(env,script,patch,release=false){return wdLedger(env,script,{action:'update',patch,release});}
+async function wdClaim(env,script,suffix,sha){
+ const rid=wdRid(script)+suffix,claim=await wpLedger(env,{action:'claim',rid,jti:rid,sha,script,actor:'owner'});
+ wdAssert(!claim.error,'Repair ledger refused claim');return claim;
+}
+async function wdVerify(env,script,rec,requireBase=true){
+ wdAssert(rec?.staged_version&&rec.base_version&&rec.expected_modules,'A recorded staged repair is required');
+ const base=await wdVersion(env,script,rec.base_version),next=await wdVersion(env,script,rec.staged_version);
+ wdAssert(await arHash(arCanon(wdResources(base)))===rec.resources_sha256&&arCanon(wdResources(base))===arCanon(wdResources(next)),'Runtime or binding configuration differs');
+ wdAssert(await arHash(arCanon(wdSettings(await wdApi(env,script,'/settings'))))===rec.settings_sha256,'Worker settings drift');
+ const body=await wdCode(env,script,next);
+ wdAssert(body.main_module===rec.main_module&&arCanon(await arModuleHashes(body))===arCanon(rec.expected_modules),'Uploaded modules differ');
+ const active=await wdCurrent(env,script);
+ wdAssert(arActive(active,requireBase?rec.base_version:rec.staged_version),'Concurrent active deployment');
+ return {state:requireBase?'staged_verified':'live_verified',staged_version:rec.staged_version,base_version:rec.base_version,candidate_sha256:rec.candidate_sha256,modules_verified:true,runtime_preserved:true,settings_preserved:true,active};
+}
+async function wdRollback(env,script,rec){
+ wdAssert(rec?.base_version&&rec.staged_version,'No rollback target recorded');
+ const active=await wdCurrent(env,script);
+ if(arActive(active,rec.base_version))return {state:'already_at_original',base_version:rec.base_version};
+ wdAssert(arActive(active,rec.staged_version),'Concurrent deployment prevents rollback');
+ const base=await wdVersion(env,script,rec.base_version);
+ wdAssert(await arHash(arCanon(wdResources(base)))===rec.resources_sha256,'Rollback configuration changed');
+ const claim=await wdClaim(env,script,'-rollback',rec.candidate_sha256);
+ if(claim.existing)return {state:'rollback_already_attempted_check_status'};
+ await wdApi(env,script,'/deployments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:rec.base_version,percentage:100}]})});
+ wdAssert(arActive(await wdCurrent(env,script),rec.base_version),'Rollback outcome unconfirmed');
+ await wpLedger(env,{action:'update',rid:wdRid(script)+'-rollback',patch:{state:'rolled_back'},release:true});
+ await wdUpdate(env,script,{state:'rolled_back'},false);return {state:'rolled_back',base_version:rec.base_version};
+}
+async function runWaloDiagnosticRepair(args,env,authContext){
+ if(authContext?.mode!=='admin'||authContext.caller==='walo'||authContext.connectionId)return {error:'WALO repair requires existing owner authorization'};
+ let action;try{action=wdArgs(args);}catch(e){return {error:wdError(e)};}
+ if(!env.CLOUDFLARE_API_TOKEN_DOORS||!env.RATE_LIMITER_DO)return {error:'Existing repair bindings unavailable; no fallback attempted'};
+ const script=args.script;
+ try{
+  if(action.startsWith('receipt_'))return await runWaloSessionReceiptRepair(args,env);
+  if(action.startsWith('key_'))return await runTenant1KeyRepair(args,env);
+  if(action.startsWith('probe_'))return await runNotificationProbeRepair(args,env);
+  if(action.startsWith('sender_cache_'))return await wcRun(args,env);
+  if(action==='inspect'){const s=await wdSnapshot(env,script,true);return {...s.safe,production_changed:false};}
+  const record=(await wdLedger(env,script,{action:'get'})).record;
+  if(action==='status')return {script,record:record||null,active:await wdCurrent(env,script)};
+  if(action==='rollback')return await wdRollback(env,script,record);
+  if(action==='stage'){
+   if(record)return {already_handled:true,record};
+   wdAssert(args.expected_snapshot_sha256&&args.candidate_sha256,'Inspection and tested candidate digests required');
+   const s=await wdSnapshot(env,script);
+   wdAssert(s.safe.snapshot_sha256===args.expected_snapshot_sha256&&s.safe.candidate_sha256===args.candidate_sha256,'Inspection or candidate drift');
+   const claim=await wdClaim(env,script,'',s.safe.candidate_sha256);
+   if(claim.existing)return {already_handled:true,record:claim.existing};
+   const expected=[];const form=new FormData();
+   const metadata={...s.settings,main_module:s.body.main_module,exports:s.version.resources.script_runtime.exports,keep_assets:true,keep_bindings:['secret_text'],bindings:s.settings.bindings.filter(b=>b.type!=='secret_text'),annotations:{'workers/message':'Approved WALO sanitized notification diagnostics','workers/tag':'walo-diagnostic-20261028'}};
+   form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}),'metadata.json');
+   for(const m of s.body.modules){const blob=m.name===s.body.main_module?new Blob([s.candidate],{type:m.content_type}):m.blob;expected.push({name:m.name,type:m.content_type,bytes:blob.size,sha256:await arHash(await blob.arrayBuffer())});form.append(m.name,blob,m.name);}
+   expected.sort((a,b)=>a.name.localeCompare(b.name));
+   const rec={...s.safe,state:'uploading',expected_modules:expected};await wdUpdate(env,script,rec);
+   try{
+    wdAssert(arCanon(await wdCurrent(env,script))===arCanon(s.safe.active),'Concurrent deployment before upload');
+    wdAssert(await arHash(arCanon(wdSettings(await wdApi(env,script,'/settings'))))===s.safe.settings_sha256,'Worker settings drift before upload');
+    const next=await wdApi(env,script,'/versions?bindings_inherit=strict',{method:'POST',headers:{'if-match':'"'+s.safe.base_etag+'"'},body:form});
+    wdAssert(typeof next.id==='string','Upload outcome has no version');
+    await wdUpdate(env,script,{state:'uploaded_verifying',staged_version:next.id});
+    const verified=await wdVerify(env,script,{...rec,staged_version:next.id});
+    await wdUpdate(env,script,{state:'staged_verified'},true);return {...verified,production_changed:false};
+   }catch(e){await wdUpdate(env,script,{state:'staging_failed_or_uncertain',failure:wdError(e)},true);throw e;}
+  }
+  if(action==='verify'){
+   const result=await wdVerify(env,script,record);
+   wdAssert(['uploaded_verifying','staging_failed_or_uncertain','staged_verified'].includes(record.state),'Operation is not awaiting stage verification');
+   await wdUpdate(env,script,{state:'staged_verified',failure:null},true);return result;
+  }
+  wdAssert(record?.state==='staged_verified'&&args.candidate_sha256===record.candidate_sha256,'Verified staged repair and matching digest required');
+  await wdVerify(env,script,record);
+  const claim=await wdClaim(env,script,'-deploy',record.candidate_sha256);
+  if(claim.existing)return {state:'deployment_already_attempted_check_status'};
+  await wdUpdate(env,script,{state:'deploying'});
+  try{
+   wdAssert(arActive(await wdCurrent(env,script),record.base_version),'Concurrent deployment before activation');
+   const dep=await wdApi(env,script,'/deployments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:record.staged_version,percentage:100}],annotations:{'workers/message':'Approved WALO diagnostics; rollback '+record.base_version}})});
+   const result=await wdVerify(env,script,record,false);
+   await wpLedger(env,{action:'update',rid:wdRid(script)+'-deploy',patch:{state:'live_verified'},release:true});
+   await wdUpdate(env,script,{state:'live_verified',deployment_id:dep.id,finished_at:new Date().toISOString()});
+   return {...result,deployment_id:dep.id,rollback_version:record.base_version,delivery_tested:false};
+  }catch(e){
+   await wpLedger(env,{action:'update',rid:wdRid(script)+'-deploy',patch:{state:'failed_or_uncertain'},release:true});
+   let rollback;try{rollback=await wdRollback(env,script,record);}catch(re){rollback={state:'unconfirmed_or_concurrent_drift',reason:wdError(re)};}
+   await wdUpdate(env,script,{state:'deployment_failed_or_uncertain',failure:wdError(e),rollback});
+   return {error:'WALO diagnostic activation failed',reason:wdError(e),rollback};
+  }
+ }catch(e){return {error:'WALO repair stopped',reason:wdError(e)};}
+}
+
+function wdNotifyFunction(code){
+ const start=code.indexOf('async function notifyAustin('),end=code.indexOf('\n}\n',start);
+ wdAssert(start>=0&&end>start&&end-start<16000&&code.indexOf('async function notifyAustin(',start+1)<0,'Notification function boundary mismatch');
+ return code.slice(start,end+2);
+}
+function wdTokens(code){
+ const tokens=[];let i=0;
+ while(i<code.length){
+  const c=code[i];if(/\s/.test(c)){i++;continue;}
+  if(code.slice(i,i+2)==='//'){const end=code.indexOf('\n',i+2);i=end<0?code.length:end+1;continue;}
+  if(code.slice(i,i+2)==='/*'){const end=code.indexOf('*/',i+2);wdAssert(end>=0,'Unclosed comment');i=end+2;continue;}
+  if(c==='"'||c==="'"||c==='\x60'){let j=i+1;for(;j<code.length;j++){if(code[j]==='\\'){j++;continue;}if(code[j]===c)break;}wdAssert(j<code.length,'Unclosed source literal');tokens.push(code.slice(i,j+1));i=j+1;continue;}
+  const match=/^(?:[A-Za-z_$][\w$]*|\d+(?:\.\d+)?|===|!==|=>|==|!=|<=|>=|&&|\|\||\?\?|\?\.|\+\+|--|\*\*|\+=|-=|\*=|\/=|\.\.\.)/.exec(code.slice(i));
+  tokens.push(match?match[0]:c);i+=match?match[0].length:1;
+ }
+ return tokens;
+}
+async function wdNotifyComparison(code){
+ const fn=wdNotifyFunction(code),actual=wdTokens(fn),expected=wdTokens(WALO_DIAGNOSTIC_EDITS['walo-mcp'][0][0]),redact=async ts=>{
+  const out=[];for(const t of ts)out.push(/^["'\x60]/.test(t)||/^\d{7,}$/.test(t)?{literal_sha256:await arHash(t),bytes:new TextEncoder().encode(t).length}:t);return out;
+ };
+ let at=0;while(at<actual.length&&at<expected.length&&actual[at]===expected[at])at++;
+ return {function_sha256:await arHash(fn),same_tokens:arCanon(actual)===arCanon(expected),actual_token_count:actual.length,expected_token_count:expected.length,first_difference:at,actual_tokens:await redact(actual),expected_tokens:await redact(expected)};
+}
+
+async function wdPatchCurrent(script,code){
+ if(script==='walo-mcp'&&code.split(WALO_DIAGNOSTIC_EDITS['walo-mcp'][0][0]).length!==2){
+  const fn=wdNotifyFunction(code);
+  // Live source inspected through hashed-literal token comparison on 2026-10-28.
+  // Exact bundled function: unchanged relay URL/key/owner/template; compiler formatting,
+  // 2000 -> 2e3, redundant parentheses and escaped warning literals differ from source.
+  if(await arHash(fn)==='c593570f5e00d08fd43b965c4723e2c6c2b169c73278fa2d665466e5c1f147bf')
+   return code.replace(fn,()=>WALO_DIAGNOSTIC_EDITS['walo-mcp'][0][1]);
+ }
+ return wdPatch(script,code);
+}
+
+
+var WSR_EDITS = [["async function handleInbound(request, env, ctx) {\n  const ct = request.headers.get(\"content-type\") || \"\";\n  if (ct.includes(\"application/json\")) {\n    // SECURITY: verify Meta X-Hub-Signature-256 over the RAW body before any work.\n    const raw = await request.arrayBuffer();\n    const gate = await verifyMetaSignature(raw, request.headers.get(\"x-hub-signature-256\"), env);\n    if (!gate.ok) return new Response(\"unauthorized\", { status: 401 });\n    let data;\n    try {\n      data = JSON.parse(new TextDecoder().decode(raw));\n    } catch {\n      return new Response(\"bad request\", { status: 400 });\n    }\n    if (data && data.object === \"instagram\") {\n      if (igReady(env)) ctx.waitUntil(processInstagram(data, env));\n      return new Response(\"OK\", { status: 200 });\n    }\n    const value = data?.entry?.[0]?.changes?.[0]?.value;\n    const msg = value?.messages?.[0];\n    const media = msg?.type === \"image\" ? msg.image : msg?.type === \"document\" && /^image\\//.test(msg?.document?.mime_type || \"\") ? msg.document : null;\n    const inbound2 = {\n      channel: \"meta\",\n      from: msg?.from ? `+${msg.from}` : \"\",\n      body: (msg?.text?.body || msg?.image?.caption || media?.caption || \"\").trim(),\n      imageId: media?.id || \"\",\n      messageId: msg?.id || \"\",\n      phoneNumberId: value?.metadata?.phone_number_id || \"\"\n    };\n    if ((inbound2.body || inbound2.imageId) && inbound2.from) ctx.waitUntil(processMeta(inbound2, env));\n    return new Response(\"OK\", { status: 200 });\n  }\n  let inbound;\n  try {\n    inbound = await parseInbound(request, env);\n  } catch (e) {\n    return new Response(\"bad request\", { status: 400 });\n  }\n  // Fail closed: non-JSON (Twilio-style) posts need a configured + valid Twilio signature.\n  if (!env.TWILIO_AUTH_TOKEN || inbound.signature === void 0) return new Response(\"bad signature\", { status: 403 });\n  {\n    const valid = await verifyTwilioSignature(request.url, inbound.rawParams, inbound.signature, env.TWILIO_AUTH_TOKEN);\n    if (!valid) return new Response(\"bad signature\", { status: 403 });\n  }\n  const tenant = await resolveTenant({ routeType: \"wa_pnid\", routeValue: inbound.to }, env);\n  if (!tenant) return twiml(\"This line is not configured.\");\n  const role = tenant.owners.includes(normalizeNumber(inbound.from)) ? \"owner\" : \"concierge\";\n  const reply = await route(inbound.body, inbound.from, env, ctx, { tenant, role });\n  return twiml(reply);\n}","async function handleInbound(request, env, ctx) {\n  const ct = request.headers.get(\"content-type\") || \"\";\n  if (ct.includes(\"application/json\")) {\n    // SECURITY: verify Meta X-Hub-Signature-256 over the RAW body before any work.\n    const raw = await request.arrayBuffer();\n    const gate = await verifyMetaSignature(raw, request.headers.get(\"x-hub-signature-256\"), env);\n    if (!gate.ok) return new Response(\"unauthorized\", { status: 401 });\n    let data;\n    try {\n      data = JSON.parse(new TextDecoder().decode(raw));\n    } catch {\n      return new Response(\"bad request\", { status: 400 });\n    }\n    ctx.waitUntil(recordWaloStatusReceipts(data, env));\n    if (data && data.object === \"instagram\") {\n      if (igReady(env)) ctx.waitUntil(processInstagram(data, env));\n      return new Response(\"OK\", { status: 200 });\n    }\n    const value = data?.entry?.[0]?.changes?.[0]?.value;\n    const msg = value?.messages?.[0];\n    const media = msg?.type === \"image\" ? msg.image : msg?.type === \"document\" && /^image\\//.test(msg?.document?.mime_type || \"\") ? msg.document : null;\n    const inbound2 = {\n      channel: \"meta\",\n      from: msg?.from ? `+${msg.from}` : \"\",\n      body: (msg?.text?.body || msg?.image?.caption || media?.caption || \"\").trim(),\n      imageId: media?.id || \"\",\n      messageId: msg?.id || \"\",\n      phoneNumberId: value?.metadata?.phone_number_id || \"\"\n    };\n    if ((inbound2.body || inbound2.imageId) && inbound2.from) ctx.waitUntil(processMeta(inbound2, env));\n    return new Response(\"OK\", { status: 200 });\n  }\n  let inbound;\n  try {\n    inbound = await parseInbound(request, env);\n  } catch (e) {\n    return new Response(\"bad request\", { status: 400 });\n  }\n  // Fail closed: non-JSON (Twilio-style) posts need a configured + valid Twilio signature.\n  if (!env.TWILIO_AUTH_TOKEN || inbound.signature === void 0) return new Response(\"bad signature\", { status: 403 });\n  {\n    const valid = await verifyTwilioSignature(request.url, inbound.rawParams, inbound.signature, env.TWILIO_AUTH_TOKEN);\n    if (!valid) return new Response(\"bad signature\", { status: 403 });\n  }\n  const tenant = await resolveTenant({ routeType: \"wa_pnid\", routeValue: inbound.to }, env);\n  if (!tenant) return twiml(\"This line is not configured.\");\n  const role = tenant.owners.includes(normalizeNumber(inbound.from)) ? \"owner\" : \"concierge\";\n  const reply = await route(inbound.body, inbound.from, env, ctx, { tenant, role });\n  return twiml(reply);\n}"],["async function processMeta(inbound, env) {\n  const tenant = await resolveTenant({ routeType: \"wa_pnid\", routeValue: inbound.phoneNumberId }, env);\n  if (!tenant) return;\n  if (inbound.messageId && env.CHAT) {\n    const dk = `msg:${tenant.id}:${inbound.messageId}`;\n    const seen = await env.CHAT.get(dk);\n    if (seen) return;\n    await env.CHAT.put(dk, \"1\", { expirationTtl: 600 });\n  }\n  const role = tenant.owners.includes(normalizeNumber(inbound.from)) ? \"owner\" : \"concierge\";\n  await noteInbound(env, inbound.from);\n  if (inbound.phoneNumberId && env.CHAT) await env.CHAT.put(\"wa:lastpnid:\" + normalizeNumber(inbound.from), String(inbound.phoneNumberId), { expirationTtl: 40 * 86400 }).catch(() => {});\n  env.__chatLogged = false;\n  const reply = inbound.imageId ? await handleInboundImage(env, tenant, role, inbound) : await route(inbound.body, inbound.from, env, null, { tenant, role });\n  const sent = await sendMetaReply(inbound.from, reply, inbound.phoneNumberId || tenant.secrets.wa_phone_number_id, env);\n  await logInbound(env, tenant.id, inbound.from, inbound.imageId ? \"[photo]\" : inbound.body, reply, sent);\n}","async function processMeta(inbound, env) {\n  const tenant = await resolveTenant({ routeType: \"wa_pnid\", routeValue: inbound.phoneNumberId }, env);\n  if (!tenant) return;\n  if (inbound.messageId && env.CHAT) {\n    const dk = `msg:${tenant.id}:${inbound.messageId}`;\n    const seen = await env.CHAT.get(dk);\n    if (seen) return;\n    await env.CHAT.put(dk, \"1\", { expirationTtl: 600 });\n  }\n  const role = tenant.owners.includes(normalizeNumber(inbound.from)) ? \"owner\" : \"concierge\";\n  await noteInbound(env, inbound.from);\n  if (inbound.phoneNumberId && env.CHAT) await env.CHAT.put(\"wa:lastpnid:\" + normalizeNumber(inbound.from), String(inbound.phoneNumberId), { expirationTtl: 40 * 86400 }).catch(() => {});\n  env.__chatLogged = false;\n  const reply = inbound.imageId ? await handleInboundImage(env, tenant, role, inbound) : await route(inbound.body, inbound.from, env, null, { tenant, role });\n  const sent = await sendMetaReply(inbound.from, reply, inbound.phoneNumberId || tenant.secrets.wa_phone_number_id, env);\n  await recordWaloReplyReceipt(env, tenant, inbound, inbound.phoneNumberId || tenant.secrets.wa_phone_number_id || env.WHATSAPP_PHONE_NUMBER_ID, sent);\n  await logInbound(env, tenant.id, inbound.from, inbound.imageId ? \"[photo]\" : inbound.body, reply, sent);\n}"],["async function sendMetaReply(to, text, phoneNumberId, env) {\n  const pnid = phoneNumberId || env.WHATSAPP_PHONE_NUMBER_ID;\n  const token = env.WHATSAPP_TOKEN;\n  if (!pnid || !token) {\n    console.error(\"Meta reply skipped: missing WHATSAPP_TOKEN or phone_number_id\");\n    return;\n  }\n  const url = `https://graph.facebook.com/v21.0/${pnid}/messages`;\n  const payload = {\n    messaging_product: \"whatsapp\",\n    to: String(to).replace(/^\\+/, \"\"),\n    type: \"text\",\n    text: { body: waloClean(text).slice(0, 4096) }\n  };\n  const open = await waWindowOpen(env, to);\n  try {\n    const res = await fetch(url, {\n      method: \"POST\",\n      headers: { Authorization: `Bearer ${token}`, \"Content-Type\": \"application/json\" },\n      body: JSON.stringify(payload)\n    });\n    if (!res.ok) {\n      console.error(\"Meta send failed\", res.status, (await res.text().catch(() => \"\")).slice(0, 200));\n      return { ok: false, delivered: false, reason: \"http_\" + res.status };\n    }\n    if (open === false) {\n      console.error(\n        \"Meta send accepted but OUTSIDE the 24h window - it will NOT be delivered.\",\n        \"to=\" + String(to).slice(-4),\n        \"Use an approved template to reach this person.\"\n      );\n      return { ok: true, delivered: \"unlikely\", reason: \"outside_24h_window\" };\n    }\n    return { ok: true, delivered: open === true ? \"likely\" : \"unknown\" };\n  } catch (e) {\n    console.error(\"Meta send error\", e && e.message ? e.message : e);\n  }\n}","async function sendMetaReply(to, text, phoneNumberId, env) {\n  const started = Date.now();\n  const pnid = phoneNumberId || env.WHATSAPP_PHONE_NUMBER_ID;\n  const token = env.WHATSAPP_TOKEN;\n  if (!pnid || !token) {\n    console.error(\"Meta reply skipped: missing configuration\");\n    return { ok: false, delivered: false, outcome: \"missing_config\", duration_ms: Date.now() - started };\n  }\n  const url = `https://graph.facebook.com/v21.0/${pnid}/messages`;\n  const payload = {\n    messaging_product: \"whatsapp\", to: String(to).replace(/^\\+/, \"\"), type: \"text\",\n    text: { body: waloClean(text).slice(0, 4096) }\n  };\n  let open = null;\n  try { open = await waWindowOpen(env, to); } catch {}\n  try {\n    const res = await fetch(url, {\n      method: \"POST\", headers: { Authorization: `Bearer ${token}`, \"Content-Type\": \"application/json\" },\n      body: JSON.stringify(payload)\n    });\n    // Never persist response bodies, textual errors, recipient numbers or headers.\n    let result = null;\n    try { result = await res.json(); } catch {}\n    const detail = {\n      outcome: res.ok ? \"accepted\" : \"rejected\", http_status: res.status,\n      message_id: waloReceiptId(result?.messages?.[0]?.id),\n      error_code: waloReceiptCode(result?.error?.code), error_subcode: waloReceiptCode(result?.error?.error_subcode),\n      window_open: open, duration_ms: Date.now() - started\n    };\n    if (!res.ok) {\n      console.error(\"Meta send rejected\", detail.http_status, detail.error_code, detail.error_subcode);\n      return { ok: false, delivered: false, reason: \"http_\" + res.status, ...detail };\n    }\n    // Preserve legacy callers' heuristics. Receipt records intentionally omit this delivered field:\n    // acceptance is not delivery; only a separate status callback reports delivery.\n    if (open === false) return { ok: true, delivered: \"unlikely\", reason: \"outside_24h_window\", ...detail };\n    return { ok: true, delivered: open === true ? \"likely\" : \"unknown\", ...detail };\n  } catch {\n    // A failed fetch can have an uncertain remote outcome. Never retry automatically.\n    console.error(\"Meta send transport outcome unknown\");\n    return { ok: false, delivered: \"unknown\", outcome: \"transport_unknown\", window_open: open, duration_ms: Date.now() - started };\n  }\n}"]];
+var WSR_HELPERS = "const WALO_RECEIPT_TTL = 7 * 86400;\nconst WALO_RECEIPT_SENDER = \"1399264479939553\";\nfunction waloReceiptId(value) {\n  return typeof value === \"string\" && /^wamid\\.[A-Za-z0-9._:+/=-]{1,506}$/.test(value) ? value : null;\n}\nfunction waloReceiptCode(value) {\n  return Number.isSafeInteger(value) && value >= 0 ? value : null;\n}\nfunction waloReceiptOwner(tenant, number) {\n  return String(tenant?.id) === \"1\" && typeof number === \"string\" &&\n    Array.isArray(tenant.owners) && tenant.owners.includes(normalizeNumber(number));\n}\nasync function waloReceiptWrite(env, record) {\n  if (!env.CHAT) return;\n  try {\n    // One immutable key per event: callbacks cannot overwrite send attempts or each other.\n    const key = \"walo:reply-receipt:v1:1:\" + Date.now() + \":\" + crypto.randomUUID();\n    await env.CHAT.put(key, JSON.stringify(record), { expirationTtl: WALO_RECEIPT_TTL });\n  } catch {\n    console.error(\"WALO receipt persistence failed\");\n  }\n}\nasync function recordWaloReplyReceipt(env, tenant, inbound, sender, sent) {\n  if (String(sender) !== WALO_RECEIPT_SENDER || !waloReceiptOwner(tenant, inbound.from)) return;\n  const outcome = [\"accepted\", \"rejected\", \"transport_unknown\", \"missing_config\"].includes(sent?.outcome)\n    ? sent.outcome : \"transport_unknown\";\n  await waloReceiptWrite(env, {\n    schema: 1, event: \"send_result\", tenant_id: \"1\", sender_id: WALO_RECEIPT_SENDER,\n    observed_at: new Date().toISOString(), inbound_message_id: waloReceiptId(inbound.messageId),\n    message_id: waloReceiptId(sent?.message_id), provider: \"meta_graph\", outcome,\n    http_status: waloReceiptCode(sent?.http_status), error_code: waloReceiptCode(sent?.error_code),\n    error_subcode: waloReceiptCode(sent?.error_subcode),\n    duration_ms: waloReceiptCode(sent?.duration_ms),\n    window_open: typeof sent?.window_open === \"boolean\" ? sent.window_open : null\n  });\n}\nasync function recordWaloStatusReceipts(data, env) {\n  try {\n    let count = 0;\n    for (const entry of Array.isArray(data?.entry) ? data.entry : []) {\n      for (const change of Array.isArray(entry?.changes) ? entry.changes : []) {\n        const value = change?.value;\n        if (String(value?.metadata?.phone_number_id) !== WALO_RECEIPT_SENDER || !Array.isArray(value?.statuses)) continue;\n        const tenant = await resolveTenant({ routeType: \"wa_pnid\", routeValue: WALO_RECEIPT_SENDER }, env);\n        for (const status of value.statuses) {\n          if (++count > 50) return;\n          const id = waloReceiptId(status?.id);\n          if (!id || ![\"sent\", \"delivered\", \"read\", \"failed\"].includes(status?.status) || !waloReceiptOwner(tenant, status?.recipient_id)) continue;\n          const seconds = /^\\d{1,11}$/.test(String(status.timestamp)) ? Number(status.timestamp) : NaN;\n          await waloReceiptWrite(env, {\n            schema: 1, event: \"delivery_status\", tenant_id: \"1\", sender_id: WALO_RECEIPT_SENDER,\n            observed_at: new Date().toISOString(), message_id: id, provider: \"meta_graph\",\n            status: status.status,\n            provider_timestamp: Number.isFinite(seconds) ? new Date(seconds * 1000).toISOString() : null,\n            error_code: waloReceiptCode(status.errors?.[0]?.code),\n            error_subcode: waloReceiptCode(status.errors?.[0]?.error_subcode)\n          });\n        }\n      }\n    }\n  } catch {\n    console.error(\"WALO status receipt processing failed\");\n  }\n}\n";
+// Fixed owner-only revision: no arbitrary source, account, tenant, recipient or message arguments.
+var WSR_SCRIPT='localops-whatsapp-bridge';
+var WSR_BASE='e0845984-a3b3-462f-860d-bed7d1ea6cf7';
+var WSR_SOURCE='107cb5e80ec7e90f5bae51069b7a9ba52daae2fa77a9f9355d944230197ee402';
+var WSR_RID='walo-session-receipts-20261029-v1';
+var WSR_PREFIX='walo:reply-receipt:v1:1:';
+async function wsrLedger(env,b){return wpLedger(env,{...b,rid:WSR_RID});}
+async function wsrUpdate(env,patch,release=false){return wsrLedger(env,{action:'update',patch,release});}
+function wsrPatch(code){
+ wdAssert(!code.includes('const WALO_RECEIPT_TTL'),'Session receipts already installed');
+ for(const [find,replacement]of WSR_EDITS){
+  let anchor=find;
+  if(code.split(anchor).length!==2){
+   const name=/^async function ([A-Za-z0-9_]+)\(/.exec(find)?.[1];
+   wdAssert(['handleInbound','processMeta','sendMetaReply'].includes(name),'Unexpected receipt function');
+   const start=code.indexOf('async function '+name+'('),end=code.indexOf('\n__name('+name+',',start);
+   wdAssert(start>=0&&end>start&&code.indexOf('async function '+name+'(',start+1)<0,'Receipt function boundary drift: '+name);
+   anchor=code.slice(start,end);
+   wdAssert(arCanon(wdTokens(anchor))===arCanon(wdTokens(find)),'Receipt function semantic drift: '+name);
+  }
+  code=code.replace(anchor,()=>replacement);
+ }
+ return WSR_HELPERS+'\n'+code;
+}
+async function wsrSnapshot(env){
+ const active=await wdCurrent(env,WSR_SCRIPT);wdAssert(arActive(active,WSR_BASE),'Bridge changed from reviewed base');
+ const version=await wdVersion(env,WSR_SCRIPT,WSR_BASE),settings=await wdApi(env,WSR_SCRIPT,'/settings'),body=await wdCode(env,WSR_SCRIPT,version);
+ wdAssert(!settings.migrations&&body.main_module==='index.js','Unsupported migration or entrypoint');
+ wdAssert((settings.bindings||[]).some(b=>b.name==='CHAT'&&b.type==='kv_namespace'),'Existing CHAT storage required');
+ const main=body.modules.find(m=>m.name===body.main_module),bytes=await main.blob.arrayBuffer(),source=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
+ wdAssert(await arHash(bytes)===WSR_SOURCE&&await arHash(source)===WSR_SOURCE,'Bridge source differs from reviewed release');
+ const candidate=wsrPatch(source),safe={revision:WSR_RID,script:WSR_SCRIPT,base_version:WSR_BASE,base_etag:version.resources.script.etag,main_module:body.main_module,module_hashes:await arModuleHashes(body),settings_sha256:await arHash(arCanon(wdSettings(settings))),resources_sha256:await arHash(arCanon(wdResources(version))),candidate_sha256:await arHash(candidate),patch_sha256:await arHash(arCanon({edits:WSR_EDITS,helpers:WSR_HELPERS}))};
+ wdAssert(arCanon(active)===arCanon(await wdCurrent(env,WSR_SCRIPT)),'Concurrent bridge deployment during snapshot');
+ return {safe:{...safe,snapshot_sha256:await arHash(arCanon(safe)),rollback_version:WSR_BASE,retention_seconds:604800},version,settings,body,candidate};
+}
+async function wsrRollback(env,rec){
+ wdAssert(rec?.staged_version&&rec.base_version===WSR_BASE,'No recorded receipt rollback target');
+ const active=await wdCurrent(env,WSR_SCRIPT);
+ if(arActive(active,WSR_BASE))return {state:'already_at_original',version:WSR_BASE};
+ wdAssert(arActive(active,rec.staged_version),'Concurrent deployment prevents receipt rollback');
+ wdAssert(await arHash(arCanon(wdResources(await wdVersion(env,WSR_SCRIPT,WSR_BASE))))===rec.resources_sha256,'Rollback configuration differs');
+ wdAssert(await arHash(arCanon(wdSettings(await wdApi(env,WSR_SCRIPT,'/settings'))))===rec.settings_sha256,'Settings drift prevents rollback');
+ const rid=WSR_RID+'-rollback',claim=await wpLedger(env,{action:'claim',rid,jti:rid,sha:rec.candidate_sha256,script:WSR_SCRIPT,actor:'owner'});
+ wdAssert(!claim.error,'Receipt rollback ledger refused');if(claim.existing)return {state:'rollback_already_attempted_check_status'};
+ await wdApi(env,WSR_SCRIPT,'/deployments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:WSR_BASE,percentage:100}]})});
+ wdAssert(arActive(await wdCurrent(env,WSR_SCRIPT),WSR_BASE),'Receipt rollback outcome unconfirmed');
+ await wpLedger(env,{action:'update',rid,patch:{state:'rolled_back'},release:true});
+ await wsrUpdate(env,{state:'rolled_back'},true);return {state:'rolled_back',version:WSR_BASE};
+}
+function wsrSafeReceipt(r){
+ if(!r||r.schema!==1||r.tenant_id!=='1'||r.sender_id!=='1399264479939553'||r.provider!=='meta_graph'||!['send_result','delivery_status'].includes(r.event))return null;
+ const id=x=>typeof x==='string'&&/^wamid\.[A-Za-z0-9._:+/=-]{1,506}$/.test(x)?x:null;
+ const num=x=>Number.isSafeInteger(x)&&x>=0?x:null;
+ const time=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(x)&&Number.isFinite(Date.parse(x))?x:null;
+ const out={schema:1,event:r.event,tenant_id:'1',sender_id:'1399264479939553',provider:'meta_graph',observed_at:time(r.observed_at),message_id:id(r.message_id),error_code:num(r.error_code),error_subcode:num(r.error_subcode)};
+ if(!out.observed_at||Date.parse(out.observed_at)<Date.now()-604800000)return null;
+ if(r.event==='send_result'){
+  if(!['accepted','rejected','transport_unknown','missing_config'].includes(r.outcome))return null;
+  Object.assign(out,{outcome:r.outcome,inbound_message_id:id(r.inbound_message_id),http_status:num(r.http_status),duration_ms:num(r.duration_ms),window_open:typeof r.window_open==='boolean'?r.window_open:null});
+ }else{
+  if(!['sent','delivered','read','failed'].includes(r.status))return null;
+  Object.assign(out,{status:r.status,provider_timestamp:time(r.provider_timestamp)});
+ }
+ return out;
+}
+async function wsrRead(env,rec){
+ wdAssert(rec?.state==='live_verified','Verified live receipt revision required');
+ await wdVerify(env,WSR_SCRIPT,rec,false);
+ const settings=await wdApi(env,WSR_SCRIPT,'/settings'),binding=(settings.bindings||[]).filter(b=>b.name==='CHAT'&&b.type==='kv_namespace');
+ wdAssert(binding.length===1&&/^[a-f0-9]{32}$/.test(binding[0].namespace_id),'Unexpected receipt namespace');
+ const base='https://api.cloudflare.com/client/v4/accounts/'+WALO_DIAGNOSTIC_ACCOUNT+'/storage/kv/namespaces/'+binding[0].namespace_id;
+ const headers={authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN_DOORS};
+ const list=await fetch(base+'/keys?prefix='+encodeURIComponent(WSR_PREFIX)+'&limit=1000',{headers});
+ const data=await list.json().catch(()=>null);wdAssert(list.ok&&data?.success&&Array.isArray(data.result),'Receipt listing failed');
+ wdAssert(!data.result_info?.cursor,'Receipt listing exceeds bounded read; no partial trace returned');
+ const keys=data.result.filter(k=>typeof k.name==='string'&&/^walo:reply-receipt:v1:1:\d{13}:[a-f0-9-]{36}$/.test(k.name)).sort((a,b)=>b.name.localeCompare(a.name)).slice(0,25);
+ const records=[];
+ for(const key of keys){
+  const response=await fetch(base+'/values/'+encodeURIComponent(key.name),{headers});
+  if(response.status===404)continue;wdAssert(response.ok,'Receipt value read failed');
+  const raw=await response.text();wdAssert(raw.length<=4096,'Unexpected receipt size');
+  let value;try{value=JSON.parse(raw);}catch{continue;}
+  const safe=wsrSafeReceipt(value);if(safe)records.push(safe);
+ }
+ return {revision:WSR_RID,records,scope:'latest_25_events_in_fixed_owner_prefix',retention_seconds:604800,eventual_consistency:true,read_only:true,message_sent:false};
+}
+async function runWaloSessionReceiptRepair(args,env){
+ wdAssert(args.script===WSR_SCRIPT,'Session receipt revision is limited to the bridge');
+ if(args.action==='receipt_inspect'){const s=await wsrSnapshot(env);return {...s.safe,production_changed:false};}
+ const record=(await wsrLedger(env,{action:'get'})).record;
+ if(args.action==='receipt_status')return {revision:WSR_RID,record:record||null,active:await wdCurrent(env,WSR_SCRIPT)};
+ if(args.action==='receipt_read')return wsrRead(env,record);
+ wdAssert(args.confirm===true,'Explicit session receipt mutation confirmation required');
+ if(args.action==='receipt_rollback')return wsrRollback(env,record);
+ if(args.action==='receipt_verify'){
+  wdAssert(['uploaded_verifying','staging_failed_or_uncertain','staged_verified'].includes(record?.state),'Receipt revision is not awaiting verification');
+  const verified=await wdVerify(env,WSR_SCRIPT,record);await wsrUpdate(env,{state:'staged_verified',failure:null},true);return verified;
+ }
+ if(args.action==='receipt_stage'){
+  if(record)return {already_handled:true,record};
+  const s=await wsrSnapshot(env);wdAssert(args.expected_snapshot_sha256===s.safe.snapshot_sha256&&args.candidate_sha256===s.safe.candidate_sha256,'Reviewed receipt snapshot drift');
+  const claim=await wsrLedger(env,{action:'claim',jti:WSR_RID,sha:s.safe.candidate_sha256,script:WSR_SCRIPT,actor:'owner'});
+  wdAssert(!claim.error,'Receipt stage ledger refused');if(claim.existing)return {already_handled:true,record:claim.existing};
+  const form=new FormData(),expected=[];
+  const metadata={...s.settings,main_module:s.body.main_module,exports:s.version.resources.script_runtime.exports,keep_assets:true,keep_bindings:['secret_text'],bindings:s.settings.bindings.filter(b=>b.type!=='secret_text'),annotations:{'workers/message':'Approved owner-only WALO seven-day session receipts','workers/tag':WSR_RID}};
+  form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}),'metadata.json');
+  for(const m of s.body.modules){const blob=m.name===s.body.main_module?new Blob([s.candidate],{type:m.content_type}):m.blob;expected.push({name:m.name,type:m.content_type,bytes:blob.size,sha256:await arHash(await blob.arrayBuffer())});form.append(m.name,blob,m.name);}
+  expected.sort((a,b)=>a.name.localeCompare(b.name));const rec={...s.safe,state:'uploading',expected_modules:expected};await wsrUpdate(env,rec);
+  try{
+   wdAssert(arActive(await wdCurrent(env,WSR_SCRIPT),WSR_BASE),'Concurrent version before receipt upload');
+   wdAssert(await arHash(arCanon(wdSettings(await wdApi(env,WSR_SCRIPT,'/settings'))))===s.safe.settings_sha256,'Bridge settings drift before receipt upload');
+   const next=await wdApi(env,WSR_SCRIPT,'/versions?bindings_inherit=strict',{method:'POST',body:form});
+   wdAssert(typeof next?.id==='string'&&/^[a-f0-9-]{36}$/.test(next.id),'Missing staged receipt version');
+   rec.staged_version=next.id;await wsrUpdate(env,{state:'uploaded_verifying',staged_version:next.id});
+   const verified=await wdVerify(env,WSR_SCRIPT,rec);await wsrUpdate(env,{state:'staged_verified'},true);return {...verified,revision:WSR_RID};
+  }catch(e){await wsrUpdate(env,{state:'staging_failed_or_uncertain',failure:wdError(e)},true);return {error:'Receipt staging stopped; do not repeat upload',reason:wdError(e)};}
+ }
+ wdAssert(args.action==='receipt_deploy'&&record?.state==='staged_verified'&&args.candidate_sha256===record.candidate_sha256,'Verified receipt revision and matching digest required');
+ await wdVerify(env,WSR_SCRIPT,record);
+ const rid=WSR_RID+'-deploy',claim=await wpLedger(env,{action:'claim',rid,jti:rid,sha:record.candidate_sha256,script:WSR_SCRIPT,actor:'owner'});
+ wdAssert(!claim.error,'Receipt deploy ledger refused');if(claim.existing)return {state:'deployment_already_attempted_check_status'};
+ await wsrUpdate(env,{state:'deploying'});
+ try{
+  wdAssert(arActive(await wdCurrent(env,WSR_SCRIPT),WSR_BASE),'Concurrent bridge deployment before activation');
+  const dep=await wdApi(env,WSR_SCRIPT,'/deployments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:record.staged_version,percentage:100}],annotations:{'workers/message':'Approved WALO receipts; rollback '+WSR_BASE}})});
+  const verified=await wdVerify(env,WSR_SCRIPT,record,false);
+  await wpLedger(env,{action:'update',rid,patch:{state:'live_verified'},release:true});
+  await wsrUpdate(env,{state:'live_verified',deployment_id:dep.id,finished_at:new Date().toISOString()},true);
+  return {...verified,revision:WSR_RID,deployment_id:dep.id,rollback_version:WSR_BASE,retention_seconds:604800,message_sent:false,delivery_tested:false};
+ }catch(e){
+  await wpLedger(env,{action:'update',rid,patch:{state:'failed_or_uncertain'},release:true});
+  let rollback;try{rollback=await wsrRollback(env,record);}catch{rollback={state:'unconfirmed_or_concurrent_drift'};}
+  await wsrUpdate(env,{state:'deployment_failed_or_uncertain',failure:wdError(e),rollback},true);
+  return {error:'Receipt activation stopped',reason:wdError(e),rollback};
+ }
+}
+
+var APIARY_REPAIR_TOOL_DEF = {name:'apiary_cache_repair',description:'Owner-only, one-time fixed Apiary HEAD/empty-cache repair. snapshot returns a private gzip backup; stage uploads the embedded reviewed patch without deploying; deploy requires verified local-preview source hash; status/rollback are limited to this operation. No arbitrary code, account, resource, cache deletion or credential changes.',inputSchema:{type:'object',additionalProperties:false,properties:{action:{type:'string',enum:['inspect','snapshot','stage','restage','verify','deploy','status','rollback'],default:'snapshot'},expected_snapshot_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},backup_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},local_preview_source_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},confirm:{type:'boolean'},_approved:{type:'boolean'}}}};
+function arCanon(v){return JSON.stringify(v,(_,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.entries(x).sort(([a],[b])=>a.localeCompare(b))):x);}
+async function arHash(v){const b=typeof v==='string'?new TextEncoder().encode(v):v;return [...new Uint8Array(await crypto.subtle.digest('SHA-256',b))].map(x=>x.toString(16).padStart(2,'0')).join('');}
+function arB64(b){let s='';for(let n=0;n<b.length;n+=16384)s+=String.fromCharCode(...b.subarray(n,n+16384));return btoa(s);}
+function arBytes(s){const decoded=atob(s),bytes=new Uint8Array(decoded.length);for(let i=0;i<decoded.length;i++)bytes[i]=decoded.charCodeAt(i);return bytes;}
+function arAssert(ok,reason){if(!ok)throw new Error(reason);}
+function arActive(d,id){return d?.versions?.length===1&&d.versions[0].version_id===id&&d.versions[0].percentage===100;}
+function arSettings(s){const r=structuredClone(s);delete r.annotations;return r;}
+function arResources(v){const r=structuredClone(v.resources);delete r.script.etag;delete r.script.last_deployed_from;return r;}
+function arArgs(args){
+ arAssert(args&&typeof args==='object'&&!Array.isArray(args),'Invalid arguments');
+ const allowed=['action','expected_snapshot_sha256','backup_sha256','local_preview_source_sha256','confirm','_approved'];arAssert(Object.keys(args).every(k=>allowed.includes(k)),'Unsupported argument');
+ const action=args.action||'snapshot';arAssert(['inspect','snapshot','stage','restage','verify','deploy','status','rollback'].includes(action),'Invalid action');
+ for(const k of ['expected_snapshot_sha256','backup_sha256','local_preview_source_sha256'])if(args[k]!==undefined)arAssert(typeof args[k]==='string'&&/^[a-f0-9]{64}$/.test(args[k]),'Invalid digest');
+ for(const k of ['confirm','_approved'])if(args[k]!==undefined)arAssert(typeof args[k]==='boolean','Invalid confirmation');
+ if(['stage','restage','verify','deploy','rollback'].includes(action))arAssert(args.confirm===true,'Explicit repair confirmation required');
+ return action;
+}
+function arPatch(code){
+ arAssert(code.includes('PAGE_CACHE_REVISION = "20261011-reviewed-guides-final"'),'Cache revision mismatch');
+ const start=code.indexOf('var apiaryWorker = {'),end=code.indexOf('\nvar apiary_entry_default = withPageCounts(',start);
+ arAssert(start>=0&&end>start&&code.indexOf('var apiaryWorker = {',start+1)<0,'Apiary module boundary mismatch');
+ let block=code.slice(start,end);
+ const edits=[
+ ['    if (hit) {','    if (hit && (await hit.clone().arrayBuffer()).byteLength > 0) {'],
+ ['        if (obj) {','        if (obj && obj.size > 0) {'],
+ ['    const resp = await worker_default.fetch(request, env, ctx);','    const renderRequest = request.method === "HEAD" ? new Request(request, { method: "GET" }) : request;\n    const resp = await worker_default.fetch(renderRequest, env, ctx);'],
+ ['      ctx.waitUntil(cache.put(key, new Response(buf2, { status: 404, headers: h2 })));','      if (buf2.byteLength > 0) ctx.waitUntil(cache.put(key, new Response(buf2, { status: 404, headers: h2 })));'],
+ ['    ctx.waitUntil(cache.put(key, stored.clone()));','    if (buf.byteLength > 0) ctx.waitUntil(cache.put(key, stored.clone()));'],
+ ['    if (r2Key && env.READING_HTML) {\n      ctx.waitUntil(env.READING_HTML.put','    if (buf.byteLength > 0 && r2Key && env.READING_HTML) {\n      ctx.waitUntil(env.READING_HTML.put'],
+ ['return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers: h2 });','return new Response(request.method === "HEAD" ? null : resp.body, { status: resp.status, statusText: resp.statusText, headers: h2 });']
+ ];
+ for(const [find,replacement]of edits){arAssert(block.split(find).length===2,'Reviewed cache patch anchor mismatch');block=block.replace(find,()=>replacement);}
+ return {code:code.slice(0,start)+block+code.slice(end),edits:edits.length};
+}
+async function arApi(env,path,init={}){
+ const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+APIARY_READ_ACCOUNT+'/workers/'+path,{...init,headers:{authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN_DOORS,...init.headers}});
+ const j=await r.json().catch(()=>null);if(!r.ok||!j?.success){const e=new Error('Apiary provider operation failed');e.safe={status:r.status,codes:j?.errors?.map(x=>x.code).filter(x=>typeof x==='number')||[]};throw e;}return j.result;
+}
+async function arCurrent(env){const r=await arApi(env,'scripts/apiary-bee/deployments');arAssert(r?.deployments?.[0],'Active deployment unavailable');return r.deployments[0];}
+async function arVersion(env,id){arAssert(/^[a-f0-9-]{36}$/.test(id),'Invalid stored version');return arApi(env,'scripts/apiary-bee/versions/'+id);}
+async function arMetadata(env){
+ const active=await arCurrent(env);arAssert(arActive(active,APIARY_REPAIR_BASE),'Active version changed from approved base');const version=await arVersion(env,APIARY_REPAIR_BASE);arAssert(version.resources?.script?.etag===APIARY_REPAIR_ETAG,'Approved base ETag mismatch');
+ const settings=await arApi(env,'scripts/apiary-bee/settings'),beta=await arApi(env,'workers/apiary-bee/versions/'+APIARY_REPAIR_BASE);delete beta.modules;
+ return {account:APIARY_READ_ACCOUNT,script:'apiary-bee',active_version:APIARY_REPAIR_BASE,etag:APIARY_REPAIR_ETAG,settings,version,beta};
+}
+async function arContent(env,etag){const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+APIARY_READ_ACCOUNT+'/workers/scripts/apiary-bee/content/v2',{headers:{authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN_DOORS}});arAssert(r.ok&&r.headers.get('etag')?.replaceAll('"','')===etag,'Latest uploaded source differs from required version');arAssert((r.headers.get('content-type')||'').startsWith('multipart/form-data'),'Unexpected source format');return r;}
+async function arCode(env,id){const version=await arVersion(env,id);const r=await arContent(env,version.resources.script.etag),main=r.headers.get('cf-entrypoint');const form=await r.formData();const modules=[];for(const [name,blob]of form){arAssert(blob instanceof Blob,'Unexpected multipart text field');modules.push({name,content_type:blob.type,blob});}arAssert(main&&modules.length>0&&modules.length<=100&&modules.some(m=>m.name===main)&&new Set(modules.map(m=>m.name)).size===modules.length,'Unexpected Worker module layout');return{id,main_module:main,modules};}
+async function arModuleHashes(beta){const out=[];for(const m of beta.modules)out.push({name:m.name,type:m.content_type,bytes:m.blob.size,sha256:await arHash(await m.blob.arrayBuffer())});return out.sort((a,b)=>a.name.localeCompare(b.name));}
+async function arSnapshot(env){
+ const snapshot=await arMetadata(env),body=await arCode(env,APIARY_REPAIR_BASE);arAssert(body.main_module===snapshot.beta.main_module,'Main module mismatch');const patch=arPatch(await body.modules.find(m=>m.name===body.main_module).blob.text()),modules=await arModuleHashes(body);arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Concurrent deployment during snapshot');
+ return {snapshot,patch,modules,modulesBody:body.modules,snapshot_sha256:await arHash(arCanon(snapshot)),settings_sha256:await arHash(arCanon(arSettings(snapshot.settings))),candidate_sha256:await arHash(patch.code)};
+}
+async function arLedger(env,b){return wpLedger(env,{...b,rid:APIARY_REPAIR_RID});}
+async function arUpdate(env,patch,release=false){return arLedger(env,{action:'update',patch,release});}
+async function arChecks(){const result=[];for(const slug of ['biggie-medieval-manuscript-letters','wiki-zweistein','wiki-raether-limit']){const url='https://apiarybee.com/community/reading/'+slug;const h=await fetch(url,{method:'HEAD',redirect:'manual'});const headBytes=(await h.arrayBuffer()).byteLength;const r=await fetch(url,{redirect:'manual'});const html=await r.text();result.push({slug,head_status:h.status,head_bytes:headBytes,get_status:r.status,bytes:new TextEncoder().encode(html).length,ok:h.status===200&&headBytes===0&&r.status===200&&html.includes('<html')&&html.includes(url)});}return {ok:result.every(x=>x.ok),checks:result};}
+async function arRollback(env,record){const active=await arCurrent(env);if(arActive(active,APIARY_REPAIR_BASE))return {state:'already_at_original',active_version:APIARY_REPAIR_BASE};arAssert(arActive(active,record.staged_version),'Concurrent deployment prevents rollback');await arVersion(env,APIARY_REPAIR_BASE);await arApi(env,'scripts/apiary-bee/deployments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:APIARY_REPAIR_BASE,percentage:100}],annotations:{'workers/message':'Rollback approved Apiary cache repair'}})});arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Rollback outcome unconfirmed');await arUpdate(env,{state:'rolled_back',finished_at:new Date().toISOString()},true);return {state:'rolled_back',active_version:APIARY_REPAIR_BASE};}
+var APIARY_REPAIR_PRESERVED_MODULES = [{name:'apiary-entry.js.map',type:'application/source-map',bytes:21209889,sha256:'730bcb29a05d854d50c4d422cf05c6cfb20e8dbcd7d1d4ae642a01cfd785e9ad'}];
+async function arVerifyFixedBody(body,record){const hashes=await arModuleHashes(body);arAssert(body.main_module==='apiary-entry.js'&&hashes.find(m=>m.name===body.main_module)?.sha256===record.candidate_sha256,'Reviewed candidate body mismatch');arAssert(arCanon(hashes.filter(m=>m.name!==body.main_module))===arCanon(APIARY_REPAIR_PRESERVED_MODULES),'Preserved modules differ from verified backup');return hashes;}
+async function arRestage(env,args,record){
+ arAssert(record?.state==='staging_failed'&&record.failure==='Uploaded runtime configuration differs'&&record.staged_version,'No eligible failed stage');arAssert(args.local_preview_source_sha256===record.candidate_sha256&&args.backup_sha256===record.backup_sha256,'Verified backup and preview digests required');arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Concurrent deployment');
+ const original=await arVersion(env,APIARY_REPAIR_BASE),failed=await arVersion(env,record.staged_version),a=arResources(original),b=arResources(failed);arAssert(a.script_runtime.exports&&!b.script_runtime.exports,'Failure is not an omitted export declaration');delete a.script_runtime.exports;arAssert(arCanon(a)===arCanon(b),'Other runtime differences prevent retry');
+ const settings=await arApi(env,'scripts/apiary-bee/settings');arAssert(await arHash(arCanon(arSettings(settings)))===record.settings_sha256,'Worker settings drift');let body=await arCode(env,record.staged_version);const expected=await arVerifyFixedBody(body,record);
+ const rid=APIARY_REPAIR_RID+'-exports-retry',claim=await wpLedger(env,{action:'claim',rid,jti:rid,sha:record.candidate_sha256,script:'apiary-bee',actor:'owner'});arAssert(!claim.error,'Retry lock unavailable');if(claim.existing)return {already_handled:true,record};
+ await arUpdate(env,{state:'restaging',previous_staged_version:record.staged_version});
+ try{
+  const metadata={...settings,main_module:body.main_module,exports:original.resources.script_runtime.exports,keep_assets:true,keep_bindings:['secret_text'],bindings:settings.bindings.filter(x=>x.type!=='secret_text'),annotations:{'workers/message':'Approved Apiary cache repair; preserve existing exports','workers/tag':'apiary-cache-repair-20261028'}};
+  let form=new FormData();form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}),'metadata.json');for(const m of body.modules)form.append(m.name,m.blob,m.name);arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Concurrent deployment before restage');
+  const next=await arApi(env,'scripts/apiary-bee/versions?bindings_inherit=strict',{method:'POST',headers:{'if-match':'"'+failed.resources.script.etag+'"'},body:form});form=null;body=null;arAssert(typeof next.id==='string','Restage outcome has no version');await arUpdate(env,{state:'uploaded_verifying',staged_version:next.id});
+  const v=await arVersion(env,next.id);arAssert(arCanon(arResources(original))===arCanon(arResources(v)),'Restaged runtime configuration differs');arAssert(await arHash(arCanon(arSettings(await arApi(env,'scripts/apiary-bee/settings'))))===record.settings_sha256,'Settings changed during restage');const uploaded=await arCode(env,next.id);arAssert(arCanon(await arVerifyFixedBody(uploaded,record))===arCanon(expected),'Restaged code differs');arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Production changed during restage');
+  await arUpdate(env,{state:'staged_verified',module_hashes:expected,staged_etag:v.resources.script.etag,local_preview_source_sha256:args.local_preview_source_sha256,failure:null});await wpLedger(env,{action:'update',rid,patch:{state:'verified'},release:true});return {state:'staged_verified',staged_version:next.id,base_version:APIARY_REPAIR_BASE,production_changed:false,modules_verified:true,runtime_preserved:true,settings_preserved:true,exports_preserved:true,candidate_sha256:record.candidate_sha256};
+ }catch(e){await arUpdate(env,{state:'restaging_failed',failure:e.safe||e.message});await wpLedger(env,{action:'update',rid,patch:{state:'failed'},release:true});throw e;}
+}
+async function arVerifyStaged(env,args,record){
+ arAssert(record?.state==='restaging_failed'&&record.failure?.status===500&&arCanon(record.failure.codes)==='[10500]'&&record.staged_version,'No eligible interrupted verification');
+ arAssert(args.local_preview_source_sha256===record.candidate_sha256&&args.backup_sha256===record.backup_sha256,'Verified backup and preview digests required');arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Concurrent deployment');
+ const original=await arVersion(env,APIARY_REPAIR_BASE),v=await arVersion(env,record.staged_version);arAssert(arCanon(arResources(original))===arCanon(arResources(v)),'Staged runtime differs');
+ arAssert(await arHash(arCanon(arSettings(await arApi(env,'scripts/apiary-bee/settings'))))===record.settings_sha256,'Worker settings drift');
+ const hashes=await arVerifyFixedBody(await arCode(env,record.staged_version),record);arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Production changed during verification');
+ await arUpdate(env,{state:'staged_verified',module_hashes:hashes,staged_etag:v.resources.script.etag,local_preview_source_sha256:args.local_preview_source_sha256,failure:null});
+ return {state:'staged_verified',staged_version:record.staged_version,production_changed:false,modules_verified:true,runtime_preserved:true,settings_preserved:true,exports_preserved:true,candidate_sha256:record.candidate_sha256};
+}
+async function runApiaryRepair(args,env,authContext){
+ // Existing owner/admin keys only; exclude WALO's separate privileged integration.
+ if(authContext?.mode!=='admin'||authContext.caller==='walo'||authContext.connectionId)return {error:'Apiary repair requires existing owner authorization'};
+ let action;try{action=arArgs(args);}catch(e){return {error:e.message};}
+ if(!env.CLOUDFLARE_API_TOKEN_DOORS||!env.RATE_LIMITER_DO)return {error:'Existing repair bindings unavailable; no fallback attempted'};
+ try{
+  if(action==='inspect'){
+   const active=await arCurrent(env),v=await arVersion(env,APIARY_REPAIR_BASE);
+   const b=await arApi(env,'workers/apiary-bee/versions/'+APIARY_REPAIR_BASE);
+   const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+APIARY_READ_ACCOUNT+'/workers/scripts/apiary-bee/content/v2',{headers:{authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN_DOORS}});
+   const headers={status:r.status,content_type:r.headers.get('content-type'),content_length:r.headers.get('content-length'),etag:r.headers.get('etag'),'cf-entrypoint':r.headers.get('cf-entrypoint')};await r.body?.cancel();
+   return {active_version:active.versions,base_etag:v.resources.script.etag,main_module:b.main_module,beta_keys:Object.keys(b).filter(k=>k!=='bindings'),module_count:b.modules?.length,headers};
+  }
+  if(action==='snapshot'){
+   const snapshot=await arMetadata(env),r=await arContent(env,APIARY_REPAIR_ETAG),contentType=r.headers.get('content-type'),main=r.headers.get('cf-entrypoint');arAssert(main===snapshot.beta.main_module,'Main module mismatch');
+   const gzip=new Uint8Array(await new Response(r.body.pipeThrough(new CompressionStream('gzip'))).arrayBuffer());arAssert(gzip.length<16*1024*1024,'Compressed backup exceeds bounded size');arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Concurrent deployment during backup');
+   return {action,account:APIARY_READ_ACCOUNT,script:'apiary-bee',base_version:APIARY_REPAIR_BASE,base_etag:APIARY_REPAIR_ETAG,main_module:main,snapshot_sha256:await arHash(arCanon(snapshot)),private_metadata:snapshot,backup_sha256:await arHash(gzip),backup_encoding:'gzip+base64-multipart',backup_content_type:contentType,backup_bytes:gzip.length,backup_base64:arB64(gzip),edits:7,revision:'20261011-reviewed-guides-final',production_changed:false};
+  }
+  const record=(await arLedger(env,{action:'get'})).record;
+  if(action==='status'){
+   const out={record:record||null,active_deployment:await arCurrent(env)};
+   if(record?.staged_version){const a=arResources(await arVersion(env,APIARY_REPAIR_BASE)),b=arResources(await arVersion(env,record.staged_version));const paths=[];const walk=(x,y,p)=>{if(arCanon(x)===arCanon(y))return;if(x&&y&&typeof x==='object'&&typeof y==='object'&&!Array.isArray(x)&&!Array.isArray(y)){for(const k of new Set([...Object.keys(x),...Object.keys(y)]))walk(x[k],y[k],p+'.'+k);}else paths.push({path:p,before_type:Array.isArray(x)?'array':typeof x,after_type:Array.isArray(y)?'array':typeof y});};walk(a,b,'resources');const sortBindings=v=>Array.isArray(v)?[...v].sort((x,y)=>x.name.localeCompare(y.name)):v;out.configuration_differences=paths;out.binding_sets_identical=arCanon(sortBindings(a.bindings))===arCanon(sortBindings(b.bindings));out.runtime_keys={before:Object.keys(a.script_runtime||{}),after:Object.keys(b.script_runtime||{})};}
+   return out;
+  }
+  if(action==='restage')return await arRestage(env,args,record);
+  if(action==='verify')return await arVerifyStaged(env,args,record);
+  if(action==='rollback'){arAssert(record?.staged_version,'No repair version recorded');return await arRollback(env,record);}
+  if(action==='stage'){
+   if(record)return {already_handled:true,record};
+   arAssert(args.expected_snapshot_sha256&&args.backup_sha256&&args.local_preview_source_sha256,'Backup and local preview digests required');
+   const s=await arSnapshot(env);arAssert(s.snapshot_sha256===args.expected_snapshot_sha256,'Snapshot drift');arAssert(s.candidate_sha256===args.local_preview_source_sha256,'Previewed candidate differs');
+   // Owner confirms the locally verified streamed backup digest; source identity is independently pinned by immutable ETag and snapshot hash.
+   const claimed=await arLedger(env,{action:'claim',jti:APIARY_REPAIR_RID,sha:s.candidate_sha256,script:'apiary-bee',actor:'owner'});arAssert(!claimed.error,'Repair ledger refused claim');if(claimed.existing)return {already_handled:true,record:claimed.existing};
+   await arUpdate(env,{state:'uploading',base_version:APIARY_REPAIR_BASE,base_etag:APIARY_REPAIR_ETAG,snapshot_sha256:s.snapshot_sha256,backup_sha256:args.backup_sha256,candidate_sha256:s.candidate_sha256,settings_sha256:s.settings_sha256,revision:'20261011-reviewed-guides-final'});
+   try{
+    const metadata={...s.snapshot.settings,main_module:s.snapshot.beta.main_module,exports:s.snapshot.version.resources.script_runtime.exports,keep_assets:true,keep_bindings:['secret_text'],bindings:s.snapshot.settings.bindings.filter(b=>b.type!=='secret_text'),annotations:{'workers/message':'Approved Apiary HEAD and empty-cache fix; unchanged revision','workers/tag':'apiary-cache-repair-20261028'}};
+    let form=new FormData();form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}),'metadata.json');
+    const expected=[];for(const m of s.modulesBody){const blob=m.name===s.snapshot.beta.main_module?new Blob([s.patch.code],{type:m.content_type}):m.blob;expected.push({name:m.name,type:m.content_type,bytes:blob.size,sha256:await arHash(await blob.arrayBuffer())});form.append(m.name,blob,m.name);}
+    arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Concurrent deployment before upload');
+    const next=await arApi(env,'scripts/apiary-bee/versions?bindings_inherit=strict',{method:'POST',headers:{'if-match':'"'+APIARY_REPAIR_ETAG+'"'},body:form});arAssert(typeof next.id==='string','Upload outcome has no version');
+    form=null;s.modulesBody=null;s.patch=null;await arUpdate(env,{state:'uploaded_verifying',staged_version:next.id});
+    const version=await arVersion(env,next.id);arAssert(arCanon(arResources(s.snapshot.version))===arCanon(arResources(version)),'Uploaded runtime configuration differs');
+    const newSettings=await arApi(env,'scripts/apiary-bee/settings');arAssert(await arHash(arCanon(arSettings(newSettings)))===s.settings_sha256,'Worker settings changed on upload');
+    const beta=await arCode(env,next.id);arAssert(beta.main_module===s.snapshot.beta.main_module&&arCanon(await arModuleHashes(beta))===arCanon(expected.sort((a,b)=>a.name.localeCompare(b.name))),'Uploaded modules differ');
+    arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Production changed during staging');await arUpdate(env,{state:'staged_verified',module_hashes:expected,staged_etag:version.resources.script.etag,local_preview_source_sha256:args.local_preview_source_sha256});
+    return {state:'staged_verified',staged_version:next.id,base_version:APIARY_REPAIR_BASE,production_changed:false,modules_verified:true,runtime_preserved:true,settings_preserved:true,candidate_sha256:s.candidate_sha256};
+   }catch(e){await arUpdate(env,{state:'staging_failed',failure:e.safe||e.message},true);throw e;}
+  }
+  arAssert(record?.state==='staged_verified','A verified staged repair is required');arAssert(args.local_preview_source_sha256===record.candidate_sha256,'Local preview digest required');
+  const original=await arVersion(env,APIARY_REPAIR_BASE),staged=await arVersion(env,record.staged_version);arAssert(staged.resources.script.etag===record.staged_etag&&arCanon(arResources(original))===arCanon(arResources(staged)),'Staged immutable identity changed');
+  arAssert(await arHash(arCanon(arSettings(await arApi(env,'scripts/apiary-bee/settings'))))===record.settings_sha256,'Worker configuration drift');
+  arAssert(arActive(await arCurrent(env),APIARY_REPAIR_BASE),'Concurrent active deployment');
+  await arUpdate(env,{state:'deploying'});
+  try{
+   const dep=await arApi(env,'scripts/apiary-bee/deployments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:record.staged_version,percentage:100}],annotations:{'workers/message':'Approved Apiary cache fix; rollback '+APIARY_REPAIR_BASE}})});
+   arAssert(arActive(await arCurrent(env),record.staged_version),'Deployment outcome unconfirmed');await arUpdate(env,{state:'live_verifying',deployment_id:dep.id});
+   const checks=await arChecks();arAssert(checks.ok,'Live verification failed');const result={state:'live_verified',version:record.staged_version,rollback_version:APIARY_REPAIR_BASE,deployment_id:dep.id,checks,revision:'20261011-reviewed-guides-final',finished_at:new Date().toISOString()};await arUpdate(env,result,true);return result;
+  }catch(e){let rollback;try{rollback=await arRollback(env,record);}catch{rollback={state:'unconfirmed_or_concurrent_drift'};}await arUpdate(env,{state:'deployment_failed',failure:e.safe||e.message,rollback},true);return {error:'Apiary deployment failed',failure:e.safe||e.message,rollback};}
+ }catch(e){return {error:'Apiary repair stopped',reason:e.safe||e.message};}
+}
 var PAGES_DEPLOY_TOOLS = new Set(PAGES_DEPLOY_TOOL_DEFS.map((t) => t.name));
 async function runPagesDeployTool(name, args, client, altClient) {
   try {
@@ -6640,8 +7632,16 @@ async function runPagesDeployTool(name, args, client, altClient) {
 var SERVER = {
   name: "cloudflare-ops-mcp",
   title: "AMH Walrus Tusk Cloudflare Ops MCP \u2014 SafeTry Agent Harness",
-  version: "0.15.0"
+  version: "0.15.6",
+  websiteUrl: "https://mcp.artificialmindhive.com/",
+  icons: [{ src: "https://mcp.artificialmindhive.com/logo.svg", mimeType: "image/svg+xml", sizes: ["any"] }]
 };
+var PUBLIC_RPC = /* @__PURE__ */ new Set(["initialize", "ping", "tools/list"]);
+function isPublicRpc(body) {
+  const list = Array.isArray(body) ? body : [body];
+  return list.length > 0 && list.length <= 8 && list.every((m) => m && typeof m === "object" && typeof m.method === "string" && (PUBLIC_RPC.has(m.method) || m.method.startsWith("notifications/")));
+}
+__name(isPublicRpc, "isPublicRpc");
 var INDEXNOW_KEY = "d4f02a51e05cfee056bc027685262a64";
 var MGMT_TOOL_DEFS = [
   {
@@ -6911,6 +7911,9 @@ var TOOLS = [
       required: ["account_id", "project"]
     }
   },
+  WALO_DIAGNOSTIC_TOOL_DEF,
+  APIARY_REPAIR_TOOL_DEF,
+  ...APIARY_READ_TOOL_DEFS,
   ...PAGES_DEPLOY_TOOL_DEFS,
   ...PAGES_PATCH_TOOL_DEFS,
   ...GITHUB_TOOL_DEFS,
@@ -6922,35 +7925,37 @@ var TOOLS = [
   {
     name: "pages_create_project",
     description: "Create a NEW Cloudflare Pages project (empty site at <name>.pages.dev). Dry-run unless apply=true. Then use pages_deploy to put files on it and pages_add_domain for a custom domain.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, name: { type: "string", description: "lowercase letters, digits, dashes" }, production_branch: { type: "string", description: "default main" }, apply: { type: "boolean" } }, required: ["account", "name"] }
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), artificialmindhive, servicepricer (souljaboy.app), or kodak (kodakblack.app)" }, name: { type: "string", description: "lowercase letters, digits, dashes" }, production_branch: { type: "string", description: "default main" }, apply: { type: "boolean" } }, required: ["account", "name"] }
   },
   {
     name: "pages_add_domain",
     description: "Attach a custom domain (e.g. tacos.com or www.tacos.com) to a Pages project, or show the status of its domains. If the domain's zone is on the same Cloudflare account, Cloudflare sets up DNS itself; otherwise the result says what record to add. Dry-run unless apply=true.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, project: { type: "string" }, domain: { type: "string", description: "omit to just list the project's domains" }, apply: { type: "boolean" } }, required: ["account", "project"] }
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), artificialmindhive, servicepricer (souljaboy.app), or kodak (kodakblack.app)" }, project: { type: "string" }, domain: { type: "string", description: "omit to just list the project's domains" }, apply: { type: "boolean" } }, required: ["account", "project"] }
   },
   {
     name: "worker_deploy",
     description: "Deploy a small Cloudflare Worker (one ES-module file, export default { fetch }) next to a site, e.g. an AI chat endpoint or a form handler. Optional bindings: ai=true gives env.AI (Workers AI, e.g. env.AI.run('@cf/moonshotai/kimi-k2.6', {messages})), d1=[{binding, database_id}] gives env.<binding>, vars={NAME:'value'}. Publishes at <name>.<account>.workers.dev. Refuses to overwrite any Worker the hub didn't create (Austin's existing workers are safe). Dry-run unless apply=true. Remember the account's free AI allowance is shared: add a rate limit to anything public.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, name: { type: "string" }, code: { type: "string", description: "the module source" }, ai: { type: "boolean" }, d1: { type: "array", items: { type: "object", properties: { binding: { type: "string" }, database_id: { type: "string" } }, required: ["binding", "database_id"] } }, vars: { type: "object" }, compatibility_date: { type: "string" }, apply: { type: "boolean" } }, required: ["account", "name", "code"] }
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), artificialmindhive, servicepricer (souljaboy.app), or kodak (kodakblack.app)" }, name: { type: "string" }, code: { type: "string", description: "the module source" }, ai: { type: "boolean" }, d1: { type: "array", items: { type: "object", properties: { binding: { type: "string" }, database_id: { type: "string" } }, required: ["binding", "database_id"] } }, vars: { type: "object" }, compatibility_date: { type: "string" }, apply: { type: "boolean" } }, required: ["account", "name", "code"] }
   },
   {
     name: "d1_create",
     description: "Create a new D1 database (or list existing ones when name is omitted). Dry-run unless apply=true.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, name: { type: "string" }, apply: { type: "boolean" } }, required: ["account"] }
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), artificialmindhive, servicepricer (souljaboy.app), or kodak (kodakblack.app)" }, name: { type: "string" }, apply: { type: "boolean" } }, required: ["account"] }
   },
   {
     name: "d1_query",
     description: "READ-ONLY SQL on a D1 database (SELECT / WITH / PRAGMA / EXPLAIN only). database = name or id. Returns rows.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, database: { type: "string" }, sql: { type: "string" }, params: { type: "array" } }, required: ["account", "database", "sql"] }
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), artificialmindhive, servicepricer (souljaboy.app), or kodak (kodakblack.app)" }, database: { type: "string" }, sql: { type: "string" }, params: { type: "array" } }, required: ["account", "database", "sql"] }
   },
   {
     name: "d1_exec",
     description: "WRITE SQL on a D1 database (CREATE TABLE, INSERT, UPDATE, DELETE...). Dry-run unless apply=true; Austin must approve writes. DROP of a table needs force=true.",
-    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), or artificialmindhive" }, database: { type: "string" }, sql: { type: "string" }, params: { type: "array" }, apply: { type: "boolean" }, force: { type: "boolean" } }, required: ["account", "database", "sql"] }
+    inputSchema: { type: "object", properties: { account: { type: "string", description: "amh (pain2hustle1), doors (austinsdoors1), artificialmindhive, servicepricer (souljaboy.app), or kodak (kodakblack.app)" }, database: { type: "string" }, sql: { type: "string" }, params: { type: "array" }, apply: { type: "boolean" }, force: { type: "boolean" } }, required: ["account", "database", "sql"] }
   },
   ...INBOX_TOOL_DEFS,
   ...WP_TOOL_DEFS,
+  ...GATE_TOOL_DEFS,
+  ...SOULJA_TOOL_DEFS,
   ...EMAIL_TOOL_DEFS,
   {
     name: "token_audit_settings",
@@ -7032,6 +8037,16 @@ __name(runHarnessTool, "runHarnessTool");
 // Shared owner/agent Pages credentials stay in Worker secrets, never tool arguments.
 function pagesOwnerAccountClient(env, authContext, accountId) {
   if (authContext?.mode !== "admin") return null;
+  if (accountId === "068a8123b10b7a9fcdcb49e6763969e9") {
+    const token = env.CLOUDFLARE_API_TOKEN_SERVICEPRICER;
+    if (!token) throw new Error("Servicepricer Pages credential is not configured");
+    return new CloudflareClient({ token });
+  }
+  if (accountId === "3573003179750b6bec7f4549ca695675") {
+    const token = env.CLOUDFLARE_API_TOKEN_KODAK;
+    if (!token) throw new Error("Kodak Pages credential is not configured");
+    return new CloudflareClient({ token });
+  }
   if (accountId === "a08783a0d3715df907ed5ccad38f0dcf") {
     const token = env.CLOUDFLARE_API_TOKEN_ARTIFICIALMINDHIVE;
     if (!token) throw new Error("Artificialmindhive Pages credential is not configured");
@@ -7043,6 +8058,9 @@ function pagesOwnerAccountClient(env, authContext, accountId) {
 }
 
 async function runTool(name, args, env, authContext) {
+  if (name === "walo_diagnostic_repair") return runWaloDiagnosticRepair(args, env, authContext);
+  if (name === "apiary_cache_repair") return runApiaryRepair(args, env, authContext);
+  if (APIARY_READ_TOOLS.has(name)) return runApiaryReadTool(name, args, env, authContext);
   if (HARNESS_TOOLS.has(name)) return runHarnessTool(name, args, env, authContext);
   if (name === "token_audit_settings") {
     const kv = env.CLOUDFLARE_OPS_OAUTH;
@@ -7119,9 +8137,9 @@ async function runTool(name, args, env, authContext) {
     case "who_serves_domain":
       return await whoServesDomain(client, domain);
     case "account_doctor":
-      return await accountDoctor(client, { expected_account_id: args.expected_account_id });
+      return await accountDoctor(pagesOwnerAccountClient(env, authContext, args.expected_account_id) || client, { expected_account_id: args.expected_account_id });
     case "pages_branch_check":
-      return await pagesBranchCheck(client, {
+      return await pagesBranchCheck(pagesOwnerAccountClient(env, authContext, args.account_id) || client, {
         account_id: args.account_id,
         project: args.project,
         git_branch: args.git_branch
@@ -7237,6 +8255,7 @@ __name(rpcError, "rpcError");
 async function handleRpc(msg, env, authContext) {
   const { id, method, params } = msg || {};
   if (id === void 0 || id === null) return null;
+  if (authContext && authContext.mode === "public" && !PUBLIC_RPC.has(method)) return rpcError(id, -32001, "unauthorized");
   if (method === "initialize") {
     const requested = params && params.protocolVersion;
     return rpcResult(id, {
@@ -7248,6 +8267,7 @@ async function handleRpc(msg, env, authContext) {
   }
   if (method === "ping") return rpcResult(id, {});
   if (method === "tools/list") {
+    if (authContext && authContext.mode === "public") return rpcResult(id, { tools: TOOLS });
     if (authContext && authContext.mode === "user") return rpcResult(id, { tools: wtuToolDefs() });
     let fed = [];
     try {
@@ -7282,6 +8302,17 @@ async function handleRpc(msg, env, authContext) {
         if (!authContext || authContext.mode !== "admin") return rpcResult(id, { content: [{ type: "text", text: JSON.stringify({ error: "email_austin is for owner/agent keys" }) }], isError: true });
         const outE = await runEmailTool(toolName, args, env, authContext.connectionId || "agent");
         return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(outE, null, 2) }], isError: !!(outE && outE.error) });
+      }
+      if (SOULJA_TOOLS.has(toolName)) {
+        if (!authContext || authContext.mode !== "admin") return rpcResult(id, { content: [{ type: "text", text: JSON.stringify({ error: toolName + " is for owner/agent keys" }) }], isError: true });
+        let outS;
+        try { outS = await runSouljaAccess(env, authContext, args); } catch (e) { outS = { error: String(e && e.message || e).slice(0, 500) }; }
+        return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(outS, null, 2) }], isError: !!(outS && outS.error) });
+      }
+      if (GATE_TOOLS.has(toolName)) {
+        if (!authContext || authContext.mode !== "admin") return rpcResult(id, { content: [{ type: "text", text: JSON.stringify({ error: toolName + " is for owner/agent keys" }) }], isError: true });
+        const outG = await runGateTool(args, env);
+        return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(outG, null, 2) }], isError: !!(outG && outG.error) });
       }
       if (WP_TOOLS.has(toolName)) {
         if (!authContext || authContext.mode !== "admin") return rpcResult(id, { content: [{ type: "text", text: JSON.stringify({ error: toolName + " is for owner/agent keys" }) }], isError: true });
@@ -7344,7 +8375,7 @@ var SECURITY_HEADERS = {
 };
 var WT_LANDING_CSP = [
   "default-src 'self' blob: data:",
-  "script-src 'self' 'unsafe-inline' blob:",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://static.cloudflareinsights.com",
   "style-src 'self' 'unsafe-inline' blob:",
   "img-src 'self' data: blob:",
   "font-src 'self' data: blob:",
@@ -7558,7 +8589,17 @@ async function fetchInner(request, env) {
   }
   const auth = request.headers.get("authorization") || "";
   const provided = (/^Bearer\s+/i.test(auth) ? auth.replace(/^Bearer\s+/i, "") : "").trim() || (request.headers.get("x-mcp-key") || "").trim() || (new URL(request.url).searchParams.get("key") || "").trim();
-  const authContext = await authorizeConnector(env, provided);
+  let authContext = await authorizeConnector(env, provided);
+  let publicBody;
+  if (!authContext.ok && !provided) {
+    try {
+      publicBody = JSON.parse(await request.clone().text());
+    } catch {
+      publicBody = void 0;
+    }
+    if (publicBody !== void 0 && isPublicRpc(publicBody)) authContext = { ok: true, mode: "public", caller: "public", keyHash: "pub:" + (request.headers.get("cf-connecting-ip") || "unknown") };
+    else publicBody = void 0;
+  }
   if (!authContext.ok) {
     return new Response(JSON.stringify(rpcError(null, -32001, "unauthorized")), {
       status: 401,
@@ -7572,8 +8613,8 @@ async function fetchInner(request, env) {
       headers: { "content-type": "application/json", "retry-after": String(rl.retryAfter), ...CORS }
     });
   }
-  let body;
-  try {
+  let body = publicBody;
+  if (body === void 0) try {
     body = await request.json();
   } catch {
     return new Response(JSON.stringify(rpcError(null, -32700, "parse error")), { status: 400, headers: { "content-type": "application/json", ...CORS } });
@@ -7756,10 +8797,16 @@ __name(siteViews, "siteViews");
 var SITE_SETUP_TOOLS = /* @__PURE__ */ new Set(["pages_create_project", "pages_add_domain", "worker_deploy", "d1_create", "d1_query", "d1_exec"]);
 async function siteSetupTool(name, args, env) {
   const accountId = pagesAccount(args.account);
-  // Additional owner credential is intentionally limited to dedicated Pages actions.
+  // Additional owner credentials are intentionally limited to dedicated Pages actions.
+  // 0.15.4: Austin wants new Workers + Workers AI on the servicepricer and kodak accounts, not the main one.
+  // Their keys may run every site-setup tool; artificialmindhive stays Pages-only.
   if (accountId === "a08783a0d3715df907ed5ccad38f0dcf" && !["pages_create_project", "pages_add_domain"].includes(name))
     return { error: "Artificialmindhive shared credential is available only for Pages tools" };
-  const token = accountId === "a08783a0d3715df907ed5ccad38f0dcf"
+  const token = accountId === "068a8123b10b7a9fcdcb49e6763969e9"
+    ? env.CLOUDFLARE_API_TOKEN_SERVICEPRICER
+    : accountId === "3573003179750b6bec7f4549ca695675"
+    ? env.CLOUDFLARE_API_TOKEN_KODAK
+    : accountId === "a08783a0d3715df907ed5ccad38f0dcf"
     ? env.CLOUDFLARE_API_TOKEN_ARTIFICIALMINDHIVE
     : accountId === "1d5fae607a857fc56cd575763bf8f3bc" ? env.CLOUDFLARE_API_TOKEN_DOORS : env.CLOUDFLARE_API_TOKEN;
   if (!token) return { error: "no hub token for that account" };
@@ -7784,6 +8831,10 @@ async function siteSetupTool(name, args, env) {
   if (name === "pages_create_project") {
     const proj = pagesProject(args.name);
     const body = { name: proj, production_branch: String(args.production_branch || "main") };
+    if (accountId === SOULJA_ACCOUNT && /-souljaboy$/.test(proj)) {
+      const have = await souljaCf(env, "/accounts/" + SOULJA_ACCOUNT + "/pages/projects/" + proj);
+      if (have.ok) return { exists: true, project: proj, url: "https://" + have.result.subdomain, domains: have.result.domains, next: "already there: pages_deploy files to it" };
+    }
     if (!apply) return { dry_run: true, would_create: body, url: proj + ".pages.dev", next: "apply=true to create" };
     const r = await cf("/pages/projects", { method: "POST", body: JSON.stringify(body) });
     return { created: true, project: r.name, url: "https://" + r.subdomain, production_branch: r.production_branch, next: "pages_deploy files to it, then pages_add_domain" };
@@ -7793,6 +8844,16 @@ async function siteSetupTool(name, args, env) {
     if (!args.domain) return { domains: (await cf("/pages/projects/" + proj + "/domains")).map((d) => ({ name: d.name, status: d.status, verification: d.verification_data && d.verification_data.status, validation: d.validation_data && d.validation_data.status })) };
     const domain = String(args.domain).trim().toLowerCase();
     if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) return { error: "domain looks wrong" };
+    if (domain === SOULJA_ZONE || domain.endsWith("." + SOULJA_ZONE)) {
+      if (accountId !== SOULJA_ACCOUNT) return { error: "souljaboy.app names live on the servicepricer account" };
+      if (souljaProjectFor(domain) !== proj) return { error: "souljaboy.app hostname not allowed for " + proj + ". Rule: " + SOULJA_RULE };
+      const owner = ((await cf("/pages/projects")) || []).find((p) => p.name !== proj && (p.domains || []).includes(domain));
+      if (owner) return { error: domain + " is already bound to project " + owner.name + "; not moving it" };
+      const bound = (await cf("/pages/projects/" + proj + "/domains")).some((d) => d.name === domain);
+      if (!apply) return { dry_run: true, would_attach: bound ? "already attached" : domain, to: proj + ".pages.dev", ...await souljaDns(env, domain, proj, false), next: "apply=true to attach" };
+      const r = bound ? { name: domain, status: "already attached" } : await cf("/pages/projects/" + proj + "/domains", { method: "POST", body: JSON.stringify({ name: domain }) });
+      return { attached: r.name, status: r.status, ...await souljaDns(env, domain, proj, true), note: "Re-run without apply to watch status go active." };
+    }
     if (!apply) return { dry_run: true, would_attach: domain, to: proj + ".pages.dev", next: "apply=true to attach" };
     const r = await cf("/pages/projects/" + proj + "/domains", { method: "POST", body: JSON.stringify({ name: domain }) });
     return { attached: r.name, status: r.status, note: "If the domain's zone is on this account Cloudflare adds the DNS record; otherwise add a CNAME " + domain + " -> " + proj + ".pages.dev. Re-run without apply to watch status go active." };
@@ -7809,7 +8870,9 @@ async function siteSetupTool(name, args, env) {
     for (const d of Array.isArray(args.d1) ? args.d1 : []) bindings.push({ type: "d1", name: String(d.binding), id: String(d.database_id) });
     for (const [k, v] of Object.entries(args.vars || {})) bindings.push({ type: "plain_text", name: k, text: String(v) });
     const metadata = { main_module: "worker.js", compatibility_date: args.compatibility_date || "2026-08-17", bindings, tags: ["hub-created"] };
-    const url = "https://" + wname + "." + (accountId === "1d5fae607a857fc56cd575763bf8f3bc" ? "austinsdoors" : "pain2hustle1") + ".workers.dev";
+    const sub = await cf("/workers/subdomain").then((r) => r && r.subdomain).catch(() => null);
+    if (!sub) return { error: "This account has no workers.dev name yet, so a Worker would have no address. Ask the owner to set one (Cloudflare > Workers > workers.dev)." };
+    const url = "https://" + wname + "." + sub + ".workers.dev";
     if (!apply) return { dry_run: true, would_deploy: wname, overwrite: !!existing, bindings: bindings.map((b) => b.type + ":" + b.name), bytes: code.length, url };
     const form = new FormData();
     form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
@@ -13071,6 +14134,16 @@ function createOAuthWorker(legacy, authorizeConnector2) {
         if (mcp) {
           const supplied = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
           if (supplied && (await authorizeConnector2(env, supplied)).ok) return legacy.fetch(request, env, ctx);
+          if (!supplied && request.method === "POST") {
+            const text = await request.clone().text();
+            let rpc;
+            try {
+              rpc = text.length <= 65536 ? JSON.parse(text) : void 0;
+            } catch {
+              rpc = void 0;
+            }
+            if (rpc !== void 0 && isPublicRpc(rpc)) return legacy.fetch(request, env, ctx);
+          }
         }
         return await provider.fetch(request, { ...env, OAUTH_KV: prefixedKV(env.CLOUDFLARE_OPS_OAUTH) }, ctx);
       } catch {
@@ -13087,4 +14160,3 @@ export {
   RateLimiterDO,
   entry_default as default
 };
-
