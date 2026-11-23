@@ -47,3 +47,4 @@ someone deployed since.
   - Why: mcptry scores servers that are discoverable without sign-in, and the MCP spec allows it.
   - Rollback version `8cf93c79-3758-4b38-bc6c-7cb23c135a10`.
   - server.json is 0.15.6 and was republished to the registry. That moved the listing off the old cfops.nothingunseen.com 0.4.0 entry.
+- 0.15.7 (2026-11-23): `inject-tool-docs.cjs` fills every undescribed argument and adds readOnly/destructive/openWorld annotations at tools/list time (mcptry tool quality). Live verified: 62/62 annotated, 0 undescribed args.
